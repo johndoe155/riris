@@ -1,0 +1,1006 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BIC Staff Admin — Gallery Management</title>
+
+  <!-- Same fonts as main site -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@300;400;500;600;700&family=Abril+Fatface&family=Inter:wght@300;400;500;600&family=Josefin+Sans:wght@600;700&family=Playfair+Display:wght@600;700&family=Montserrat:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600&family=Quicksand:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans:    ['Inter','system-ui','sans-serif'],
+            display: ['Abril Fatface','serif'],
+            brand:   ['Josefin Sans','sans-serif'],
+            serif:   ['Playfair Display','serif'],
+          },
+          colors: {
+            brand: {
+              indigo: '#05014a',
+              yellow: '#FACC15',
+              dark:   '#0f172a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width:6px; height:6px; }
+    ::-webkit-scrollbar-track { background:#0f172a; }
+    ::-webkit-scrollbar-thumb { background:#334155; border-radius:3px; }
+
+    /* ── Auth overlay ── */
+    #authOverlay {
+      position:fixed; inset:0; z-index:9999;
+      background: linear-gradient(135deg,#05014a 0%,#0f172a 60%,#1e293b 100%);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .auth-card {
+      width:100%; max-width:420px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:1.5rem;
+      padding:2.5rem;
+      backdrop-filter:blur(20px);
+      box-shadow:0 40px 80px rgba(0,0,0,0.6);
+    }
+
+    /* ── Drag-drop highlight ── */
+    .drag-over { outline:2px dashed #FACC15 !important; background:rgba(250,204,21,0.06) !important; }
+
+    /* ── Image thumb ── */
+    .img-thumb { position:relative; flex-shrink:0; cursor:grab; }
+    .img-thumb:active { cursor:grabbing; }
+    .img-thumb.dragging { opacity:0.4; }
+    .img-thumb .remove-img {
+      position:absolute; top:4px; right:4px;
+      background:rgba(239,68,68,0.9); color:#fff;
+      border:none; border-radius:50%; width:22px; height:22px;
+      font-size:14px; line-height:22px; text-align:center;
+      cursor:pointer; display:none;
+    }
+    .img-thumb:hover .remove-img { display:block; }
+
+    /* ── Notification toast ── */
+    #toast {
+      position:fixed; bottom:2rem; right:2rem; z-index:10000;
+      padding:.85rem 1.5rem; border-radius:.75rem;
+      font-family:Inter,sans-serif; font-size:.875rem;
+      opacity:0; transform:translateY(12px);
+      transition: opacity .3s ease, transform .3s ease;
+      pointer-events:none; max-width:340px;
+    }
+    #toast.show { opacity:1; transform:translateY(0); pointer-events:auto; }
+    #toast.success { background:#10b981; color:#fff; }
+    #toast.error   { background:#ef4444; color:#fff; }
+    #toast.info    { background:#3b82f6; color:#fff; }
+
+    /* ── Panel slide-in ── */
+    #editPanel {
+      position:fixed; top:0; right:0; bottom:0; width:100%; max-width:680px;
+      background:#0f172a; border-left:1px solid rgba(255,255,255,0.07);
+      z-index:800; transform:translateX(100%);
+      transition:transform .4s cubic-bezier(.2,.9,.3,1);
+      display:flex; flex-direction:column; overflow:hidden;
+    }
+    #editPanel.open { transform:translateX(0); }
+    #panelOverlay {
+      display:none; position:fixed; inset:0; z-index:799;
+      background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+    }
+    #panelOverlay.show { display:block; }
+
+    /* ── Sequence drop zone ── */
+    .drop-zone {
+      min-height:120px;
+      border:2px dashed rgba(255,255,255,0.12);
+      border-radius:.75rem;
+      display:flex; flex-wrap:wrap; gap:.75rem;
+      padding:.75rem; align-content:flex-start;
+      transition:border-color .2s, background .2s;
+    }
+
+    /* ── Input style ── */
+    .field {
+      width:100%; background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12); border-radius:.5rem;
+      color:#f1f5f9; padding:.65rem 1rem; font-size:.875rem;
+      font-family:Inter,sans-serif; outline:none;
+      transition:border-color .2s, box-shadow .2s;
+    }
+    .field:focus { border-color:#FACC15; box-shadow:0 0 0 3px rgba(250,204,21,0.15); }
+    .field::placeholder { color:#475569; }
+
+    /* ── Search ── */
+    #searchBar {
+      width:100%; background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.1); border-radius:.75rem;
+      color:#f1f5f9; padding:.65rem 1rem .65rem 2.6rem; font-size:.875rem;
+      font-family:Inter,sans-serif; outline:none;
+      transition:border-color .2s;
+    }
+    #searchBar:focus { border-color:#FACC15; }
+
+    /* ── Gallery card ── */
+    .gallery-card {
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.07);
+      border-radius:1rem; overflow:hidden;
+      transition:border-color .2s, transform .2s, box-shadow .2s;
+    }
+    .gallery-card:hover { border-color:rgba(250,204,21,0.3); transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,0,0,0.4); }
+
+    /* ── Loader spinner ── */
+    .spinner {
+      width:18px; height:18px; border:2px solid rgba(255,255,255,0.2);
+      border-top-color:#FACC15; border-radius:50%;
+      animation:spin .7s linear infinite; display:inline-block;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── Upload progress bar ── */
+    .upload-bar { height:3px; background:#FACC15; border-radius:2px; transition:width .3s ease; }
+
+    /* ── Reorder handle ── */
+    .drag-handle {
+      cursor:grab; padding:4px 6px; color:#475569;
+      user-select:none; font-size:1.2rem; line-height:1;
+    }
+    .drag-handle:active { cursor:grabbing; }
+
+    /* fade in for cards */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .fade-up { animation:fadeUp .4s ease both; }
+  </style>
+</head>
+
+<body class="antialiased bg-slate-900 text-slate-100 min-h-screen">
+
+<!-- ════════════════════════════════════════════════════════════
+     AUTH OVERLAY
+═════════════════════════════════════════════════════════════ -->
+<div id="authOverlay">
+  <div class="auth-card">
+    <!-- Logo / Brand -->
+    <div class="flex items-center gap-3 mb-8">
+      <div class="w-10 h-10 rounded-full bg-brand-yellow flex items-center justify-center">
+        <span style="font-family:'Josefin Sans',sans-serif" class="text-brand-indigo font-bold text-sm">BIC</span>
+      </div>
+      <div>
+        <p style="font-family:'Cormorant SC',serif" class="text-white font-semibold text-lg leading-none">Bodija Int'l College</p>
+        <p class="text-slate-500 text-xs mt-0.5 tracking-widest uppercase">Staff Portal</p>
+      </div>
+    </div>
+
+    <h1 style="font-family:'Playfair Display',serif" class="text-2xl font-bold text-white mb-1">Admin Access</h1>
+    <p class="text-slate-400 text-sm mb-8">Enter your staff credentials to continue.</p>
+
+    <form id="loginForm" novalidate>
+      <div class="mb-4">
+        <label class="block text-xs text-slate-400 uppercase tracking-widest mb-2">Password</label>
+        <div class="relative">
+          <input id="passwordInput" type="password" class="field pr-10" placeholder="Enter staff password" autocomplete="current-password">
+          <button type="button" id="togglePw" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300" aria-label="Toggle password visibility">
+            <svg id="eyeIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </button>
+        </div>
+        <p id="authError" class="text-red-400 text-xs mt-2 hidden">Incorrect password. Please try again.</p>
+      </div>
+
+      <button type="submit" id="loginBtn" class="w-full mt-2 py-3 rounded-full bg-brand-yellow text-brand-indigo font-bold text-sm uppercase tracking-widest hover:bg-yellow-300 transition-colors flex items-center justify-center gap-2">
+        <span id="loginBtnText">Unlock Admin Panel</span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+      </button>
+    </form>
+
+    <p class="text-center text-slate-600 text-xs mt-6">This page is not publicly accessible.</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     PANEL OVERLAY
+═════════════════════════════════════════════════════════════ -->
+<div id="panelOverlay"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     MAIN ADMIN APP  (hidden until logged in)
+═════════════════════════════════════════════════════════════ -->
+<div id="adminApp" class="hidden">
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-white/5">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="w-9 h-9 rounded-full bg-brand-yellow flex items-center justify-center hover:scale-105 transition-transform" aria-label="Back to site">
+          <span style="font-family:'Josefin Sans',sans-serif" class="text-brand-indigo font-bold text-xs">BIC</span>
+        </a>
+        <div class="hidden sm:block">
+          <span style="font-family:'Cormorant SC',serif" class="text-white font-semibold">Bodija Int'l College</span>
+          <span class="ml-2 text-xs text-brand-yellow font-mono tracking-widest uppercase">/ Admin</span>
+        </div>
+      </div>
+
+      <!-- Right controls -->
+      <div class="flex items-center gap-3">
+        <a href="index.html" target="_blank" class="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          View Site
+        </a>
+        <button id="logoutBtn" class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg border border-white/10 hover:border-red-400/30">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Page Content ────────────────────────────────────────── -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+      <div>
+        <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Gallery Management</p>
+        <h1 style="font-family:'Playfair Display',serif" class="text-3xl font-bold text-white">Life at BIC</h1>
+        <p class="text-slate-400 text-sm mt-1">Create, edit and organise all gallery items.</p>
+      </div>
+      <button id="newItemBtn" class="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-brand-yellow text-brand-indigo font-bold text-sm rounded-full hover:bg-yellow-300 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New Gallery Item
+      </button>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8" id="statsBar">
+      <div class="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4">
+        <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Total Items</p>
+        <p id="statItems" class="text-2xl font-bold text-white">–</p>
+      </div>
+      <div class="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4">
+        <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Total Images</p>
+        <p id="statImages" class="text-2xl font-bold text-white">–</p>
+      </div>
+      <div class="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4 col-span-2 sm:col-span-1">
+        <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Last Saved</p>
+        <p id="statSaved" class="text-sm font-semibold text-brand-yellow">Never</p>
+      </div>
+      <div class="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4 hidden sm:block">
+        <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Data File</p>
+        <p class="text-xs font-mono text-slate-400">gallery-data.json</p>
+      </div>
+    </div>
+
+    <!-- Search + Filter bar -->
+    <div class="relative mb-6">
+      <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+      <input id="searchBar" type="search" placeholder="Search gallery items by title or subtitle…">
+    </div>
+
+    <!-- Gallery Grid -->
+    <div id="galleryGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <!-- Cards injected by JS -->
+    </div>
+
+    <!-- Empty state -->
+    <div id="emptyState" class="hidden text-center py-24">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+        <svg class="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      </div>
+      <p class="text-slate-500">No gallery items found. Create your first one!</p>
+      <button id="emptyNewBtn" class="mt-4 inline-flex items-center gap-2 px-5 py-2 bg-brand-yellow text-brand-indigo text-sm font-bold rounded-full hover:bg-yellow-300 transition-colors">+ New Item</button>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loadingState" class="text-center py-24">
+      <div class="spinner mx-auto mb-4"></div>
+      <p class="text-slate-500 text-sm">Loading gallery data…</p>
+    </div>
+
+  </main>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     EDIT / CREATE PANEL (slides in from right)
+═════════════════════════════════════════════════════════════ -->
+<div id="editPanel" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+
+  <!-- Panel Header -->
+  <div class="flex items-center justify-between px-6 py-4 border-b border-white/[0.07] flex-shrink-0">
+    <h2 id="panelTitle" style="font-family:'Playfair Display',serif" class="text-xl font-bold text-white">New Gallery Item</h2>
+    <button id="closePanel" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors" aria-label="Close panel">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <!-- Panel Body (scrollable) -->
+  <div class="flex-1 overflow-y-auto px-6 py-6 space-y-7">
+
+    <!-- ── Item Info ──────────────────────────────────────────── -->
+    <section>
+      <h3 class="text-xs text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+        <span class="w-5 h-5 rounded-full bg-brand-yellow text-brand-indigo text-[10px] font-bold flex items-center justify-center">1</span>
+        Item Details
+      </h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">Title <span class="text-red-400">*</span></label>
+          <input id="itemTitle" type="text" class="field" placeholder="e.g. Science Fair 2024" maxlength="80">
+          <p id="titleError" class="text-red-400 text-xs mt-1 hidden">Title is required.</p>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">Subtitle / Metadata</label>
+          <input id="itemSubtitle" type="text" class="field" placeholder="e.g. Innovation & Technology" maxlength="120">
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Image Sequence ────────────────────────────────────── -->
+    <section>
+      <h3 class="text-xs text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+        <span class="w-5 h-5 rounded-full bg-brand-yellow text-brand-indigo text-[10px] font-bold flex items-center justify-center">2</span>
+        Image Sequence
+        <span id="imageCount" class="ml-auto text-xs font-normal text-slate-500">0 images</span>
+      </h3>
+      <p class="text-xs text-slate-500 mb-4">Drag thumbnails to reorder. The first image becomes the gallery cover.</p>
+
+      <!-- Drop zone -->
+      <div id="dropZone" class="drop-zone" aria-label="Image sequence drop zone">
+        <p id="dropHint" class="text-slate-600 text-xs self-center mx-auto">Drag & drop images here or use the button below</p>
+      </div>
+      <p id="sequenceError" class="text-red-400 text-xs mt-2 hidden">At least one image is required.</p>
+
+      <!-- Upload button -->
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <label class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm text-slate-300 hover:bg-white/10 hover:border-white/20 transition-colors cursor-pointer">
+          <svg class="w-4 h-4 text-brand-yellow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          Upload Images
+          <input id="imageUploadInput" type="file" accept="image/*" multiple class="sr-only">
+        </label>
+        <span class="text-xs text-slate-600">JPEG, PNG, WebP, GIF · max 8 MB each</span>
+      </div>
+
+      <!-- Upload progress -->
+      <div id="uploadProgress" class="hidden mt-3">
+        <div class="flex items-center gap-2 mb-1">
+          <div class="spinner"></div>
+          <span id="uploadProgressText" class="text-xs text-slate-400">Uploading…</span>
+        </div>
+        <div class="bg-white/5 rounded-full h-1 overflow-hidden">
+          <div id="uploadBar" class="upload-bar h-1" style="width:0%"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Preview ───────────────────────────────────────────── -->
+    <section id="previewSection" class="hidden">
+      <h3 class="text-xs text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+        <span class="w-5 h-5 rounded-full bg-brand-yellow text-brand-indigo text-[10px] font-bold flex items-center justify-center">3</span>
+        Cover Preview
+      </h3>
+      <div class="relative aspect-[4/3] max-w-xs rounded-xl overflow-hidden bg-slate-800">
+        <img id="coverPreview" src="" alt="Cover preview" class="w-full h-full object-cover">
+        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
+          <div>
+            <p id="previewTitle"  class="text-white text-sm font-bold font-serif"></p>
+            <p id="previewSub" class="text-brand-yellow text-xs"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Danger zone (edit mode only) -->
+    <section id="dangerZone" class="hidden border border-red-900/30 rounded-xl p-4">
+      <h3 class="text-xs text-red-400 uppercase tracking-widest mb-3">Danger Zone</h3>
+      <p class="text-slate-500 text-xs mb-3">Permanently remove this gallery item. This cannot be undone.</p>
+      <button id="deleteItemBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-red-900/30 border border-red-700/40 text-red-400 text-sm rounded-lg hover:bg-red-900/50 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        Delete This Item
+      </button>
+    </section>
+
+  </div>
+
+  <!-- Panel Footer -->
+  <div class="flex-shrink-0 px-6 py-4 border-t border-white/[0.07] flex items-center justify-between gap-3">
+    <button id="cancelPanel" class="px-5 py-2.5 rounded-full border border-white/10 text-slate-400 text-sm hover:bg-white/5 hover:text-white transition-colors">Cancel</button>
+    <button id="saveItemBtn" class="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-yellow text-brand-indigo font-bold text-sm rounded-full hover:bg-yellow-300 transition-colors">
+      <span id="saveBtnText">Save Item</span>
+      <span id="saveBtnSpinner" class="hidden spinner border-brand-indigo/20 border-t-brand-indigo"></span>
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     IMAGE LIGHTBOX (quick preview)
+═════════════════════════════════════════════════════════════ -->
+<div id="lightbox" class="hidden fixed inset-0 z-[900] bg-black/90 flex items-center justify-center p-4" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" alt="Preview" class="max-w-full max-h-full object-contain rounded-xl shadow-2xl" onclick="event.stopPropagation()">
+  <button class="absolute top-4 right-4 text-white/70 hover:text-white" onclick="closeLightbox()">
+    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
+  </button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     TOAST NOTIFICATION
+═════════════════════════════════════════════════════════════ -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SCRIPTS
+═════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  // ── Config ────────────────────────────────────────────────────────────────
+  const API_BASE = 'admin-api.php';
+  const PASS     = 'admin123';
+  const SESSION_KEY = 'bic_admin_auth';
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let galleryData  = [];   // [{id, title, subtitle, images:[]}]
+  let currentItem  = null; // item being edited/created
+  let editMode     = false;
+  let dragSrcEl    = null;
+
+  // ── DOM refs ──────────────────────────────────────────────────────────────
+  const authOverlay   = document.getElementById('authOverlay');
+  const adminApp      = document.getElementById('adminApp');
+  const loginForm     = document.getElementById('loginForm');
+  const passwordInput = document.getElementById('passwordInput');
+  const authError     = document.getElementById('authError');
+  const logoutBtn     = document.getElementById('logoutBtn');
+  const togglePw      = document.getElementById('togglePw');
+
+  const galleryGrid   = document.getElementById('galleryGrid');
+  const emptyState    = document.getElementById('emptyState');
+  const loadingState  = document.getElementById('loadingState');
+  const searchBar     = document.getElementById('searchBar');
+  const newItemBtn    = document.getElementById('newItemBtn');
+  const emptyNewBtn   = document.getElementById('emptyNewBtn');
+
+  const editPanel     = document.getElementById('editPanel');
+  const panelOverlay  = document.getElementById('panelOverlay');
+  const panelTitle    = document.getElementById('panelTitle');
+  const closePanel    = document.getElementById('closePanel');
+  const cancelPanel   = document.getElementById('cancelPanel');
+  const saveItemBtn   = document.getElementById('saveItemBtn');
+  const saveBtnText   = document.getElementById('saveBtnText');
+  const saveBtnSpinner= document.getElementById('saveBtnSpinner');
+  const deleteItemBtn = document.getElementById('deleteItemBtn');
+  const dangerZone    = document.getElementById('dangerZone');
+
+  const itemTitle     = document.getElementById('itemTitle');
+  const itemSubtitle  = document.getElementById('itemSubtitle');
+  const titleError    = document.getElementById('titleError');
+  const sequenceError = document.getElementById('sequenceError');
+  const dropZone      = document.getElementById('dropZone');
+  const dropHint      = document.getElementById('dropHint');
+  const imageCount    = document.getElementById('imageCount');
+  const imageUpload   = document.getElementById('imageUploadInput');
+
+  const uploadProgress    = document.getElementById('uploadProgress');
+  const uploadProgressText= document.getElementById('uploadProgressText');
+  const uploadBar         = document.getElementById('uploadBar');
+
+  const previewSection = document.getElementById('previewSection');
+  const coverPreview   = document.getElementById('coverPreview');
+  const previewTitle   = document.getElementById('previewTitle');
+  const previewSub     = document.getElementById('previewSub');
+
+  const statItems  = document.getElementById('statItems');
+  const statImages = document.getElementById('statImages');
+  const statSaved  = document.getElementById('statSaved');
+
+  const toast = document.getElementById('toast');
+
+  // ════════════════════════════════════════════════════════════
+  // AUTH
+  // ════════════════════════════════════════════════════════════
+  function isAuthed() { return sessionStorage.getItem(SESSION_KEY) === '1'; }
+
+  if (isAuthed()) { showApp(); }
+
+  loginForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const val = passwordInput.value.trim();
+    if (val === PASS) {
+      sessionStorage.setItem(SESSION_KEY, '1');
+      authError.classList.add('hidden');
+      showApp();
+    } else {
+      authError.classList.remove('hidden');
+      passwordInput.value = '';
+      passwordInput.focus();
+    }
+  });
+
+  togglePw.addEventListener('click', () => {
+    const t = passwordInput.type === 'password' ? 'text' : 'password';
+    passwordInput.type = t;
+  });
+
+  logoutBtn.addEventListener('click', () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    location.reload();
+  });
+
+  function showApp() {
+    authOverlay.style.display = 'none';
+    adminApp.classList.remove('hidden');
+    loadGallery();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // API HELPERS
+  // ════════════════════════════════════════════════════════════
+  async function apiFetch(action, options = {}) {
+    const url = `${API_BASE}?action=${action}`;
+    const headers = { 'X-Admin-Token': PASS, ...(options.headers || {}) };
+    const res = await fetch(url, { ...options, headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // LOAD GALLERY
+  // ════════════════════════════════════════════════════════════
+  async function loadGallery() {
+    loadingState.classList.remove('hidden');
+    galleryGrid.classList.add('hidden');
+    emptyState.classList.add('hidden');
+    try {
+      const data = await apiFetch('get_gallery');
+      galleryData = Array.isArray(data) ? data : [];
+    } catch (err) {
+      // Fallback: try to read gallery-data.json directly (no PHP scenario)
+      try {
+        const r = await fetch('gallery-data.json');
+        if (r.ok) galleryData = await r.json();
+      } catch (_) { galleryData = []; }
+      if (!galleryData.length) {
+        showToast('Could not load gallery data. Is admin-api.php installed?', 'error', 6000);
+      }
+    }
+    loadingState.classList.add('hidden');
+    galleryGrid.classList.remove('hidden');
+    renderGrid(galleryData);
+    updateStats();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // RENDER GRID
+  // ════════════════════════════════════════════════════════════
+  function renderGrid(items) {
+    galleryGrid.innerHTML = '';
+    if (!items || !items.length) {
+      emptyState.classList.remove('hidden');
+      return;
+    }
+    emptyState.classList.add('hidden');
+    items.forEach((item, i) => {
+      const cover = item.images && item.images[0] ? item.images[0] : '';
+      const count = item.images ? item.images.length : 0;
+      const card = document.createElement('div');
+      card.className = 'gallery-card fade-up';
+      card.style.animationDelay = `${i * 60}ms`;
+      card.innerHTML = `
+        <div class="relative aspect-[4/3] bg-slate-800 overflow-hidden">
+          ${cover
+            ? `<img src="${escHtml(cover)}" alt="${escHtml(item.title)}" class="w-full h-full object-cover">`
+            : `<div class="w-full h-full flex items-center justify-center"><svg class="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`
+          }
+          <div class="absolute top-2 right-2 flex gap-1.5">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-black/60 text-slate-300">${count} img${count !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <div class="p-4">
+          <h3 style="font-family:'Playfair Display',serif" class="text-white font-semibold text-base truncate">${escHtml(item.title) || '<span class="text-slate-500 italic">Untitled</span>'}</h3>
+          <p class="text-slate-400 text-xs mt-0.5 truncate">${escHtml(item.subtitle) || '—'}</p>
+          <div class="flex gap-2 mt-3">
+            <button class="edit-btn flex-1 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-300 hover:bg-brand-yellow/10 hover:border-brand-yellow/30 hover:text-brand-yellow transition-colors flex items-center justify-center gap-1.5" data-id="${escHtml(item.id)}">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              Edit
+            </button>
+            <button class="dupe-btn py-1.5 px-2.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-400 hover:bg-white/10 transition-colors" data-id="${escHtml(item.id)}" title="Duplicate item">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            </button>
+          </div>
+        </div>`;
+      galleryGrid.appendChild(card);
+    });
+
+    // Bind edit buttons
+    galleryGrid.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => openEditPanel(btn.dataset.id));
+    });
+    galleryGrid.querySelectorAll('.dupe-btn').forEach(btn => {
+      btn.addEventListener('click', () => duplicateItem(btn.dataset.id));
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // SEARCH / FILTER
+  // ════════════════════════════════════════════════════════════
+  let searchTimer;
+  searchBar.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      const q = searchBar.value.trim().toLowerCase();
+      const filtered = q
+        ? galleryData.filter(it =>
+            (it.title||'').toLowerCase().includes(q) ||
+            (it.subtitle||'').toLowerCase().includes(q))
+        : galleryData;
+      renderGrid(filtered);
+    }, 200);
+  });
+
+  // ════════════════════════════════════════════════════════════
+  // PANEL — OPEN / CLOSE
+  // ════════════════════════════════════════════════════════════
+  newItemBtn.addEventListener('click', openNewPanel);
+  emptyNewBtn.addEventListener('click', openNewPanel);
+  closePanel.addEventListener('click', closePanelFn);
+  cancelPanel.addEventListener('click', closePanelFn);
+  panelOverlay.addEventListener('click', closePanelFn);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanelFn(); });
+
+  function openNewPanel() {
+    editMode  = false;
+    currentItem = { id: 'item-' + Date.now(), title: '', subtitle: '', images: [] };
+    panelTitle.textContent = 'New Gallery Item';
+    saveBtnText.textContent = 'Create Item';
+    dangerZone.classList.add('hidden');
+    populatePanel();
+    slideIn();
+  }
+
+  function openEditPanel(id) {
+    const item = galleryData.find(i => i.id === id);
+    if (!item) return;
+    editMode  = true;
+    currentItem = JSON.parse(JSON.stringify(item)); // deep copy
+    panelTitle.textContent = 'Edit Gallery Item';
+    saveBtnText.textContent = 'Save Changes';
+    dangerZone.classList.remove('hidden');
+    populatePanel();
+    slideIn();
+  }
+
+  function slideIn() {
+    panelOverlay.classList.add('show');
+    editPanel.classList.add('open');
+    itemTitle.focus();
+  }
+
+  function closePanelFn() {
+    editPanel.classList.remove('open');
+    panelOverlay.classList.remove('show');
+    currentItem = null;
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // POPULATE PANEL FIELDS
+  // ════════════════════════════════════════════════════════════
+  function populatePanel() {
+    titleError.classList.add('hidden');
+    sequenceError.classList.add('hidden');
+    itemTitle.value    = currentItem.title    || '';
+    itemSubtitle.value = currentItem.subtitle || '';
+    rebuildDropZone();
+    updatePreview();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // DROP ZONE — REBUILD THUMBNAILS
+  // ════════════════════════════════════════════════════════════
+  function rebuildDropZone() {
+    // Remove all thumbs
+    dropZone.querySelectorAll('.img-thumb').forEach(el => el.remove());
+    const imgs = currentItem.images || [];
+    dropHint.style.display = imgs.length ? 'none' : 'block';
+    imgs.forEach((src, idx) => addThumb(src, idx));
+    imageCount.textContent = `${imgs.length} image${imgs.length !== 1 ? 's' : ''}`;
+  }
+
+  function addThumb(src, idx) {
+    const thumb = document.createElement('div');
+    thumb.className = 'img-thumb w-20 h-20 rounded-lg overflow-hidden border border-white/10 hover:border-brand-yellow/40 transition-colors';
+    thumb.draggable = true;
+    thumb.dataset.src = src;
+    thumb.dataset.idx = idx;
+    thumb.innerHTML = `
+      <img src="${escHtml(src)}" alt="" class="w-full h-full object-cover pointer-events-none" loading="lazy">
+      <button class="remove-img" aria-label="Remove image" title="Remove">✕</button>
+      <div class="drag-handle absolute inset-x-0 bottom-0 bg-black/50 text-center text-white text-[9px] leading-4">⠿ drag</div>`;
+    thumb.style.position = 'relative';
+
+    // Remove
+    thumb.querySelector('.remove-img').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const i = currentItem.images.indexOf(src);
+      if (i !== -1) {
+        currentItem.images.splice(i, 1);
+        rebuildDropZone();
+        updatePreview();
+      }
+    });
+
+    // Preview on click
+    thumb.querySelector('img').addEventListener('click', () => openLightbox(src));
+
+    // Drag events
+    thumb.addEventListener('dragstart', handleDragStart);
+    thumb.addEventListener('dragover',  handleDragOver);
+    thumb.addEventListener('dragleave', handleDragLeave);
+    thumb.addEventListener('drop',      handleDrop);
+    thumb.addEventListener('dragend',   handleDragEnd);
+
+    dropZone.appendChild(thumb);
+    dropHint.style.display = 'none';
+  }
+
+  // Drag to reorder
+  function handleDragStart(e) {
+    dragSrcEl = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.src);
+  }
+  function handleDragOver(e) {
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    this.classList.add('drag-over');
+  }
+  function handleDragLeave() { this.classList.remove('drag-over'); }
+  function handleDragEnd() {
+    this.classList.remove('dragging');
+    dropZone.querySelectorAll('.img-thumb').forEach(t => t.classList.remove('drag-over','dragging'));
+  }
+  function handleDrop(e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+    if (dragSrcEl === this) return;
+    const srcPath = dragSrcEl.dataset.src;
+    const dstPath = this.dataset.src;
+    const srcIdx  = currentItem.images.indexOf(srcPath);
+    const dstIdx  = currentItem.images.indexOf(dstPath);
+    if (srcIdx !== -1 && dstIdx !== -1) {
+      currentItem.images.splice(srcIdx, 1);
+      currentItem.images.splice(dstIdx, 0, srcPath);
+      rebuildDropZone();
+      updatePreview();
+    }
+  }
+
+  // Drop zone accepts file drops too
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length) uploadFiles(files);
+  });
+
+  // ════════════════════════════════════════════════════════════
+  // IMAGE UPLOAD
+  // ════════════════════════════════════════════════════════════
+  imageUpload.addEventListener('change', () => {
+    const files = Array.from(imageUpload.files);
+    if (files.length) uploadFiles(files);
+    imageUpload.value = '';
+  });
+
+  async function uploadFiles(files) {
+    uploadProgress.classList.remove('hidden');
+    let done = 0;
+    for (const file of files) {
+      uploadProgressText.textContent = `Uploading ${file.name}…`;
+      uploadBar.style.width = `${Math.round((done / files.length) * 100)}%`;
+      try {
+        const fd = new FormData();
+        fd.append('image', file);
+        fd.append('token', PASS);
+        const res = await fetch(`${API_BASE}?action=upload_image`, {
+          method: 'POST',
+          headers: { 'X-Admin-Token': PASS },
+          body: fd
+        });
+        const json = await res.json();
+        if (json.ok && json.path) {
+          currentItem.images.push(json.path);
+          addThumb(json.path, currentItem.images.length - 1);
+          imageCount.textContent = `${currentItem.images.length} image${currentItem.images.length !== 1 ? 's' : ''}`;
+          dropHint.style.display = 'none';
+          updatePreview();
+        } else {
+          showToast(`Upload failed: ${json.error || 'Unknown error'}`, 'error');
+        }
+      } catch (err) {
+        showToast(`Upload error: ${err.message}`, 'error');
+      }
+      done++;
+    }
+    uploadBar.style.width = '100%';
+    setTimeout(() => {
+      uploadProgress.classList.add('hidden');
+      uploadBar.style.width = '0%';
+    }, 800);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // LIVE PREVIEW
+  // ════════════════════════════════════════════════════════════
+  itemTitle.addEventListener('input', updatePreview);
+  itemSubtitle.addEventListener('input', updatePreview);
+
+  function updatePreview() {
+    const imgs = currentItem ? currentItem.images : [];
+    if (imgs.length) {
+      previewSection.classList.remove('hidden');
+      coverPreview.src = imgs[0];
+      previewTitle.textContent = itemTitle.value || 'Untitled';
+      previewSub.textContent   = `View ${imgs.length} Photo${imgs.length !== 1 ? 's' : ''}`;
+    } else {
+      previewSection.classList.add('hidden');
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // SAVE ITEM
+  // ════════════════════════════════════════════════════════════
+  saveItemBtn.addEventListener('click', async () => {
+    // Validation
+    let valid = true;
+    if (!itemTitle.value.trim()) {
+      titleError.classList.remove('hidden'); valid = false;
+    } else { titleError.classList.add('hidden'); }
+    if (!currentItem.images.length) {
+      sequenceError.classList.remove('hidden'); valid = false;
+    } else { sequenceError.classList.add('hidden'); }
+    if (!valid) return;
+
+    currentItem.title    = itemTitle.value.trim();
+    currentItem.subtitle = itemSubtitle.value.trim();
+
+    // Update galleryData
+    if (editMode) {
+      const idx = galleryData.findIndex(i => i.id === currentItem.id);
+      if (idx !== -1) galleryData[idx] = currentItem;
+    } else {
+      galleryData.push(currentItem);
+    }
+
+    // Save to server
+    saveBtnText.textContent = 'Saving…';
+    saveBtnSpinner.classList.remove('hidden');
+    saveItemBtn.disabled = true;
+
+    try {
+      const res = await apiFetch('save_gallery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': PASS },
+        body: JSON.stringify(galleryData)
+      });
+      if (res.ok) {
+        showToast(editMode ? 'Changes saved successfully!' : 'New item created!', 'success');
+        statSaved.textContent = 'Just now';
+        closePanelFn();
+        renderGrid(galleryData);
+        updateStats();
+      } else {
+        showToast(`Save failed: ${res.error}`, 'error');
+        // Roll back if new
+        if (!editMode) galleryData.pop();
+      }
+    } catch (err) {
+      showToast(`Server error: ${err.message}. Is admin-api.php running?`, 'error', 7000);
+      if (!editMode) galleryData.pop();
+    } finally {
+      saveBtnText.textContent = editMode ? 'Save Changes' : 'Create Item';
+      saveBtnSpinner.classList.add('hidden');
+      saveItemBtn.disabled = false;
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════
+  // DELETE ITEM
+  // ════════════════════════════════════════════════════════════
+  deleteItemBtn.addEventListener('click', async () => {
+    if (!currentItem) return;
+    const confirmed = confirm(`Delete "${currentItem.title || 'this item'}"?\n\nThis removes it from the gallery. Uploaded image files are NOT deleted.`);
+    if (!confirmed) return;
+
+    galleryData = galleryData.filter(i => i.id !== currentItem.id);
+    try {
+      await apiFetch('save_gallery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': PASS },
+        body: JSON.stringify(galleryData)
+      });
+      showToast('Item deleted.', 'info');
+    } catch (err) {
+      showToast('Could not save after delete: ' + err.message, 'error');
+    }
+    closePanelFn();
+    renderGrid(galleryData);
+    updateStats();
+  });
+
+  // ════════════════════════════════════════════════════════════
+  // DUPLICATE ITEM
+  // ════════════════════════════════════════════════════════════
+  function duplicateItem(id) {
+    const src = galleryData.find(i => i.id === id);
+    if (!src) return;
+    const dupe = JSON.parse(JSON.stringify(src));
+    dupe.id    = 'item-' + Date.now();
+    dupe.title = src.title + ' (copy)';
+    galleryData.push(dupe);
+    apiFetch('save_gallery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': PASS },
+      body: JSON.stringify(galleryData)
+    }).then(() => {
+      showToast('Item duplicated.', 'success');
+      renderGrid(galleryData);
+      updateStats();
+    }).catch(err => showToast('Duplication failed: ' + err.message, 'error'));
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // STATS
+  // ════════════════════════════════════════════════════════════
+  function updateStats() {
+    statItems.textContent  = galleryData.length;
+    statImages.textContent = galleryData.reduce((s, i) => s + (i.images||[]).length, 0);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // LIGHTBOX
+  // ════════════════════════════════════════════════════════════
+  function openLightbox(src) {
+    document.getElementById('lightboxImg').src = src;
+    document.getElementById('lightbox').classList.remove('hidden');
+  }
+  window.closeLightbox = function() {
+    document.getElementById('lightbox').classList.add('hidden');
+    document.getElementById('lightboxImg').src = '';
+  };
+
+  // ════════════════════════════════════════════════════════════
+  // TOAST
+  // ════════════════════════════════════════════════════════════
+  let toastTimer;
+  function showToast(msg, type = 'info', dur = 3500) {
+    clearTimeout(toastTimer);
+    toast.textContent = msg;
+    toast.className   = `show ${type}`;
+    document.getElementById('toast').style.cssText = '';  // re-apply
+    toast.classList.add('show');
+    toastTimer = setTimeout(() => toast.classList.remove('show'), dur);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // HELPERS
+  // ════════════════════════════════════════════════════════════
+  function escHtml(s) {
+    if (typeof s !== 'string') return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+})();
+</script>
+</body>
+</html>

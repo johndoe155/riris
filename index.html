@@ -1,0 +1,2014 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bodija International College — Excellence in Education</title>
+  <meta name="description" content="Empowering future leaders through excellence in education, science, arts, and technology.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@300;400;500;600&family=Josefin+Sans:wght@600;700&family=Playfair+Display:wght@600;700&family=Montserrat:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">  
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <script>
+  // Example: add class when fonts are ready
+  document.documentElement.classList.add('fonts-loading');
+  document.fonts.load('700 1em "Cormorant SC"').then(()=> {
+    document.documentElement.classList.remove('fonts-loading');
+    document.documentElement.classList.add('fonts-loaded');
+  });
+</script>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        // Your existing fonts
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          display: ['Abril Fatface', 'serif'],
+          brand: ['Josefin Sans', 'sans-serif'],
+          serif: ['Playfair Display', 'serif'],
+        },
+        // Your existing colors
+        colors: {
+          brand: {
+            indigo: '#05014a',
+            yellow: '#FACC15',
+            dark: '#0f172a',
+          }
+        },
+        // Your existing border radius
+        borderRadius: {
+          '3xl': '1.5rem',
+        },
+        // Integrated Animations
+        keyframes: {
+          fadeIn: {
+            '0%': { opacity: '0' },
+            '100%': { opacity: '1' },
+          },
+        },
+        animation: {
+          fadeIn: 'fadeIn 0.5s ease-in-out forwards',
+        },
+      }
+    }
+  }
+</script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['Abril Fatface', 'serif'],
+            brand: ['Josefin Sans', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+            cormorant: ['Cormorant SC', 'serif'],
+            'cormorant-infant': ['Cormorant Infant', 'serif'],
+          },
+          colors: {
+            brand: {
+              indigo: '#05014a',
+              yellow: '#FACC15',
+              dark: '#0f172a',
+              cream: '#FAF6EF',
+              stone: '#D6D3D1',
+            }
+          },
+          borderRadius: { '3xl': '1.5rem', '4xl': '2rem' },
+          keyframes: {
+            fadeInUp:   { '0%': { opacity:'0', transform:'translateY(32px)' }, '100%': { opacity:'1', transform:'translateY(0)' } },
+            fadeInLeft: { '0%': { opacity:'0', transform:'translateX(-32px)' }, '100%': { opacity:'1', transform:'translateX(0)' } },
+            fadeInRight:{ '0%': { opacity:'0', transform:'translateX(32px)' }, '100%': { opacity:'1', transform:'translateX(0)' } },
+            drawLine:   { '0%': { transform:'scaleY(0)' }, '100%': { transform:'scaleY(1)' } },
+            shimmer:    { '0%': { backgroundPosition: '-200% center' }, '100%': { backgroundPosition: '200% center' } },
+            quoteScale: { '0%': { opacity:'0', transform:'scale(0.7) rotate(-8deg)' }, '100%': { opacity:'1', transform:'scale(1) rotate(0deg)' } },
+          },
+          animation: {
+            fadeInUp:   'fadeInUp 0.75s cubic-bezier(0.22,1,0.36,1) both',
+            fadeInLeft: 'fadeInLeft 0.75s cubic-bezier(0.22,1,0.36,1) both',
+            fadeInRight:'fadeInRight 0.75s cubic-bezier(0.22,1,0.36,1) both',
+            drawLine:   'drawLine 1.2s cubic-bezier(0.22,1,0.36,1) both',
+            shimmer:    'shimmer 3s linear infinite',
+            quoteScale: 'quoteScale 0.6s cubic-bezier(0.34,1.56,0.64,1) both',
+          }
+        }
+      }
+    }
+  </script>
+
+  
+  <link rel="stylesheet" href="style.css">
+  <style type="text/tailwindcss">
+    @layer components {
+      .btn-primary {
+        @apply relative overflow-hidden inline-flex items-center justify-center gap-3 px-10 py-4 bg-brand-yellow text-brand-indigo text-xs sm:text-sm font-semibold uppercase tracking-[0.2em] rounded-full transition-all duration-500 ease-out shadow-xl shadow-brand-yellow/20 hover:shadow-2xl hover:shadow-brand-yellow/40 hover:-translate-y-0.5 hover:scale-[1.02] active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-yellow/70 focus:ring-offset-2 focus:ring-offset-transparent;
+      }
+
+      .btn-primary::before {
+        @apply content-[''] absolute top-0 left-[-100%] w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-20deg] transition-transform duration-700 ease-out;
+      }
+
+      .btn-primary:hover::before {
+        @apply left-[200%];
+      }
+
+      .btn-secondary {
+        @apply inline-flex items-center justify-center gap-3 px-10 py-4 bg-white/5 border border-white/20 backdrop-blur-md text-white text-xs sm:text-sm font-medium uppercase tracking-[0.2em] rounded-full transition-all duration-500 ease-out hover:bg-white/10 hover:border-white/50 hover:shadow-lg hover:shadow-white/5 hover:-translate-y-0.5 hover:scale-[1.02] active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent;
+      }
+    }
+    
+    .fonts-loading .logo { /* fallback look */ }
+.fonts-loaded  .logo { font-family: 'Cormorant SC', serif; }
+  </style>
+  <style>
+/* menu.css
+   Extracted from prototypes.html — contains only the mobile-menu / brand button styles
+   (variables, media queries, transition timings preserved) */
+
+/* menu-specific variables (preserve exact names/values) */
+:root{
+  --z-hamburger: 10002;
+  --z-overlay: 10003;
+  --z-panel: 10004;
+  --overlay-duration: 260ms;
+  --panel-duration: 360ms;
+  --panel-delay: 600ms;
+  --overlay-opacity: 1;
+  --overlay-ease: cubic-bezier(.2,.9,.3,1);
+  --overlay-hold: 600ms;
+  --panel-ease: cubic-bezier(.2,.9,.3,1);
+  --menu-bg: url('her.jpg'); /* prototype value */
+  --accent-red: #8B0000;
+  --muted-purple: rgba(180,180,210,0.35);
+}
+
+
+/* ---------- Mobile menu stacking & overlay/panel ---------- */
+.mobile-menu {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay) - 1);
+  display: none;
+  pointer-events: none;
+}
+.mobile-menu.open {
+  display: block;
+  pointer-events: auto;
+}
+
+/* overlay */
+.mobile-menu__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17,24,39,var(--overlay-opacity));
+  z-index: var(--z-overlay);
+  pointer-events: auto;
+  transform: translateX(-100%);
+  transition: transform var(--overlay-duration,220ms) var(--overlay-ease);
+}
+.mobile-menu__overlay.overlay-in {
+  transform: translateX(0);
+}
+
+/* panel (sliding) */
+.mobile-menu__panel {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  z-index: var(--z-panel);
+  transform: translateX(-100%);
+  transition: transform var(--panel-duration, 340ms) var(--panel-ease) var(--panel-delay);
+  will-change: transform;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background-image: var(--menu-bg);
+  background-size: cover;
+  background-position: right center;
+  background-repeat: no-repeat;
+  box-shadow: none;
+}
+.mobile-menu__panel.panel-in {
+  transform: translateX(0);
+}
+
+/* NOTE: the prototype has .mobile-menu__inner transform/opacity for staggered entrance.
+   The prototype included ".mobile-menu__panel.panel-in .mobile-menu__inner { transform: translateY(0); opacity: 1; }"
+   but the base .mobile-menu__inner rule was not present in the snapshot. Provide a minimal fallback
+   so panel animation and fade behave the same as the prototype. See integration note below. */
+.mobile-menu__panel.panel-in .mobile-menu__inner {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* fallback base state for inner (added as the smallest reproducible fallback) */
+.mobile-menu__inner {
+  transform: translateY(8px);
+  opacity: 0;
+  transition: transform .28s cubic-bezier(.2,.9,.3,1) var(--panel-delay), opacity .22s ease var(--panel-delay);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* header & close button */
+.mobile-menu__header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14vh; }
+.mobile-menu__close{appearance:none;border:none;margin-top:10px;background:transparent;color: rgba(220, 38, 38, 0.85);display:grid;place-items:center;cursor:pointer;transition:transform .15s ease;border-radius:50%;}
+.mobile-menu__close:active{transform:scale(.98); -webkit-tap-highlight-color: transparent;}
+.mobile-menu__close svg{color: rgba(220, 38, 38, 0.85);}
+.mobile-menu__close,
+.mobile-menu__close::before,
+.mobile-menu__close::after {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+.mobile-menu__close:focus,
+.mobile-menu__close:focus-visible,
+.mobile-menu__close:active,
+.mobile-menu__close:hover {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+.mobile-menu__close svg circle { display: none !important; }
+.mobile-menu__close { padding: 0; }
+
+/* nav items */
+.mobile-menu__nav{display:flex;flex-direction:column;gap:clamp(10px,3.2vh,22px);align-items:flex-start;width:100%;max-width:100%;}
+.menu-item{
+  display:block;
+  text-decoration:none;
+  color:var(--muted-purple);
+  font-weight:300;
+  letter-spacing:0.6px;
+  font-family:"Inter","Helvetica Neue",Arial,sans-serif;
+  font-size:clamp(28px,9vw,56px);
+  line-height:0.95;
+  transition:color 140ms ease, transform 160ms ease;
+  -webkit-font-smoothing:antialiased;
+}
+.menu-item:hover,.menu-item:focus{ color:#dfe8ff; transform:translateX(4px); outline:none; }
+
+/* CTA/footer/socials inside menu */
+.showreel-cta{display:flex;align-items:center;gap:12px;margin-top:18px;margin-left:2px;}
+.cta-chevron{width:18px;height:18px;color:var(--accent-red);flex:0 0 auto;}
+.cta-text{color:#fff;font-weight:700;text-decoration:none;font-size:16px;letter-spacing:.2px;}
+.cta-text:hover{text-decoration:underline;}
+
+.mobile-menu__footer{margin-top:auto;padding-top:28px;padding-bottom:8vh;max-width:100%;}
+.socials{display:flex;gap:12px;align-items:center;}
+.social{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);color:#fff;text-decoration:none;font-weight:600;opacity:.95;transition:transform .12s ease, background .12s ease;}
+.social:hover{transform:translateY(-4px);background:rgba(255,255,255,0.03);}
+
+/* small screens tweak */
+@media (max-width:420px){
+  .mobile-menu__inner{padding-left:22px;padding-right:16px;}
+  .menu-item{font-size:clamp(26px,11vw,42px);}
+}
+
+/* Staff login trigger (subtle link in footer) */
+    .adm-staff-trigger {
+    display: flex;
+      justify-content: flex-end;
+    	      color: inherit; opacity: 0.4; font-size: 12px;
+    	            cursor: pointer; text-decoration: none; transition: opacity .15s;
+outline: none !important;
+    	                }
+    	                    .adm-staff-trigger:hover { opacity: 0.8; }
+    }
+  </style>
+  <style>
+  /* reusable keyframe fade+up */
+  .fade-in-up {
+    opacity: 0;
+    transform: translateY(10px);
+    animation-name: fadeInUp;
+    animation-duration: 560ms;
+    animation-fill-mode: both;
+    animation-timing-function: cubic-bezier(.2,.9,.3,1);
+    animation-delay: var(--delay, 0ms);
+    will-change: opacity, transform;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in-up {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
+</style>
+<style>
+/* Initial hidden state, pushed down by 40px */
+.reveal-el {
+  opacity: 0;
+  transform: translateY(40px);
+  /* The delay is handled by your inline style, so we only define duration and properties here */
+  transition-property: opacity, transform;
+  transition-duration: 700ms; 
+  will-change: opacity, transform; /* Performance optimization */
+}
+
+/* The springy easing function you hinted at with your class name */
+.card-spring {
+  /* This cubic-bezier creates a subtle 'bounce' at the end of the fade-in */
+  transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.15); 
+}
+
+/* The active state that our JavaScript will trigger */
+.reveal-el.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+    /* 3. MICROINTERACTIONS: Form Focus */
+    .input-animated {
+      transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+    .input-animated:focus {
+      outline: none;
+      transform: scale(1.015) translateY(-2px);
+      box-shadow: 0 10px 20px -5px rgba(20, 184, 166, 0.15), 0 0 0 4px rgba(20, 184, 166, 0.2);
+      border-color: #14b8a6;
+    }
+
+    /* 4. MICROINTERACTIONS: Icon Toggles (Heart) */
+    .heart-btn svg {
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), fill 0.2s ease, stroke 0.2s ease;
+    }
+    .heart-btn:active svg {
+      transform: scale(0.6);
+    }
+    .heart-btn.liked svg {
+      fill: #ef4444; /* Red 500 */
+      stroke: #ef4444;
+      animation: heart-burst 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes heart-burst {
+      0% { transform: scale(0.8); }
+      50% { transform: scale(1.4); }
+      100% { transform: scale(1); }
+    }
+
+    /* 5. MICROINTERACTIONS: Form Validation Success */
+    .btn-submit {
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-submit:active {
+      transform: scale(0.95);
+    }
+    .success-state {
+      background-color: #10b981 !important; /* Emerald 500 */
+      transform: scale(1.05) !important;
+      box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
+    }
+    @keyframes checkmark-pop {
+      0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+      70% { transform: scale(1.3) rotate(0deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .success-state .checkmark {
+      display: inline-block;
+      animation: checkmark-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    /* 6. PARALLAX LAYERS */
+    .parallax-layer {
+      will-change: transform;
+    }
+  </style>
+  <style>
+    /* 1. Define the animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px); /* Optional: adds a slight "rise" effect */
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 2. Apply it to your text */
+.fade-in-text {
+  animation: fadeIn 1s ease-out forwards;
+}
+
+/* CSS */
+.slide-in-on-scroll {
+  transform: translateX(-40px);
+  opacity: 0;
+  transition: transform 480ms cubic-bezier(.22,.9,.37,1), opacity 480ms;
+  will-change: transform, opacity;
+}
+
+/* When JS adds .visible -> slide in */
+.slide-in-on-scroll.visible {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* Reduced-motion fallback */
+@media (prefers-reduced-motion: reduce) {
+  .slide-in-on-scroll {
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+  </style>
+  
+</head>
+<body class="antialiased bg-slate-50 text-slate-800">
+
+  <!-- Initial Loader -->
+  <div id="loader" class="loader-overlay" aria-hidden="false">
+    <div class="loader">
+      <div class="bic">BIC</div>
+    </div>
+  </div>
+
+  <!-- CMS Data Object -->
+  <script>
+    window.__CMS__ = {
+      siteTitle: "Bodija Internsecational College",
+      hero: {
+        eyebrow: "Welcome",
+        title: "Success Through Labour",
+        kicker: "Empowering future leaders through excellence in education and character.",
+        ctaPrimary: "Explore Programs",
+        ctaSecondary: "Admissions",
+        video: "hero.mp4",
+        poster: "heroo.jpg",
+        videoDesktop: "hero-desktop.mp4",
+        posterDesktop: "hero-desktop.jpg"
+      },
+      programs: [
+        { title: "Science & Technology", description: "State-of-the-art STEM labs, robotics, and coding bootcamps.", color: "#05014a" },
+        { title: "Arts & Humanities", description: "Fostering creative expression through visual arts, music, and literature.", color: "#857dfc" },
+        { title: "Business & Economics", description: "Entrepreneurship programs designed to build financial literacy.", color: "#d97706" }
+      ]
+    };
+  </script>
+
+  <!-- Header -->
+  <header class="fixed inset-x-0 top-0 z-40 transition-all duration-300" id="mainHeader">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        <!-- Brand -->
+        <div class="flex items-center gap-4 z-50">
+          <a href="#" class="brand-btn group" aria-label="Bodija International College Home">
+            BIC
+          </a>
+          <span class="hidden sm:block text-lg font-semibold tracking-tight text-white mix-blend-difference">
+            Bodija International College
+          </span>
+        </div>
+
+        <!-- Desktop Nav -->
+        <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-white mix-blend-difference" aria-label="Primary">
+          <a class="hover:text-brand-yellow transition-colors" href="#home">Home</a>
+          <a class="hover:text-brand-yellow transition-colors" href="#about">About</a>
+          <a class="hover:text-brand-yellow transition-colors" href="#academics">Academics</a>
+          <a class="hover:text-brand-yellow transition-colors" href="#gallery">Gallery</a>
+          <a class="hover:text-brand-yellow transition-colors" href="#contact">Contact</a>
+        </nav>
+
+<!-- mobile menu opener (preserve id/class/aria exactly) -->
+<button id="hamburger"
+                aria-controls="mobileMenu"
+          aria-expanded="false"
+          aria-label="Open menu"
+                tabindex="0"
+        class="lg:hidden p-2 focus:outline-none z-[60] relative" aria-label="Toggle Mobile Menu">
+  <svg class="icon text-slate-900" width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>  
+</button>
+
+<!-- Mobile menu (exact markup from prototype) -->
+<div id="mobileMenu" class="mobile-menu" aria-hidden="true" role="dialog" aria-label="Mobile menu">
+  <div class="mobile-menu__overlay" data-overlay></div>
+
+  <aside class="mobile-menu__panel" role="document" aria-hidden="true">
+    <div class="mobile-menu__inner">
+      <header class="mobile-menu__header">
+        <div class="logo"></div>
+        <button class="mobile-menu__close" aria-label="Close menu" type="button">
+          <svg width="82" height="82" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M18 6L6 18" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 6L18 18" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </header>
+
+      <nav class="mobile-menu__nav" role="navigation" aria-label="Main menu">
+        <a href="/index.html" class="menu-item">Home</a>
+        <a href="http://127.0.0.1:2020" class="menu-item">Updates</a>
+        <a href="http://127.0.0.1:3030" class="menu-item">Our Programs</a>
+        <a href="http://127.0.0.1:6060" class="menu-item">Get In Touch</a>
+        <a href="http://127.0.0.1:5050" class="menu-item">Digital Library</a>
+      </nav>
+
+      <!-- (the prototype has a footer area; kept present in CSS) -->
+      <div class="mobile-menu__footer">
+        <div class="flex items-center mt-6 gap-3">
+  <a class="social-circle"
+     href="https://www.facebook.com/bicbisbodija"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Facebook"
+     title="Facebook">
+    <!-- facebook svg -->
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M22 12.07C22 6.48 17.52 2 11.93 2S2 6.48 2 12.07C2 17.06 5.66 21.13 10.44 21.93v-6.85H8.08v-2.95h2.36V9.41c0-2.34 1.39-3.63 3.52-3.63 1.02 0 2.08.18 2.08.18v2.29h-1.17c-1.15 0-1.51.72-1.51 1.46v1.76h2.57l-.41 2.95h-2.16V21.9C18.34 21.13 22 17.06 22 12.07z" fill="currentColor"/>
+    </svg>
+  </a>
+
+  <a class="social-circle"
+     href="https://www.instagram.com/bic_bis?igsh=MXdxMGFubnpteTEzeg=="
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Instagram"
+     title="Instagram">
+    <!-- insta svg -->
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M7 2h10a5 5 0 015 5v10a5 5 0 01-5 5H7a5 5 0 01-5-5V7a5 5 0 015-5zM12 8.8a3.2 3.2 0 100 6.4 3.2 3.2 0 000-6.4zM17.5 6.2a.9.9 0 11-1.8 0 .9.9 0 011.8 0z" fill="currentColor"/>
+    </svg>
+  </a>
+
+  <a class="social-circle"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Dribbble"
+     title="Dribbble">
+    <!-- dribbble svg -->
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.3 16.1c-1.64-1.9-3.95-3.1-6.6-3.47 1.01-2.47 2.37-4.6 3.27-5.77 2.22 1.39 3.8 3.63 3.86 6.24.01.35-.25.66-.53.99zM7.9 6.1c1.27 1.02 2.44 3.22 3.19 5.3-2.86.25-5.29 1.2-6.99 2.7A7.96 7.96 0 017.9 6.1z" fill="currentColor"/>
+    </svg>
+  </a>
+
+  <a class="social-circle"
+     href="https://x.com/bic_bis"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Twitter"
+     title="Twitter">
+    <!-- twitter svg -->
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M22 5.92c-.63.28-1.3.48-2 .56.72-.43 1.28-1.12 1.54-1.95-.67.4-1.42.69-2.22.85A3.5 3.5 0 0016.5 4c-1.93 0-3.5 1.6-3.5 3.57 0 .28.03.55.09.81-2.9-.15-5.48-1.6-7.2-3.8-.3.5-.47 1.09-.47 1.72 0 1.22.6 2.3 1.52 2.93-.56-.02-1.09-.18-1.55-.44v.05c0 1.66 1.19 3.04 2.77 3.35-.29.08-.59.12-.9.12-.22 0-.44-.02-.65-.06.45 1.36 1.76 2.36 3.31 2.39A7.03 7.03 0 014 19.54c1.96 1.26 4.3 2 6.82 2 8.18 0 12.66-7.3 12.66-13.64v-.62c.86-.63 1.6-1.4 2.18-2.3-.78.36-1.62.62-2.5.73z" fill="currentColor"/>
+    </svg>
+  </a>
+</div>
+      </div><!-- /.mobile-menu__footer -->
+    </div><!-- /.mobile-menu__inner -->
+  </aside><!-- /.mobile-menu__panel -->
+</div><!-- /#mobileMenu -->
+  </header>
+
+  <main id="main">
+    
+    <!-- HERO SECTION -->
+    <section id="home" class="relative w-full h-[100dvh] min-h-[600px] flex items-end overflow-hidden">
+      
+      <!-- Media Layer: Video fades to Poster -->
+      <div class="absolute inset-0 -z-10 bg-slate-50">
+        <div id="heroPoster" class="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-1000 opacity-0" aria-hidden="true"></div>
+        <div id="videoContainer" class="absolute inset-0 w-full h-full">
+          <!-- Video injected by JS -->
+        </div>
+        <!-- Gradient Overlay -->
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
+      </div>
+
+      <!-- Content -->
+      <div class="relative z-10 w-full max-w-7xl mx-auto px-6 pb-24 sm:pb-32 text-white">
+        <div class="max-w-4xl">
+          <div id="heroEyebrow" class="inline-block opacity-0 px-5 py-1.5 mb-9 text-xs font-medium tracking-[0.2em] uppercase bg-brand-yellow/5 text-brand-yellow border border-brand-yellow/30 rounded-full backdrop-blur-md transition-all duration-300 hover:bg-brand-yellow/10">
+  Welcome
+</div>
+
+          
+          <h1 id="heroTitle" class="font-display text-5xl sm:text-7xl lg:text-8xl leading-[0.9] mb-6 opacity-0 translate-y-8">
+            Success Through<br/>Labour
+          </h1>
+          
+          <p id="heroKicker" style="font-family: Quicksand" class="text-lg sm:text-xl text-slate-300 max-w-2xl mb-10 opacity-0 translate-y-8 font-light leading-relaxed">
+            Empowering future leaders through excellence in education, character building, and community service.
+          </p>
+
+          <div class="flex flex-wrap gap-4 opacity-0 translate-y-8" id="heroButtons">
+            <a id="ctaPrimary" href="http://127.0.0.1:3030" class="btn-primary group">
+              <span class="relative z-10">Explore Programs</span>
+              <div class="absolute inset-0 bg-white/20 scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+            </a>
+            <a id="ctaSecondary" href="#contact" class="btn-secondary group">
+              <span>Contact Admissions</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scroll indicator -->
+      <div class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce text-white/50">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+      </div>
+    </section>
+
+    <!-- PINNED STORY SECTION -->
+    <section id="about" class="bg-[#D6D3D1] py-24 relative">
+      <div class="max-w-7xl mx-auto px-6">
+        
+        <!-- Pinned Panel 1 -->
+        <article class="pinned-panel min-h-[80vh] grid lg:grid-cols-2 gap-16 items-center mb-32">
+          <div class="panel-left space-y-6">
+            <span class="reveal opacity-0 text-brand-indigo font-bold tracking-widest uppercase text-sm">  About BIC
+            </span>
+
+            <h2 class="text-4xl md:text-5xl font-display text-slate-900 leading-tight">A Legacy of Excellence</h2>
+            <p style="font-family: Quicksand" class="text-lg text-slate-600 leading-relaxed">
+              Bodija International College is dedicated to fostering academic excellence, creativity, and community engagement. We believe in a holistic approach to education that prepares students for the challenges of the modern world.
+            </p>
+            <ul class="space-y-4 pt-4">
+              <li style="font-family: Montserrat" class="slide-in-on-scroll flex items-center gap-3 text-slate-700">
+                <span class="reveal opacity-0 w-2 h-2 rounded-full bg-brand-yellow"></span> Global Curriculum Standards
+              </li>
+              <li style="font-family: Montserrat" class="slide-in-on-scroll flex items-center gap-3 text-slate-700">
+                <span class="reveal opacity-0 w-2 h-2 rounded-full bg-brand-yellow"></span> 10:1 Student-Teacher Ratio
+              </li>
+              <li style="font-family: Montserrat" class="slide-in-on-scroll flex items-center gap-3 text-slate-700">
+                <span class="reveal opacity-0 w-2 h-2 rounded-full bg-brand-yellow"></span> Award-winning STEM Program
+              </li>
+            </ul>
+          </div>
+          <div class="panel-right relative">
+             <div class="grid grid-cols-1 gap-6">
+               <div class="bg-white p-8 rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 border border-slate-100 transform hover:-translate-y-1">
+                 <div class="w-12 h-12 bg-indigo-50 rounded-md flex items-center justify-center text-brand-indigo mb-4">
+                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                 </div>
+                 <h3 style="font-family: Cormorant SC" class="reveal opacity-0 text-2xl font-bold mb-2">Modern Labs</h3>
+                 <p style="font-family: Quicksand" class="reveal opacity-0 text-slate-600">Equipped with the latest technology to facilitate hands-on learning in sciences.</p>
+               </div>
+               <div class="bg-white p-8 rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 border border-slate-100 transform hover:-translate-y-1">
+                 <div class="w-12 h-12 bg-indigo-50 rounded-md flex items-center justify-center text-brand-indigo mb-4">
+                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                 </div>
+                 <h3 style="font-family: Cormorant SC" class="reveal opacity-0 text-2xl font-bold mb-2">Library & Research</h3>
+                 <p style="font-family: Quicksand" class="reveal opacity-0 text-slate-600">A vast collection of physical and digital resources to support academic inquiry.</p>
+               </div>
+             </div>
+          </div>
+        </article>
+
+        <!-- Pinned Panel 2 (Programs) -->
+        <article id="academics" class="pinned-panel min-h-[80vh] flex flex-col justify-center">
+          <div class="text-center max-w-3xl mx-auto mb-16">
+            <span class="text-brand-indigo font-bold tracking-widest uppercase text-sm">Academics</span>
+            <h2 class="text-4xl md:text-5xl font-display text-slate-900 mt-4 mb-6">Our Programs</h2>
+            <p style="font-family: Quicksand" class="text-lg text-slate-600">Project-based learning, interdisciplinary teams, and mentorship prepare students for the real world.</p>
+          </div>
+          
+          <div id="programGrid" class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+            <!-- Populated via JS -->
+          </div>
+        </article>
+      </div>
+    </section>
+
+<section id="bic-heritage" class="py-28 md:py-36 relative overflow-hidden">
+
+  <!-- Decorative large text watermark -->
+  <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden" aria-hidden="true">
+    <span class="font-cormorant text-[22vw] font-bold text-white opacity-[0.02] tracking-widest leading-none">BIC</span>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-6 relative z-10">
+
+    <!-- Section Header -->
+    <div class="text-center mb-20 md:mb-28">
+      <div class="bic-reveal ornament-divider text-brand-yellow mb-6 max-w-xs mx-auto">
+        <span class="section-eyebrow text-brand-yellow">Our Heritage</span>
+      </div>
+      <h2 class="bic-reveal font-cormorant text-5xl md:text-7xl font-bold text-white leading-tight mb-6" style="--delay:100ms; font-family:'Cormorant SC',serif;">
+        A Story Written<br/>
+        <em style="font-family:'Cormorant Infant',serif; font-style:italic; font-weight:300; color:rgba(250,204,21,0.85);">in Excellence</em>
+      </h2>
+      <p class="bic-reveal text-slate-300 max-w-2xl mx-auto text-lg leading-relaxed" style="--delay:200ms; font-family:'Quicksand',sans-serif;">
+        Since 1995, Bodija International College has been shaping minds, building character, and transforming futures — one student at a time.
+      </p>
+    </div>
+
+    <!-- Timeline -->
+    <div class="relative" id="bicTimeline">
+
+      <!-- Animated vertical line -->
+      <div class="timeline-line" id="timelineLine"></div>
+
+      <!-- TIMELINE ITEMS -->
+
+      <!-- 1995 -->
+      <div class="timeline-item grid md:grid-cols-2 gap-0 items-center mb-16 md:mb-20">
+        <div class="md:pr-16 md:text-right bic-reveal from-left" style="--delay:0ms;">
+          <div class="timeline-content">
+            <div class="timeline-year">1995 — Founding</div>
+            <h3 class="text-white text-xl font-semibold mb-2" style="font-family:'Playfair Display',serif;">The Vision Takes Root</h3>
+            <p class="text-slate-400 text-sm leading-relaxed" style="font-family:'Quicksand',sans-serif;">
+              Founded in the heart of Bodija, Ibadan, Bodija International College opened its gates with a bold ambition: to bridge global standards of education with the rich intellectual tradition of Nigeria.
+            </p>
+          </div>
+        </div>
+        <div class="hidden md:block"></div>
+        <div class="timeline-dot" style="top: 50%; transform: translate(-50%, -50%);"></div>
+      </div>
+
+      <!-- 2001 -->
+      <div class="timeline-item grid md:grid-cols-2 gap-0 items-center mb-16 md:mb-20">
+        <div class="hidden md:block"></div>
+        <div class="md:pl-16 bic-reveal from-right" style="--delay:80ms;">
+          <div class="timeline-content">
+            <div class="timeline-year">2001 — First Class</div>
+            <h3 class="text-white text-xl font-semibold mb-2" style="font-family:'Playfair Display',serif;">A Generation Graduates</h3>
+            <p class="text-slate-400 text-sm leading-relaxed" style="font-family:'Quicksand',sans-serif;">
+              Our inaugural graduating class achieved remarkable distinction results, validating the rigorous standards our founders had set and establishing a benchmark of academic excellence that endures today.
+            </p>
+          </div>
+        </div>
+        <div class="timeline-dot" style="top: 50%; transform: translate(-50%, -50%);"></div>
+      </div>
+
+      <!-- 2008 -->
+      <div class="timeline-item grid md:grid-cols-2 gap-0 items-center mb-16 md:mb-20">
+        <div class="md:pr-16 md:text-right bic-reveal from-left" style="--delay:160ms;">
+          <div class="timeline-content">
+            <div class="timeline-year">2008 — Expansion</div>
+            <h3 class="text-white text-xl font-semibold mb-2" style="font-family:'Playfair Display',serif;">A Campus Transformed</h3>
+            <p class="text-slate-400 text-sm leading-relaxed" style="font-family:'Quicksand',sans-serif;">
+              State-of-the-art science laboratories, a comprehensive research library, and new sports facilities were commissioned — investing in the physical environment that inspires great minds.
+            </p>
+          </div>
+        </div>
+        <div class="hidden md:block"></div>
+        <div class="timeline-dot" style="top: 50%; transform: translate(-50%, -50%);"></div>
+      </div>
+
+      <!-- 2015 -->
+      <div class="timeline-item grid md:grid-cols-2 gap-0 items-center mb-16 md:mb-20">
+        <div class="hidden md:block"></div>
+        <div class="md:pl-16 bic-reveal from-right" style="--delay:240ms;">
+          <div class="timeline-content">
+            <div class="timeline-year">2015 — Accreditation</div>
+            <h3 class="text-white text-xl font-semibold mb-2" style="font-family:'Playfair Display',serif;">Internationally Recognised</h3>
+            <p class="text-slate-400 text-sm leading-relaxed" style="font-family:'Quicksand',sans-serif;">
+              BIC received formal accreditation for its curriculum, cementing its reputation as one of Oyo State's most distinguished secondary institutions and opening doors for students to world-class universities.
+            </p>
+          </div>
+        </div>
+        <div class="timeline-dot" style="top: 50%; transform: translate(-50%, -50%);"></div>
+      </div>
+
+      <!-- 2020 -->
+      <div class="timeline-item grid md:grid-cols-2 gap-0 items-center mb-16 md:mb-20">
+        <div class="md:pr-16 md:text-right bic-reveal from-left" style="--delay:320ms;">
+          <div class="timeline-content">
+            <div class="timeline-year">2020 — Digital Era</div>
+            <h3 class="text-white text-xl font-semibold mb-2" style="font-family:'Playfair Display',serif;">Education Reimagined</h3>
+            <p class="text-slate-400 text-sm leading-relaxed" style="font-family:'Quicksand',sans-serif;">
+              Pioneering the integration of digital tools, BIC ensured students remained at the frontier of modern learning — adapting and excelling when the world demanded resilience and innovation most.
+            </p>
+          </div>
+        </div>
+        <div class="hidden md:block"></div>
+        <div class="timeline-dot" style="top: 50%; transform: translate(-50%, -50%);"></div>
+      </div>
+
+      <!-- Present -->
+      <div class="timeline-item grid md:grid-cols-2 gap-0 items-center">
+        <div class="hidden md:block"></div>
+        <div class="md:pl-16 bic-reveal from-right" style="--delay:400ms;">
+          <div class="timeline-content" style="border-color: rgba(250,204,21,0.3); background: rgba(250,204,21,0.05);">
+            <div class="timeline-year" style="color: #fde68a;">Today — A Living Legacy</div>
+            <h3 class="text-white text-xl font-semibold mb-2" style="font-family:'Playfair Display',serif;">The Story Continues</h3>
+            <p class="text-slate-300 text-sm leading-relaxed" style="font-family:'Quicksand',sans-serif;">
+              Today, BIC continues to produce leaders, innovators, and change-makers — carrying our founding motto <em style="color:rgba(250,204,21,0.8);">"Success Through Labour"</em> into every classroom, every competition, and every life we touch.
+            </p>
+          </div>
+        </div>
+        <div class="timeline-dot" style="top: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(250,204,21,0.3), 0 0 32px rgba(250,204,21,0.25);"></div>
+      </div>
+
+    </div><!-- /timeline -->
+
+  </div><!-- /container -->
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     2. MESSAGE FROM THE ADMINISTRATION
+     ═══════════════════════════════════════════════════════════════ -->
+<section id="bic-message" class="py-28 md:py-36 relative overflow-hidden">
+
+  <!-- Subtle diagonal accent strip -->
+  <div class="absolute top-0 right-0 w-1/3 h-full pointer-events-none" aria-hidden="true"
+       style="background: linear-gradient(135deg, transparent 0%, rgba(5,1,74,0.03) 100%);"></div>
+
+  <div class="max-w-6xl mx-auto px-6 relative z-10">
+
+    <!-- Section Header -->
+    <div class="text-center mb-16 md:mb-20">
+      <div class="bic-reveal ornament-divider text-brand-indigo mb-6 max-w-xs mx-auto">
+        <span class="section-eyebrow text-brand-indigo">Administration</span>
+      </div>
+      <h2 class="bic-reveal font-serif text-4xl md:text-6xl font-semibold text-brand-indigo leading-tight" style="--delay:100ms;">
+        A Message of<br/>
+        <em style="font-family:'Cormorant Infant',serif; font-weight:300; color:#4a4580;">Purpose &amp; Promise</em>
+      </h2>
+    </div>
+
+    <!-- Two-column layout: Photo + Quote -->
+    <div class="grid gap-12 lg:gap-20 items-center">
+
+      <!-- Photo Column -->
+      <div class="bic-reveal from-left flex justify-center lg:justify-center" style="--delay:0ms;">
+  <div class="admin-photo-frame w-full max-w-[320px]">
+    <div class="admin-photo-inner">
+      <img src="princi.jpg" alt="Principal, Bodija International College"
+           class="w-full h-full object-cover object-center" />
+
+      <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;" aria-hidden="true">
+        <svg width="100%" height="100%" viewBox="0 0 320 420" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity:0.06;">
+          <circle cx="160" cy="210" r="120" stroke="#FACC15" stroke-width="1"/>
+          <circle cx="160" cy="210" r="150" stroke="#FACC15" stroke-width="0.5"/>
+          <line x1="0" y1="210" x2="320" y2="210" stroke="#FACC15" stroke-width="0.5"/>
+          <line x1="160" y1="0" x2="160" y2="420" stroke="#FACC15" stroke-width="0.5"/>
+          <polygon points="160,60 260,315 60,315" stroke="#FACC15" stroke-width="0.5" fill="none"/>
+        </svg>
+      </div>
+
+    </div>
+  </div><!-- /admin-photo-inner -->
+</div><!-- /admin-photo-frame -->
+</div><!-- /photo col -->
+  
+
+      <!-- Quote Column -->
+      <div class="bic-reveal from-right" style="--delay:150ms;">
+        <div class="bic-quote-block relative pl-4 pt-6">
+
+          <!-- Decorative giant quotation mark -->
+          <span class="quote-glyph" aria-hidden="true">&ldquo;</span>
+
+          <!-- The Quote -->
+          <blockquote class="relative z-10">
+            <p class="text-2xl md:text-3xl lg:text-[2rem] leading-relaxed font-light text-brand-indigo mb-8"
+               style="font-family:'Cormorant Infant',serif; font-style:italic; line-height:1.55;">
+               I have predictively seen the brighter future because our educators have the connections to guide you to your choice of university and to your new career through careful selection of subjects in the  Child Protection Unit, but the creativity in you is what defines your future.
+
+               At BIC, our subjects are tailored to benefit your future interest. Be inspired to make an impact. This is my verdict.
+            </p>
+
+            <!-- Gold rule -->
+            <hr class="gold-rule animate mb-6" />
+
+            <!-- Attribution -->
+            <footer class="flex items-center justify-center">
+              <div>
+                <cite class="not-italic block text-brand-indigo font-semibold tracking-wide" style="font-family:'Playfair Display',serif; font-size:1rem;">
+                  The Founding Chairman
+                </cite>
+                <span class="section-eyebrow text-slate-500 text-[0.6rem]">
+                  Bodija International College, Ibadan
+                </span>
+              </div>
+            </footer>
+          </blockquote>
+
+        </div><!-- /bic-quote-block -->
+
+        <!-- Small stats strip below quote -->
+        <div class="mt-12 grid grid-cols-3 gap-6 border-t border-brand-indigo/10 pt-10">
+          <div class="bic-reveal" style="--delay:250ms;">
+            <div class="text-3xl font-bold text-brand-indigo mb-1" style="font-family:'Cormorant SC',serif;">30<span class="text-brand-yellow">+</span></div>
+            <div class="text-xs text-slate-500 uppercase tracking-widest" style="font-family:'Josefin Sans',sans-serif;">Years of Excellence</div>
+          </div>
+          <div class="bic-reveal" style="--delay:330ms;">
+            <div class="text-3xl font-bold text-brand-indigo mb-1" style="font-family:'Cormorant SC',serif;">5K<span class="text-brand-yellow">+</span></div>
+            <div class="text-xs text-slate-500 uppercase tracking-widest" style="font-family:'Josefin Sans',sans-serif;">Alumni Worldwide</div>
+          </div>
+          <div class="bic-reveal" style="--delay:410ms;">
+            <div class="text-3xl font-bold text-brand-indigo mb-1" style="font-family:'Cormorant SC',serif;">10<span class="text-brand-yellow">:1</span></div>
+            <div class="text-xs text-slate-500 uppercase tracking-widest" style="font-family:'Josefin Sans',sans-serif;">Student–Teacher Ratio</div>
+          </div>
+        </div>
+
+      </div><!-- /quote col -->
+    </div><!-- /grid -->
+
+  </div><!-- /container -->
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     3. MISSION & VISION
+     ═══════════════════════════════════════════════════════════════ -->
+<section id="bic-mission-vision" class="py-28 md:py-36 relative">
+
+  <div class="max-w-6xl mx-auto px-6 relative z-10">
+
+    <!-- Section Header -->
+    <div class="text-center mb-16 md:mb-20">
+      <div class="bic-reveal ornament-divider text-brand-indigo mb-6 max-w-xs mx-auto">
+        <span class="section-eyebrow text-brand-indigo">Our Guiding Light</span>
+      </div>
+      <h2 class="bic-reveal text-4xl md:text-6xl font-semibold text-brand-indigo leading-tight" style="--delay:100ms; font-family:'Playfair Display',serif;">
+        Mission &amp; Vision
+      </h2>
+      <p class="bic-reveal mt-5 text-slate-600 max-w-xl mx-auto leading-relaxed" style="--delay:200ms; font-family:'Quicksand',sans-serif;">
+        Two principles. One unified purpose. Everything we do at BIC is measured against these foundational commitments.
+      </p>
+    </div>
+
+    <!-- Cards Grid -->
+    <div class="grid md:grid-cols-2 gap-6 lg:gap-8">
+
+      <!-- MISSION CARD -->
+      <div class="mv-card mv-card-mission bic-reveal from-left" style="--delay:50ms;">
+
+        <!-- Glowing orb background -->
+        <div class="mv-glow"></div>
+
+        <!-- Corner ornament (compass rose) -->
+        <div class="mv-corner-ornament tr" aria-hidden="true">
+          <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" width="120" height="120">
+            <circle cx="60" cy="60" r="58" stroke="#FACC15" stroke-width="0.8"/>
+            <circle cx="60" cy="60" r="40" stroke="#FACC15" stroke-width="0.5"/>
+            <line x1="60" y1="2" x2="60" y2="118" stroke="#FACC15" stroke-width="0.5"/>
+            <line x1="2" y1="60" x2="118" y2="60" stroke="#FACC15" stroke-width="0.5"/>
+            <polygon points="60,2 65,55 60,60 55,55" fill="#FACC15" opacity="0.6"/>
+            <polygon points="60,118 65,65 60,60 55,65" fill="#FACC15" opacity="0.2"/>
+            <polygon points="2,60 55,55 60,60 55,65" fill="#FACC15" opacity="0.2"/>
+            <polygon points="118,60 65,55 60,60 65,65" fill="#FACC15" opacity="0.6"/>
+          </svg>
+        </div>
+
+        <!-- Card Content -->
+        <div class="relative z-10 p-10 lg:p-12">
+
+          <!-- Icon -->
+          <div class="mv-icon mv-icon-mission mb-8">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FACC15" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Torch / lamp icon -->
+              <path d="M9 21h6M12 3C9.8 3 8 4.8 8 7c0 1.6.9 3 2.2 3.8L9 17h6l-1.2-6.2C15.1 10 16 8.6 16 7c0-2.2-1.8-4-4-4z"/>
+              <path d="M8 21v-1a4 4 0 018 0v1"/>
+            </svg>
+          </div>
+
+          <!-- Label -->
+          <div class="section-eyebrow text-brand-yellow mb-4 text-[0.65rem]">Our Mission</div>
+
+          <!-- Heading -->
+          <h3 class="text-white text-3xl md:text-4xl font-semibold mb-6 leading-tight" style="font-family:'Cormorant SC',serif;">
+            To Illuminate<br/>Every Mind
+          </h3>
+
+          <!-- Rule -->
+          <div style="width:40px; height:1px; background: rgba(250,204,21,0.5); margin-bottom:24px;"></div>
+
+          <!-- Body -->
+          <p class="text-slate-300 text-base leading-relaxed" style="font-family:'Quicksand',sans-serif;">
+            To provide a holistic, internationally-benchmarked education that fosters academic excellence, moral integrity, and a lifelong passion for learning — equipping every student with the knowledge, skills, and values to thrive in a dynamic world.
+          </p>
+
+          <!-- Bottom accent: three pillars -->
+          <div class="mt-10 grid grid-cols-3 gap-3 pt-8 border-t border-white/10">
+            <div class="text-center">
+              <div class="text-brand-yellow text-xs font-bold mb-1" style="font-family:'Josefin Sans',sans-serif; letter-spacing:0.1em;">KNOWLEDGE</div>
+              <div class="w-6 h-px bg-brand-yellow/30 mx-auto"></div>
+            </div>
+            <div class="text-center">
+              <div class="text-brand-yellow text-xs font-bold mb-1" style="font-family:'Josefin Sans',sans-serif; letter-spacing:0.1em;">CHARACTER</div>
+              <div class="w-6 h-px bg-brand-yellow/30 mx-auto"></div>
+            </div>
+            <div class="text-center">
+              <div class="text-brand-yellow text-xs font-bold mb-1" style="font-family:'Josefin Sans',sans-serif; letter-spacing:0.1em;">SERVICE</div>
+              <div class="w-6 h-px bg-brand-yellow/30 mx-auto"></div>
+            </div>
+          </div>
+
+        </div><!-- /card content -->
+      </div><!-- /mission card -->
+
+
+      <!-- VISION CARD -->
+      <div class="mv-card mv-card-vision bic-reveal from-right" style="--delay:150ms;">
+
+        <!-- Glowing orb background -->
+        <div class="mv-glow"></div>
+
+        <!-- Corner ornament (star / horizon) -->
+        <div class="mv-corner-ornament bl" aria-hidden="true">
+          <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" width="120" height="120">
+            <circle cx="60" cy="60" r="58" stroke="#FACC15" stroke-width="0.8"/>
+            <path d="M60 10 L70 50 L110 60 L70 70 L60 110 L50 70 L10 60 L50 50 Z" stroke="#FACC15" stroke-width="0.7" fill="none"/>
+            <circle cx="60" cy="60" r="8" stroke="#FACC15" stroke-width="0.8" fill="rgba(250,204,21,0.1)"/>
+          </svg>
+        </div>
+
+        <!-- Card Content -->
+        <div class="relative z-10 p-10 lg:p-12">
+
+          <!-- Icon -->
+          <div class="mv-icon mv-icon-vision mb-8">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FACC15" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Horizon / vision icon -->
+              <circle cx="12" cy="12" r="2"/>
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+              <path d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+            </svg>
+          </div>
+
+          <!-- Label -->
+          <div class="section-eyebrow text-brand-yellow mb-4 text-[0.65rem]">Our Vision</div>
+
+          <!-- Heading -->
+          <h3 class="text-white text-3xl md:text-4xl font-semibold mb-6 leading-tight" style="font-family:'Cormorant SC',serif;">
+            To Lead With<br/>Distinction
+          </h3>
+
+          <!-- Rule -->
+          <div style="width:40px; height:1px; background: rgba(250,204,21,0.5); margin-bottom:24px;"></div>
+
+          <!-- Body -->
+          <p class="text-slate-300 text-base leading-relaxed" style="font-family:'Quicksand',sans-serif;">
+            To be the foremost secondary institution in Nigeria, producing graduates of exceptional character and outstanding competence — young men and women who lead with purpose, serve their communities with distinction, and leave an indelible mark on their generation.
+          </p>
+
+          <!-- Bottom accent: three horizons -->
+          <div class="mt-10 grid grid-cols-3 gap-3 pt-8 border-t border-white/10">
+            <div class="text-center">
+              <div class="text-brand-yellow text-xs font-bold mb-1" style="font-family:'Josefin Sans',sans-serif; letter-spacing:0.1em;">LEADERSHIP</div>
+              <div class="w-6 h-px bg-brand-yellow/30 mx-auto"></div>
+            </div>
+            <div class="text-center">
+              <div class="text-brand-yellow text-xs font-bold mb-1" style="font-family:'Josefin Sans',sans-serif; letter-spacing:0.1em;">IMPACT</div>
+              <div class="w-6 h-px bg-brand-yellow/30 mx-auto"></div>
+            </div>
+            <div class="text-center">
+              <div class="text-brand-yellow text-xs font-bold mb-1" style="font-family:'Josefin Sans',sans-serif; letter-spacing:0.1em;">LEGACY</div>
+              <div class="w-6 h-px bg-brand-yellow/30 mx-auto"></div>
+            </div>
+          </div>
+
+        </div><!-- /card content -->
+      </div><!-- /vision card -->
+
+    </div><!-- /cards grid -->
+
+    <!-- Bottom CTA -->
+    <div class="text-center mt-16 md:mt-20 bic-reveal" style="--delay:300ms;">
+      <a href="http://127.0.0.1:6060"
+         class="inline-flex items-center gap-3 px-10 py-4 bg-brand-indigo text-white text-xs font-semibold uppercase tracking-[0.2em] rounded-full transition-all duration-500 ease-out shadow-xl shadow-brand-indigo/25 hover:shadow-2xl hover:shadow-brand-indigo/35 hover:-translate-y-0.5 hover:scale-[1.02] active:scale-95">
+        <span>Begin Your Journey at BIC</span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+      </a>
+    </div>
+
+  </div><!-- /container -->
+</section>
+
+    <!-- GALLERY SECTION -->
+    <section id="gallery" class="bg-slate-900 text-white py-12 relative overflow-hidden">
+      <!-- Decorative background elements -->
+      <div class="absolute top-0 left-0 w-64 h-64 bg-brand-yellow/5 rounded-full blur-3xl"></div>
+      <div class="absolute bottom-0 right-0 w-96 h-96 bg-brand-indigo/20 rounded-full blur-3xl"></div>
+
+      <div class="max-w-7xl mx-auto px-6 relative z-10">
+        <div class="flex flex-col md:flex-row justify-between items-end mb-12">
+          <div>
+            <h2 style="font-family: Cormorant SC" class="reveal opacity-0 font-display font-bold text-5xl md:text-6xl mb-4">Life at BIC</h2>
+            <p style="font-family: Quicksand" class="text-slate-400 max-w-md">Explore our campus, events, and student activities through our lens.</p>
+          </div>
+          <div class="hidden md:block pb-2">
+            <span class="text-xs font-mono text-slate-500 uppercase tracking-widest">Swipe to explore</span>
+          </div>
+        </div>
+
+<div id="publicGalleryGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+  <!-- Gallery items are injected by the script below -->
+  <div class="col-span-full flex items-center justify-center py-16 text-slate-500 text-sm" id="galleryLoader">
+    Loading gallery…
+  </div>
+</div>
+
+<script>
+(function loadPublicGallery() {
+  fetch('gallery-data.json?v=' + Date.now())
+    .then(r => r.ok ? r.json() : Promise.reject('fetch failed'))
+    .then(items => {
+      const grid = document.getElementById('publicGalleryGrid');
+      const loader = document.getElementById('galleryLoader');
+      if (!items || !items.length) {
+        if (loader) loader.textContent = 'No gallery items yet.';
+        return;
+      }
+      if (loader) loader.remove();
+
+      items.forEach(item => {
+        const cover   = item.images && item.images[0] ? item.images[0] : 'images/gallery1.jpg';
+        const count   = item.images ? item.images.length : 0;
+        const archive = JSON.stringify(item.images || []);
+
+        const div = document.createElement('div');
+        div.className = 'flex flex-col w-full';
+        div.innerHTML = `
+          <button
+            class="gallery-item group relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-800 focus:outline-none focus:ring-4 focus:ring-brand-yellow/50"
+            data-src="${esc(cover)}"
+            data-archive='${archive.replace(/'/g,"&#39;")}'
+            data-title="${esc(item.title)}"
+            data-sub="${esc(item.subtitle)}"
+            aria-label="View ${esc(item.title)} Gallery">
+            <img src="${esc(cover)}" alt="${esc(item.title)}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
+            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+              <div class="text-left translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                <h3 class="text-xl font-bold font-serif text-white">${esc(item.title)}</h3>
+                <p class="text-sm text-brand-yellow">View ${count} Photo${count !== 1 ? 's' : ''}</p>
+              </div>
+            </div>
+          </button>
+          <div style="font-family: Montserrat;" class="px-2">
+            <h3 class="text-xl md:text-2xl text-center text-white mt-6">${esc(item.title)}</h3>
+            <p class="text-center text-indigo-300/80 mt-2">${esc(item.subtitle)}</p>
+          </div>`;
+        grid.appendChild(div);
+      });
+
+      // Re-bind any gallery lightbox behaviour your main site uses
+      if (typeof initGallery === 'function') initGallery();
+    })
+    .catch(() => {
+      const loader = document.getElementById('galleryLoader');
+      if (loader) loader.textContent = '';
+    });
+
+  function esc(s) {
+    if (typeof s !== 'string') return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+})();
+</script>
+    </div>
+  </button>
+</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT SECTION -->
+    <section id="contact" class="py-24 bg-white">
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center mb-16">
+          <span class="slide-in-on-scroll text-brand-indigo font-bold tracking-widest uppercase text-sm">Admissions</span>
+          <h2 class="reveal opacity-0 text-4xl md:text-5xl font-display text-slate-900 mt-4">Start Your Journey</h2>
+          <p class="mt-4 text-slate-600 max-w-2xl mx-auto">We are accepting applications for the next academic session. Contact us for inquiries or to schedule a campus tour.</p>
+        </div>
+
+        <div class="grid gap-12 items-start">
+          
+          <!-- Contact Info -->
+          <div class="bg-slate-50 p-8 rounded-3xl border border-slate-100">
+            <h3 class="text-2xl font-bold text-slate-900 mb-6 font-serif">Contact Information</h3>
+            <div class="space-y-8">
+              <div class="flex gap-4">
+                <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-brand-indigo shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+  <circle cx="12" cy="10" r="3"></circle>
+</svg>
+
+                </div>
+                <div>
+                  <h4 style="font-family: Montserrat" class="slide-in-on-scroll font-semibold text-slate-900">Visit Us</h4>
+                  <p style="font-family: Quicksand" class="font-md text-slate-600 mt-1">1-5, Tunde Lakanmi Crescent, Bodija<br>Ibadan, Oyo State</p>
+                </div>
+              </div>
+              
+              <div class="flex gap-4">
+                <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-brand-indigo shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+  <polyline points="22,6 12,13 2,6"></polyline>
+</svg>
+
+                </div>
+                <div>
+              <h4 style="font-family: Montserrat" class="slide-in-on-scroll font-semibold text-slate-900">Email Us</h4>
+                  <a href="mailto:bicbis95@gmail.com" style="font-family: Quicksand" class="font-md text-brand-indigo hover:underline mt-1 block">bicbis95@gmail.com</a>
+                </div>
+              </div>
+
+              <div class="flex gap-4">
+                <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-brand-indigo shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+</svg>
+
+                </div>
+                <div>
+                  <h4 style="font-family: Montserrat" class="slide-in-on-scroll font-semibold text-slate-900">Call Us</h4>
+                  <a href="tel:+234 816 606 1632" style="font-family: Quicksand" class="font-md text-brand-indigo hover:underline mt-1 block">+234 816 606 1632</a>
+                  <p class="text-xs text-slate-500 mt-1">Mon-Fri, 8am - 4pm</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Embed Map -->
+            <div class="mt-8 rounded-2xl overflow-hidden h-48 bg-slate-200 border border-slate-200">
+               <iframe 
+                src="https://www.google.com/maps?q=7.4240,3.9076&z=15&output=embed" 
+                class="w-full h-full border-0" 
+                loading="lazy" 
+                title="School Location Map">
+               </iframe>
+            </div>
+          </div>
+
+          <!-- Contact Form -->
+          <form id="contactForm" class="bg-white p-8 rounded shadow-xl border border-slate-100" novalidate>
+            <div class="space-y-6">
+              
+              <div class="relative">
+                <input type="text" id="name" name="name" required style="font-family: Montserrat" class="peer w-full px-4 py-2 pt-6 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-indigo focus:border-transparent placeholder-transparent bg-slate-50 transition-all" placeholder="John Doe">
+                <label for="name" style="font-family: Montserrat" class="absolute left-4 text-xs font-md text-slate-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-focus:top-1 peer-focus:text-xs peer-focus:text-brand-indigo">Full Name</label>
+              </div>
+
+              <div class="relative">
+                <input type="email" id="email" name="email" required   style="font-family: Montserrat" class="peer w-full px-4 py-2 pt-6 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-indigo focus:border-transparent placeholder-transparent bg-slate-50 transition-all" placeholder="john@example.com">
+                <label for="email" style="font-family: Montserrat" class="absolute left-4 top-1 text-xs font-md text-slate-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-focus:top-1 peer-focus:text-xs peer-focus:text-brand-indigo">Email Address</label>
+              </div>
+
+              <div class="relative">
+                <textarea id="message" name="message" required rows="2" style="font-family: Montserrat" class="peer w-full px-4 py-3 pt-6 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-indigo focus:border-transparent placeholder-transparent bg-slate-50 resize-none transition-all" placeholder="Message"></textarea>
+                <label for="message" style="font-family: Montserrat" class="absolute left-4 top-1 text-xs font-md text-slate-500 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-focus:top-1 peer-focus:text-xs peer-focus:text-brand-indigo">Your Message</label>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <input type="checkbox" id="consent" required style="accent-color: #0f172a;"
+                  class="w-5 h-5 text-brand-indigo border-slate-300 rounded focus:ring-brand-indigo transition-colors cursor-pointer">
+                <label for="consent" class="text-sm text-slate cursor-pointer select-none">I agree to the processing of my personal data.</label>
+              </div>
+
+              <button type="submit" id="submitBtn" class="reveal opacity-0 w-full btn-primary justify-center">
+                <span id="btnText">Send Message</span>
+                <svg id="btnSpinner" class="hidden animate-spin ml-2 h-5 w-5 text-brand-indigo" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              </button>
+              
+              <div id="formStatus" class="sr-only" role="status" aria-live="polite"></div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="text-left bg-[#05014a] pt-12 pb-16 text-gray-200">
+    <div class="max-w-6xl mx-auto px-6 grid grid-cols-1 gap-10">
+
+      <!-- left column: brand + address -->
+      <div class="space-y-6">
+        <!-- replaced span -->
+        <div class="flex items-center gap-3">
+          <div class="w-24 h-24 rounded-sm flex items-center justify-center overflow-hidden">
+            <img src="logo.png" alt="Your Company" class="w-full h-full object-contain" loading="lazy" />
+            </div>
+
+  <div>
+    <h1 style="font-family: Cormorant SC;" class="text-2xl font-semibold">Bodija Int'l College</h1>
+    <p style="font-family: Quicksand;" class="text-lg text-gray-500">Success through Labor</p>
+  </div>
+</div>
+    <!-- other content... -->
+        
+        <p class="reveal opacity-0 text-slate-500 font-bold tracking-widest uppercase text-xs">How we make it happen</p>
+        <h1 class="slide-in-on-scroll mt-12 font-display text-white text-[50px] leading-[0.92] tracking-[-0.015em] drop-shadow-[0_10px_30px_rgba(0,0,0,0.7)] max-w-[520px]">
+  Building<br/>deep human<br/>connection<br/>that sparks<br/>success
+</h1>
+
+      </div>
+
+      <!-- center column: content, values link, cities, contact -->
+      <div class="flex flex-col justify-between">
+        <div>
+          <p style="font-family: Montserrat;" class="reveal opacity-0 muted leading-relaxed max-w-xl text-sm mb-4">
+            We see childhood as a launchpad. Through hands-on STEAM, project-based learning, and personalized instruction, we blend joyful discovery with high expectations so every child is known, challenged, and supported to build curiosity, resilience, collaboration, and ethical leadership.</p>
+            
+            <p style="font-family: Montserrat;" class="muted leading-relaxed max-w-xl text-sm">Our vision is confident, adaptable learners who succeed academically and as responsible citizens. With measurable progress, clear communication, and strong family partnerships, we balance joy and excellence to turn potential into practice.
+          </p>
+          
+          <!-- small social row (mobile stacked) -->
+<div class="flex items-center mt-6 gap-3">
+  <a class="social-circle"
+     href="https://www.facebook.com/bicbisbodija"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Facebook"
+     title="Facebook">
+    <!-- facebook svg -->
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M22 12.07C22 6.48 17.52 2 11.93 2S2 6.48 2 12.07C2 17.06 5.66 21.13 10.44 21.93v-6.85H8.08v-2.95h2.36V9.41c0-2.34 1.39-3.63 3.52-3.63 1.02 0 2.08.18 2.08.18v2.29h-1.17c-1.15 0-1.51.72-1.51 1.46v1.76h2.57l-.41 2.95h-2.16V21.9C18.34 21.13 22 17.06 22 12.07z" fill="currentColor"/>
+    </svg>
+  </a>
+
+  <a class="social-circle"
+     href="https://www.instagram.com/bic_bis?igsh=MXdxMGFubnpteTEzeg=="
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Instagram"
+     title="Instagram">
+    <!-- insta svg -->
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M7 2h10a5 5 0 015 5v10a5 5 0 01-5 5H7a5 5 0 01-5-5V7a5 5 0 015-5zM12 8.8a3.2 3.2 0 100 6.4 3.2 3.2 0 000-6.4zM17.5 6.2a.9.9 0 11-1.8 0 .9.9 0 011.8 0z" fill="currentColor"/>
+    </svg>
+  </a>
+
+  <a class="social-circle"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Dribbble"
+     title="Dribbble">
+    <!-- dribbble svg -->
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.3 16.1c-1.64-1.9-3.95-3.1-6.6-3.47 1.01-2.47 2.37-4.6 3.27-5.77 2.22 1.39 3.8 3.63 3.86 6.24.01.35-.25.66-.53.99zM7.9 6.1c1.27 1.02 2.44 3.22 3.19 5.3-2.86.25-5.29 1.2-6.99 2.7A7.96 7.96 0 017.9 6.1z" fill="currentColor"/>
+    </svg>
+  </a>
+
+  <a class="social-circle"
+     href="https://x.com/bic_bis"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Twitter"
+     title="Twitter">
+    <!-- twitter svg -->
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M22 5.92c-.63.28-1.3.48-2 .56.72-.43 1.28-1.12 1.54-1.95-.67.4-1.42.69-2.22.85A3.5 3.5 0 0016.5 4c-1.93 0-3.5 1.6-3.5 3.57 0 .28.03.55.09.81-2.9-.15-5.48-1.6-7.2-3.8-.3.5-.47 1.09-.47 1.72 0 1.22.6 2.3 1.52 2.93-.56-.02-1.09-.18-1.55-.44v.05c0 1.66 1.19 3.04 2.77 3.35-.29.08-.59.12-.9.12-.22 0-.44-.02-.65-.06.45 1.36 1.76 2.36 3.31 2.39A7.03 7.03 0 014 19.54c1.96 1.26 4.3 2 6.82 2 8.18 0 12.66-7.3 12.66-13.64v-.62c.86-.63 1.6-1.4 2.18-2.3-.78.36-1.62.62-2.5.73z" fill="currentColor"/>
+    </svg>
+  </a>
+</div>
+
+        <!-- bottom area: email, newsletter, language -->
+        <div class="mt-6 pt-6 border-t border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div class="text-sm muted">We'd love to hear from you — <a href="mailto:bicbis95@gmail.com" class="text-white font-medium">bicbis95@gmail.com</a></div>
+
+      <!-- right column: big stacked tagline -->
+      <div class=" items-end justify-end">
+        <div class="tagline">
+          Success<br/>Through<br/>Labor 
+        </div>
+      </div>
+    </div>
+
+    <!-- copyright row -->
+    <div class="max-w-6xl mx-auto px-6 mt-10">
+      <div class="border-t border-gray-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div  class="text-sm muted">&copy; <span id="year"></span> Bodija International College. All rights reserved.&nbsp;<a class="adm-staff-trigger" href="/admin.html" id="adminTrigger">Staff Login</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Lightbox (Restored & Accessible) -->
+  <div id="lightbox" class="fixed inset-0 z-[60] bg-black/95 hidden opacity-0 transition-opacity duration-300 flex items-center justify-center" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Image Gallery">
+    
+    <!-- Close Btn -->
+    <button id="lbClose" class="absolute top-6 right-6 text-white/70 hover:text-white z-[70] p-2 focus:outline-none focus:ring-2 focus:ring-white rounded-full">
+      <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      <span class="sr-only">Close Gallery</span>
+    </button>
+
+    <!-- Nav Btns -->
+    <button id="lbPrev" class="absolute left-4 sm:left-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-white/10 p-3 rounded-full z-[70] transition-colors focus:outline-none focus:ring-2 focus:ring-white">
+      <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+      <span class="sr-only">Previous Image</span>
+    </button>
+    
+    <button id="lbNext" class="absolute right-4 sm:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-white/10 p-3 rounded-full z-[70] transition-colors focus:outline-none focus:ring-2 focus:ring-white">
+      <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+      <span class="sr-only">Next Image</span>
+    </button>
+
+    <!-- Image Container -->
+    <div class="relative w-full h-full p-4 sm:p-12 flex flex-col items-center justify-center">
+      <img id="lbImg" src="" alt="" class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl transition-transform duration-300" loading="lazy">
+      
+      <!-- Caption -->
+      <div id="lbCaption" class="mt-4 text-center">
+        <h3 id="lbTitle" class="text-white text-xl font-display font-medium"></h3>
+        <p id="lbCounter" class="text-slate-400 text-sm mt-1 font-mono tracking-widest">1 / 5</p>
+      </div>
+
+      <!-- Loader -->
+      <div id="lbLoader" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300">
+        <div class="w-10 h-10 border-4 border-white/20 border-t-brand-yellow rounded-full animate-spin"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Gallery Lightbox Script - Fixed & Optimized
+    (function() {
+      'use strict';
+
+      // DOM elements
+      const lightbox = document.getElementById('lightbox');
+      const lbImg = document.getElementById('lbImg');
+      const lbTitle = document.getElementById('lbTitle');
+      const lbCounter = document.getElementById('lbCounter');
+      const lbClose = document.getElementById('lbClose');
+      const lbPrev = document.getElementById('lbPrev');
+      const lbNext = document.getElementById('lbNext');
+      const lbLoader = document.getElementById('lbLoader');
+
+      // State
+      let currentArchive = [];
+      let currentIndex = 0;
+      let isLoading = false;
+      let touchStartX = 0;
+      let touchEndX = 0;
+
+      // Prevent body scroll when lightbox is open
+      function toggleBodyScroll(disable) {
+        if (disable) {
+          document.documentElement.style.overflow = 'hidden';
+          document.body.style.overflow = 'hidden';
+        } else {
+          document.documentElement.style.overflow = '';
+          document.body.style.overflow = '';
+        }
+      }
+
+      // Show loading indicator
+      function showLoader() {
+        if (lbLoader) {
+          lbLoader.classList.remove('opacity-0');
+          lbLoader.classList.add('opacity-100');
+        }
+        isLoading = true;
+      }
+
+      // Hide loading indicator
+      function hideLoader() {
+        if (lbLoader) {
+          lbLoader.classList.add('opacity-0');
+          lbLoader.classList.remove('opacity-100');
+        }
+        isLoading = false;
+      }
+
+      // Update image display
+      function updateImage(index) {
+        if (!currentArchive || currentArchive.length === 0) return;
+
+        // Clamp index
+        currentIndex = (index + currentArchive.length) % currentArchive.length;
+        const src = currentArchive[currentIndex];
+
+        if (!src) return;
+
+        showLoader();
+
+        // Preload image
+        const img = new Image();
+        img.onload = () => {
+          lbImg.src = src;
+          lbImg.alt = 'Gallery image ' + (currentIndex + 1);
+          hideLoader();
+        };
+        img.onerror = () => {
+          lbImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22%3E%3Crect fill=%22%23333%22 width=%22400%22 height=%22300%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-family=%22Arial%22 font-size=%2220%22 fill=%22%23999%22%3EImage failed to load%3C/text%3E%3C/svg%3E';
+          hideLoader();
+        };
+        img.src = src;
+
+        // Update counter
+        if (lbCounter) {
+          lbCounter.textContent = (currentIndex + 1) + ' / ' + currentArchive.length;
+        }
+      }
+
+      // Open lightbox
+      function openLightbox(archive, index = 0) {
+        if (!lightbox || !archive || archive.length === 0) return;
+
+        currentArchive = archive;
+        currentIndex = index;
+
+        // Show lightbox with proper animation
+        lightbox.classList.remove('hidden');
+        lightbox.setAttribute('aria-hidden', 'false');
+        toggleBodyScroll(true);
+
+        // Trigger reflow to enable transition
+        void lightbox.offsetWidth;
+        lightbox.classList.remove('opacity-0');
+        lightbox.classList.add('opacity-100');
+
+        updateImage(index);
+        lbClose.focus();
+      }
+
+      // Close lightbox
+      function closeLightbox() {
+        if (!lightbox) return;
+
+        lightbox.classList.add('opacity-0');
+        lightbox.classList.remove('opacity-100');
+
+        setTimeout(() => {
+          lightbox.classList.add('hidden');
+          lightbox.setAttribute('aria-hidden', 'true');
+          toggleBodyScroll(false);
+        }, 300);
+      }
+
+      // Navigate to next image
+      function nextImage() {
+        if (isLoading) return;
+        updateImage(currentIndex + 1);
+      }
+
+      // Navigate to previous image
+      function prevImage() {
+        if (isLoading) return;
+        updateImage(currentIndex - 1);
+      }
+
+      // Handle touch swipe
+      function handleTouchStart(e) {
+        touchStartX = e.changedTouches[0].screenX;
+      }
+
+      function handleTouchEnd(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+      }
+
+      function handleSwipe() {
+        const diff = touchStartX - touchEndX;
+        const threshold = 50;
+
+        if (Math.abs(diff) > threshold) {
+          if (diff > 0) {
+            nextImage();
+          } else {
+            prevImage();
+          }
+        }
+      }
+
+      // Event listeners
+      if (lbClose) {
+        lbClose.addEventListener('click', closeLightbox);
+      }
+      if (lbPrev) {
+        lbPrev.addEventListener('click', prevImage);
+      }
+      if (lbNext) {
+        lbNext.addEventListener('click', nextImage);
+      }
+
+      // Close on background click
+      if (lightbox) {
+        lightbox.addEventListener('click', (e) => {
+          if (e.target === lightbox) {
+            closeLightbox();
+          }
+        });
+      }
+
+      // Keyboard navigation
+      document.addEventListener('keydown', (e) => {
+        if (lightbox.classList.contains('hidden')) return;
+
+        switch (e.key) {
+          case 'Escape':
+            e.preventDefault();
+            closeLightbox();
+            break;
+          case 'ArrowLeft':
+            e.preventDefault();
+            prevImage();
+            break;
+          case 'ArrowRight':
+            e.preventDefault();
+            nextImage();
+            break;
+        }
+      });
+
+      // Touch swipe support
+      if (lightbox) {
+        lightbox.addEventListener('touchstart', handleTouchStart, false);
+        lightbox.addEventListener('touchend', handleTouchEnd, false);
+      }
+
+      // Initialize gallery items
+      window.initGallery = function() {
+        const galleryItems = document.querySelectorAll('.gallery-item');
+        galleryItems.forEach(item => {
+          // Remove any existing listeners to prevent duplicates
+          const clone = item.cloneNode(true);
+          item.parentNode.replaceChild(clone, item);
+        });
+
+        // Re-query after cloning
+        document.querySelectorAll('.gallery-item').forEach(item => {
+          item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const archiveStr = item.getAttribute('data-archive');
+            const title = item.getAttribute('data-title');
+            const subtitle = item.getAttribute('data-sub');
+
+            try {
+              const archive = JSON.parse(archiveStr);
+              if (lbTitle) lbTitle.textContent = title;
+              openLightbox(archive, 0);
+            } catch (err) {
+              console.error('Failed to parse gallery archive:', err);
+            }
+          });
+
+          // Keyboard support for gallery items
+          item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              item.click();
+            }
+          });
+        });
+      };
+
+      // Initialize on DOM ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', window.initGallery);
+      } else {
+        window.initGallery();
+      }
+    })();
+  </script>
+  <script>
+    // menu.js
+// Extracted from prototypes.html (keeps original behavior and exports).
+(function () {
+  'use strict';
+
+  function qs(selector, ctx = document) { return (ctx || document).querySelector(selector); }
+  function qsa(selector, ctx = document) { return Array.from((ctx || document).querySelectorAll(selector)); }
+
+  function getFocusable(container) {
+    if (!container) return [];
+    return qsa("a[href], button:not([disabled]), textarea, input:not([type=hidden]):not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])", container)
+      .filter(function(el){ return el.offsetParent !== null || el.getClientRects().length; });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var menu = document.getElementById('mobileMenu');
+    if (!menu) { console.warn('mobileMenu element not found.'); return; }
+
+    var overlay = menu.querySelector('[data-overlay]');
+    var panel = menu.querySelector('.mobile-menu__panel');
+    var closeBtns = Array.prototype.slice.call(menu.querySelectorAll('.mobile-menu__close'));
+    var openButtons = Array.prototype.slice.call(document.querySelectorAll('[aria-controls="mobileMenu"], [data-mobile-open], .mobile-open, .mobile-toggle, #mobileOpenBtn'));
+    var externalCloseButtons = Array.prototype.slice.call(document.querySelectorAll('[data-mobile-close], .mobile-close, .mobile-menu__close, [data-mobile-toggle="close"]'));
+
+    function parseTime(s) {
+      if (!s) return 0;
+      var str = String(s).trim();
+      if (str.indexOf('ms', str.length - 2) !== -1) return parseFloat(str);
+      if (str.indexOf('s', str.length - 1) !== -1) return parseFloat(str) * 1000;
+      var n = parseFloat(str);
+      return isFinite(n) ? n : 0;
+    }
+
+    var rootStyles = getComputedStyle(document.documentElement);
+    var OVERLAY_DUR = parseTime(rootStyles.getPropertyValue('--overlay-duration')) || 220;
+    var PANEL_DUR   = parseTime(rootStyles.getPropertyValue('--panel-duration')) || 340;
+    var PANEL_DELAY = parseTime(rootStyles.getPropertyValue('--panel-delay')) || 120;
+    var OVERLAY_HOLD = parseTime(rootStyles.getPropertyValue('--overlay-hold')) || 0;
+
+    var timeouts = [];
+    var lastFocused = null;
+
+    function clearAllTimeouts(){ timeouts.forEach(function(i){ clearTimeout(i); }); timeouts = []; }
+
+    function preventScroll(enable){
+      if (enable) { document.documentElement.style.overflow = 'hidden'; document.body.style.overflow = 'hidden'; }
+      else { document.documentElement.style.overflow = ''; document.body.style.overflow = ''; }
+    }
+
+    function onKeyDown(e){
+      if (!menu.classList.contains('open')) return;
+      if (e.key === 'Escape') { e.preventDefault(); closeMobileMenu(); return; }
+      if (e.key === 'Tab') {
+        if (!panel) return;
+        var focusable = getFocusable(panel);
+        if (!focusable.length) { e.preventDefault(); return; }
+        var first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+
+    function focusTrap(e){
+      if (!menu.classList.contains('open')) return;
+      if (!panel) return;
+      if (panel.contains(e.target)) return;
+      e.stopPropagation();
+      var f = getFocusable(panel);
+      if (f.length) f[0].focus(); else panel.focus();
+    }
+
+    // Ensure menu is appended to body to avoid ancestor stacking contexts
+    if (menu && menu.parentElement !== document.body) {
+      document.body.appendChild(menu);
+      overlay = menu.querySelector('[data-overlay]');
+      panel = menu.querySelector('.mobile-menu__panel');
+    }
+
+    // store for restoring open buttons state
+    var openerStateMap = new WeakMap();
+
+    function disableOpenButtons() {
+      openButtons.forEach(function(b){
+        if (!b) return;
+        var prev = {
+          tabindex: b.hasAttribute('tabindex') ? b.getAttribute('tabindex') : null,
+          pointerEvents: b.style.pointerEvents || null,
+          ariaHidden: b.hasAttribute('aria-hidden') ? b.getAttribute('aria-hidden') : null
+        };
+        openerStateMap.set(b, prev);
+        try { b.setAttribute('tabindex', '-1'); } catch (e) {}
+        b.style.pointerEvents = 'none';
+        try { b.setAttribute('aria-hidden', 'true'); } catch (e) {}
+      });
+    }
+
+    function restoreOpenButtons() {
+      openButtons.forEach(function(b){
+        if (!b) return;
+        var prev = openerStateMap.get(b) || {};
+        if (prev.tabindex === null || prev.tabindex === undefined) b.removeAttribute('tabindex');
+        else b.setAttribute('tabindex', prev.tabindex);
+        if (prev.pointerEvents === null || prev.pointerEvents === undefined) b.style.removeProperty('pointer-events');
+        else b.style.pointerEvents = prev.pointerEvents;
+        if (prev.ariaHidden === null || prev.ariaHidden === undefined) b.removeAttribute('aria-hidden');
+        else b.setAttribute('aria-hidden', prev.ariaHidden);
+        openerStateMap.delete(b);
+      });
+    }
+
+    function openMobileMenu(){
+      if (menu.classList.contains('open')) return;
+      lastFocused = document.activeElement;
+      menu.classList.add('open');
+      menu.setAttribute('aria-hidden', 'false');
+      if (panel) panel.setAttribute('aria-hidden', 'false');
+
+      // disable hamburgers / openers while menu is open
+      disableOpenButtons();
+
+      if (overlay) overlay.classList.remove('overlay-in');
+      if (panel) panel.classList.remove('panel-in');
+      void (overlay && overlay.offsetWidth);
+      if (overlay) overlay.classList.add('overlay-in');
+
+      var t = setTimeout(function(){
+        if (panel) {
+          panel.classList.add('panel-in');
+          var closeBtn = panel.querySelector('.mobile-menu__close');
+          if (closeBtn) closeBtn.focus({ preventScroll: true });
+        }
+      }, PANEL_DELAY);
+      timeouts.push(t);
+
+      document.addEventListener('focus', focusTrap, true);
+      document.addEventListener('keydown', onKeyDown);
+      if (overlay) overlay.addEventListener('click', overlayClick);
+      preventScroll(true);
+      openButtons.forEach(function(b){ if (b && b.setAttribute) b.setAttribute('aria-expanded', 'true'); });
+    }
+
+    function closeMobileMenu(){
+      if (!menu.classList.contains('open')) return;
+      clearAllTimeouts();
+      if (panel) panel.classList.remove('panel-in');
+
+      var t1 = setTimeout(function(){
+        var tHold = setTimeout(function(){
+          if (overlay) overlay.classList.remove('overlay-in');
+          var tHide = setTimeout(function(){
+            menu.classList.remove('open');
+            menu.setAttribute('aria-hidden', 'true');
+            if (panel) panel.setAttribute('aria-hidden', 'true');
+
+            // restore hamburgers / openers to previous state
+            restoreOpenButtons();
+
+            preventScroll(false);
+            if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus({ preventScroll: true });
+          }, OVERLAY_DUR);
+          timeouts.push(tHide);
+        }, OVERLAY_HOLD);
+        timeouts.push(tHold);
+      }, PANEL_DUR);
+      timeouts.push(t1);
+
+      document.removeEventListener('focus', focusTrap, true);
+      document.removeEventListener('keydown', onKeyDown);
+      if (overlay) overlay.removeEventListener('click', overlayClick);
+      openButtons.forEach(function(b){ if (b && b.setAttribute) b.setAttribute('aria-expanded', 'false'); });
+    }
+
+    function overlayClick(){ closeMobileMenu(); }
+
+    // Attach listeners to openers
+    openButtons.forEach(function(btn){
+      if (!btn) return;
+      btn.addEventListener('click', function(ev){ ev.preventDefault(); openMobileMenu(); });
+      btn.addEventListener('keydown', function(ev){
+        var k = ev.key;
+        if (k === 'Enter' || k === ' ' || k === 'Spacebar') { ev.preventDefault(); openMobileMenu(); }
+      });
+    });
+
+    // Attach close buttons
+    externalCloseButtons.concat(closeBtns).forEach(function(btn){ if (!btn) return; btn.addEventListener('click', function(ev){ ev.preventDefault(); closeMobileMenu(); }); });
+
+    // Expose globals (keeps parity with prototype)
+    window.openMobileMenu = openMobileMenu;
+    window.closeMobileMenu = closeMobileMenu;
+    window.toggleMobileMenu = function(){ if (menu.classList.contains('open')) closeMobileMenu(); else openMobileMenu(); };
+
+    // Preload background image if present
+    (function preloadBg(){
+      if (!panel) return;
+      var style = getComputedStyle(panel);
+      var bg = style.getPropertyValue('background-image') || '';
+      var url = '';
+      var start = bg.indexOf('url(');
+      var end = bg.lastIndexOf(')');
+      if (start !== -1 && end !== -1 && end > start) {
+        url = bg.slice(start + 4, end).replace(/['\"]/g, '');
+      }
+      if (url) { var img = new Image(); img.src = url; }
+    })();
+
+  }); // DOMContentLoaded end
+
+})();
+  </script>
+<script>
+
+
+      // 2. Scroll Reveal Observer (Staggered Entrances)
+      const revealElements = document.querySelectorAll('.reveal-el');
+      const observerOptions = {
+        root: null,
+        threshold: 0.1,
+        rootMargin: "0px 0px -50px 0px"
+      };
+
+      const revealObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            // Apply a slight delay based on the element's DOM index inside its container for stagger
+            const parent = entry.target.parentElement;
+            if(parent && (parent.classList.contains('grid') || parent.id === 'programGrid')) {
+                const index = Array.from(parent.children).indexOf(entry.target);
+                entry.target.style.transitionDelay = `${index * 150}ms`;
+            }
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, observerOptions);
+
+      revealElements.forEach(el => revealObserver.observe(el));
+
+      // 3. Parallax Scroll Effect
+      const parallaxLayers = document.querySelectorAll('.parallax-layer');
+      window.addEventListener('scroll', () => {
+        const scrolled = window.scrollY;
+        parallaxLayers.forEach(layer => {
+          const speed = layer.dataset.speed || 0.3;
+          const yPos = -(scrolled * speed);
+          layer.style.transform = `translateY(${yPos}px)`;
+        });
+      });
+
+      // 4. Microinteraction: Heart/Like Toggle
+      const heartBtns = document.querySelectorAll('.heart-btn');
+      heartBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          btn.classList.toggle('liked');
+        });
+      });
+
+      // 5. Microinteraction: Form Validation & Success State
+      const form = document.getElementById('contactForm');
+      const submitBtn = document.getElementById('submitBtn');
+      const btnText = submitBtn.querySelector('.btn-text');
+      const checkmark = submitBtn.querySelector('.checkmark');
+      const spinner = submitBtn.querySelector('.spinner');
+
+      if(form) {
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          
+          // State 1: Loading
+          submitBtn.classList.add('pointer-events-none', 'opacity-90');
+          btnText.textContent = "Sending...";
+          spinner.classList.remove('hidden');
+          
+          // Simulate network request
+          setTimeout(() => {
+            // State 2: Success! (Popping checkmark, green background)
+            spinner.classList.add('hidden');
+            submitBtn.classList.remove('bg-slate-900', 'hover:bg-slate-800');
+            submitBtn.classList.add('success-state');
+            btnText.textContent = "Message Sent!";
+            checkmark.classList.remove('hidden');
+
+            // Reset after 3.5 seconds
+            setTimeout(() => {
+              submitBtn.classList.remove('success-state', 'pointer-events-none', 'opacity-90');
+              submitBtn.classList.add('bg-slate-900', 'hover:bg-slate-800');
+              btnText.textContent = "Send Message";
+              checkmark.classList.add('hidden');
+              form.reset();
+              // Remove focus blur from inputs
+              document.activeElement.blur();
+            }, 3500);
+
+          }, 1200);
+        });
+      }
+    });
+  </script>
+  <script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        // Add the animation and make it visible
+        entry.target.classList.add('animate-fadeIn');
+        entry.target.classList.remove('opacity-0');
+        // Stop observing once the animation has played
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1 }); // Triggers when 10% of the element is visible
+
+  // Target all elements with the 'reveal' class
+  document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+</script>
+<script>
+  // JavaScript: add this at bottom of page or in an external script
+const items = document.querySelectorAll('.slide-in-on-scroll');
+const io = new IntersectionObserver((entries, observer) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target); // optional: only animate once
+    }
+  });
+}, { threshold: 0.15 });
+
+items.forEach(i => io.observe(i));
+</script>
+<script src="script.js" defer></script>
+</body>
+</html>
