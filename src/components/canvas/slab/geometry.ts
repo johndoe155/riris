@@ -148,6 +148,36 @@ export function buildCardFacePlane(spec: SlabSpec = SLAB_SPEC, segs = 24): THREE
   return geo;
 }
 
+/**
+ * Flat plate with a hole, UV-mapped over its own bounding box. Used for the
+ * window floor: the baked shadow, the well pockets and the tray tone only
+ * cover the strip of tray you can actually see, and a plane cannot have a
+ * hole, so the card-shaped cutout has to be part of the geometry.
+ */
+export function buildWindowPlate(
+  outer: Rect,
+  hole: Rect,
+  power: number,
+  segs: number
+): THREE.BufferGeometry {
+  const shape = squircle(outer.w, outer.h, outer.r, power, segs, outer.x ?? 0, outer.y ?? 0);
+  const inner = squircle(hole.w, hole.h, hole.r, power, segs, hole.x ?? 0, hole.y ?? 0);
+  shape.holes.push(new THREE.Path(inner.getPoints().slice().reverse()));
+  const geo = new THREE.ShapeGeometry(shape);
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    uv.setXY(
+      i,
+      (pos.getX(i) - ((outer.x ?? 0) - outer.w / 2)) / outer.w,
+      (pos.getY(i) - ((outer.y ?? 0) - outer.h / 2)) / outer.h
+    );
+  }
+  uv.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
+
 /* ------------------------------------------------------------------ *
  * Layer set
  * ------------------------------------------------------------------ */
@@ -169,6 +199,8 @@ export interface SlabGeometry {
   card: THREE.BufferGeometry;
   /** flat card-shaped plane for the printed face, foil and back */
   cardFace: THREE.BufferGeometry;
+  /** window floor: the tray texture's plane, with the card cutout as a hole */
+  trayPlate: THREE.BufferGeometry;
   /** retaining wells in the window */
   slots: THREE.BufferGeometry[];
   planes: SlabLayers;
@@ -291,9 +323,18 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     curveSegments: q.curve,
   });
   const cardFace = buildCardFacePlane(spec, q.corner * 2);
+  const trayPlate = buildWindowPlate(
+    { ...windowRect, w: windowW * 0.995, h: windowH * 0.995 },
+    { w: L.trayW, h: L.trayH, r: L.trayRadius, x: 0, y: spec.cardY },
+    P,
+    q.corner
+  );
 
-  // --- retaining wells above the card (visible through the window)
-  const slotY = L.windowY + windowH / 2 - spec.slotTop - spec.slotH / 2;
+  // --- retaining wells in the apron above the card. The apron is the strip of
+  // tray between the window's top edge and the card's top edge; a well that
+  // reached past the card would float in front of the art.
+  const apronTop = L.windowY + windowH / 2;
+  const slotY = Math.min(apronTop - spec.slotTop - spec.slotH / 2, spec.cardY + spec.cardH / 2 - spec.slotH / 2 - 0.02);
   const slots = L.slotX.map((x) => {
     const g = new THREE.BoxGeometry(spec.slotW, spec.slotH, 0.01);
     g.translate(x, slotY, 0);
@@ -302,7 +343,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
 
   const tri = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
   const triangles =
-    tri(shell) + tri(backPlate) + tri(tray) + tri(band) + tri(labelPlate) + tri(ridge) + tri(card) +
+    tri(trayPlate) + tri(shell) + tri(backPlate) + tri(tray) + tri(band) + tri(labelPlate) + tri(ridge) + tri(card) +
     tri(cardFace) + slots.reduce((a, s) => a + tri(s), 0);
 
   return {
@@ -314,6 +355,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     ridge,
     card,
     cardFace,
+    trayPlate,
     slots,
     planes: L,
     at: {

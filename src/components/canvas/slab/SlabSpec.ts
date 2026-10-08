@@ -84,7 +84,7 @@ export interface SlabSpec {
   artBottom: number;
 
   /* ---- furniture ---- */
-  /** retaining wells above the card */
+  /** retaining wells in the apron above the card (they must not overlap it) */
   slotTop: number;
   slotH: number;
   slotW: number;
@@ -134,9 +134,9 @@ export const SLAB_SPEC: SlabSpec = {
   artTop: 0.036,
   artBottom: 0.336,
 
-  slotTop: 0.09,
-  slotH: 0.16,
-  slotW: 0.0085,
+  slotTop: 0.02,
+  slotH: 0.1,
+  slotW: 0.014,
   slots: 4,
 };
 

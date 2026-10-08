@@ -251,9 +251,10 @@ export function Slab({
         <mesh geometry={geo.backPlate} material={mat.tray} position={[0, 0, geo.at.backPlate]} />
         {/* tray ring — a plate with the card's cutout */}
         <mesh geometry={geo.tray} material={mat.tray} position={[0, 0, geo.at.tray]} />
-        {/* tray texture on the floor, with the baked AO in it */}
-        <mesh position={[0, L.windowY, L.trayFront - 0.0008]} rotation={[0, 0, 0]}>
-          <planeGeometry args={[SLAB_SPEC.windowW * 0.995, SLAB_SPEC.windowH * 0.995]} />
+        {/* window floor: the tray texture's plane, with the card cutout in it
+            (the geometry behind it is the deep structure, this is the surface
+            you actually see in the apron around the card) */}
+        <mesh geometry={geo.trayPlate} position={[0, 0, L.trayFront + 0.0012]} raycast={() => null}>
           <meshStandardMaterial map={trayTex} roughness={0.86} metalness={0.04} />
         </mesh>
         {/* frosted band around the window */}

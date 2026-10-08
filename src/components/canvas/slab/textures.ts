@@ -533,11 +533,11 @@ export function buildLabelTexture(o: LabelText): THREE.CanvasTexture {
  * ------------------------------------------------------------------ */
 
 export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, layout: TrayLayout) {
-  // smoky plate
+  // smoky plate, tuned to the window floor tone sampled off the reference
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#2b2b31');
-  g.addColorStop(0.45, '#232329');
-  g.addColorStop(1, '#1b1b20');
+  g.addColorStop(0, '#3c3339');
+  g.addColorStop(0.45, '#30282e');
+  g.addColorStop(1, '#231d22');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
