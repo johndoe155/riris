@@ -3,7 +3,15 @@
 import * as THREE from 'three';
 import type { SlabCard } from '@/data/slabCards';
 import { SLAB_SPEC, trayLayout } from './SlabSpec';
-import { drawCardBack, drawCardFace, drawLabel, drawTray, type CardFaceText, type LabelText } from './textures';
+import {
+  drawCardBack,
+  drawCardFace,
+  drawLabel,
+  drawTray,
+  mixHex,
+  type CardFaceText,
+  type LabelText,
+} from './textures';
 import type { BackStyle } from '@/data/slabCards';
 
 /**
@@ -224,7 +232,10 @@ export function getLabelTexture(
     width,
     height: Math.round(width * LABEL_ASPECT),
     accent,
-    plate: blank ? '#FFFFFF' : card.color2,
+    // the reference plate reads neutral dark (~#383037) with only a hint of the
+    // card's own colour — a saturated moulding photographs far hotter than the
+    // real part; the colour belongs in the accent border, not the plate
+    plate: blank ? '#FFFFFF' : mixHex('#3f343c', card.color2, 0.06),
     ink: blank ? '#141414' : '#F7F5F2',
     qr: !blank,
     blank,

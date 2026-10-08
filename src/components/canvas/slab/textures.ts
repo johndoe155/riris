@@ -27,6 +27,21 @@ function makeCanvas(w: number, h: number) {
   return { canvas, ctx };
 }
 
+/** Blend two #rrggbb colours; t = 0 keeps `a`, t = 1 returns `b`. */
+export function mixHex(a: string, b: string, t: number): string {
+  const parse = (h: string) => {
+    const s = h.replace('#', '');
+    const v = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
+    return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+  };
+  const [r1, g1, b1] = parse(a);
+  const [r2, g2, b2] = parse(b);
+  const mix = (x: number, y: number) => Math.round(x + (y - x) * t);
+  return `#${[mix(r1, r2), mix(g1, g2), mix(b1, b2)]
+    .map((c) => c.toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
 function toTexture(canvas: HTMLCanvasElement, { srgb = false } = {}): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
@@ -437,57 +452,92 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
     return;
   }
 
-  // thin inner border, mirroring the moulded ridge
-  ctx.strokeStyle = o.accent;
-  ctx.globalAlpha = 0.5;
-  ctx.lineWidth = Math.max(1, W * 0.0045);
-  roundRect(ctx, W * 0.022, H * 0.1, W * 0.956, H * 0.8, H * 0.11);
+  // the plate is moulded, so it is a shade lighter along the top than the
+  // bottom — the reference reads a touch of that even in flat light
+  const plateGrad = ctx.createLinearGradient(0, 0, 0, H);
+  plateGrad.addColorStop(0, 'rgba(255,255,255,0.05)');
+  plateGrad.addColorStop(1, 'rgba(0,0,0,0.16)');
+  ctx.fillStyle = plateGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // thin inner border, mirroring the moulded ridge: a pale line, not a
+  // coloured one — the reference's frame is white/neutral and the colour in
+  // the header comes from the mark at the right
+  // the line hugs the plate, the way the reference's highlight does, and its
+  // radius has to be the plate's own (SLAB_SPEC.labelRadius is a fraction of
+  // min(w, h), i.e. H*0.055 in this texture)
+  const inset = W * 0.008;
+  ctx.strokeStyle = 'rgba(234,240,248,0.5)';
+  ctx.lineWidth = Math.max(1, W * 0.0036);
+  roundRect(ctx, inset, inset, W - inset * 2, H - inset * 2, Math.max(2, H * 0.055 - inset));
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  const pad = W * 0.038;
+  const pad = W * 0.065;
   const centreY = H / 2;
 
   /* ---- right: the QR block, with the grade and serial stacked to its left */
-  const q = H * 0.6;
+  const q = H * 0.56;
   const qx = W - pad - q;
   const qy = centreY - q / 2;
-  ctx.fillStyle = o.ink;
+  // the mark: a QR-style tile whose three finder squares carry the card's own
+  // colour, which is where the label's accent lives (the reference puts its
+  // coloured logo glyph in exactly this corner of the plate)
+  ctx.fillStyle = mixHex(o.plate, '#000000', 0.42);
   ctx.fillRect(qx, qy, q, q);
-  ctx.fillStyle = o.plate;
-  ctx.fillRect(qx + q * 0.06, qy + q * 0.06, q * 0.88, q * 0.88);
-  ctx.fillStyle = o.ink;
+  ctx.strokeStyle = 'rgba(233,239,247,0.22)';
+  ctx.lineWidth = Math.max(1, W * 0.0018);
+  ctx.strokeRect(qx, qy, q, q);
   const n = 9;
-  const cell = (q * 0.88) / n;
+  const cell = q / n;
   const r = rng(0x9e37);
+  ctx.fillStyle = o.ink;
   for (let y = 0; y < n; y++) {
     for (let x = 0; x < n; x++) {
-      const corner = (x < 3 && y < 3) || (x > n - 4 && y < 3) || (x < 3 && y > n - 4);
-      if (corner ? !(x === 1 && y === 1) && !(x === 0 && y === 0) : r() > 0.52) {
-        ctx.fillRect(qx + q * 0.06 + x * cell, qy + q * 0.06 + y * cell, cell * 0.92, cell * 0.92);
+      const finder = (x < 3 && y < 3) || (x > n - 4 && y < 3) || (x < 3 && y > n - 4);
+      if (finder) continue;
+      if (r() > 0.58) {
+        ctx.globalAlpha = 0.62;
+        ctx.fillRect(qx + x * cell, qy + y * cell, cell * 0.84, cell * 0.84);
       }
     }
   }
+  ctx.globalAlpha = 1;
+  const finderAt = (fx: number, fy: number) => {
+    ctx.fillStyle = o.accent;
+    ctx.globalAlpha = 0.92;
+    ctx.fillRect(qx + fx * cell, qy + fy * cell, cell * 3, cell * 3);
+    ctx.fillStyle = mixHex(o.plate, '#000000', 0.42);
+    ctx.fillRect(qx + (fx + 1) * cell, qy + (fy + 1) * cell, cell, cell);
+    ctx.globalAlpha = 1;
+  };
+  finderAt(0, 0);
+  finderAt(n - 3, 0);
+  finderAt(0, n - 3);
 
-  /* ---- zones: title | grade + serial | QR, so nothing can collide ---- */
-  const titleZone = W * 0.5;
-  const markRight = W * 0.795;
+  /* ---- zones: title | grade + serial | mark, so nothing can collide ---- */
+  // the reference's widest title line runs to 0.55 of the plate; our titles are
+  // longer words, so the zone ends just short of the divider and the fit loop
+  // scales the type down when it has to
+  const titleZone = W * 0.52;
+  const markRight = W * 0.79;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = o.ink;
-  ctx.globalAlpha = 0.9;
-  ctx.font = `800 ${H * 0.3}px "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.grade, markRight, centreY - H * 0.09);
-  ctx.globalAlpha = 0.6;
-  ctx.font = `600 ${H * 0.15}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.serial, markRight, centreY + H * 0.19);
+  ctx.globalAlpha = 0.92;
+  ctx.font = `800 ${H * 0.26}px "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.fillText(o.grade, markRight, centreY - H * 0.1);
+  ctx.globalAlpha = 0.55;
+  ctx.font = `600 ${H * 0.14}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.fillText(o.serial, markRight, centreY + H * 0.2);
   ctx.globalAlpha = 1;
   ctx.textAlign = 'left';
 
-  // hairline divider between the title and the marks
-  ctx.globalAlpha = 0.3;
-  ctx.fillStyle = o.accent;
-  ctx.fillRect(W * 0.535, H * 0.2, Math.max(1, W * 0.0016), H * 0.6);
+  // hairline divider between the title and the marks — neutral, like the inner
+  // border, so the plate stays dark and only the mark carries colour
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = o.ink;
+  ctx.fillRect(W * 0.53, H * 0.22, Math.max(1, W * 0.0014), H * 0.56);
   ctx.globalAlpha = 1;
 
   /* ---- left: a two-line heavy title, shrunk and then trimmed to fit ---- */
@@ -498,7 +548,7 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
     .slice(0, 2)
     .map((l) => l.toUpperCase());
   const avail = titleZone - pad;
-  let size = H * 0.28;
+  let size = H * 0.31;
   for (; size > H * 0.12; size -= 2) {
     ctx.font = heavy(size);
     if (Math.max(...lines.map((l) => ctx.measureText(l).width)) <= avail) break;
@@ -511,11 +561,13 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
     return `${cut}…`;
   });
 
-  const lead = size * 1.14;
+  // the reference stacks its two lines tight: cap 0.224 of the plate, 1.26 caps
+  // of leading, so the block spans half the plate and sits centred
+  const lead = size * 0.92;
   const blockTop = centreY - ((fitted.length - 1) * lead) / 2;
   ctx.fillStyle = o.ink;
   fitted.forEach((line, i) => {
-    ctx.globalAlpha = i === 0 ? 1 : 0.72;
+    ctx.globalAlpha = i === 0 ? 1 : 0.9;
     ctx.fillText(line, pad, blockTop + i * lead);
   });
   ctx.globalAlpha = 1;
@@ -533,11 +585,13 @@ export function buildLabelTexture(o: LabelText): THREE.CanvasTexture {
  * ------------------------------------------------------------------ */
 
 export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, layout: TrayLayout) {
-  // smoky plate, tuned to the window floor tone sampled off the reference
+  // smoky plate, tuned to the window floor tone sampled off the reference: the
+  // case is translucent, so the floor never goes black under the card — it
+  // stays a mauve-smoke that is lighter at the top where the window is open
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#3c3339');
-  g.addColorStop(0.45, '#30282e');
-  g.addColorStop(1, '#231d22');
+  g.addColorStop(0, '#57494f');
+  g.addColorStop(0.45, '#463a44');
+  g.addColorStop(1, '#3b3139');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
@@ -583,32 +637,75 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
   roundRect(ctx, cx + pad * 0.1, cy + pad * 0.1, cw - pad * 0.2, ch - pad * 0.2, w * 0.045);
   ctx.stroke();
 
-  // ambient occlusion under the label ridge, along the top of the window
-  const top = ctx.createLinearGradient(0, 0, 0, h * 0.16);
-  top.addColorStop(0, 'rgba(0,0,0,0.62)');
-  top.addColorStop(0.35, 'rgba(0,0,0,0.22)');
+  // ambient occlusion under the label ridge: a thin band, because most of the
+  // apron above the card is lit by the open window, not shadowed
+  const top = ctx.createLinearGradient(0, 0, 0, h * 0.055);
+  top.addColorStop(0, 'rgba(0,0,0,0.6)');
+  top.addColorStop(0.5, 'rgba(0,0,0,0.22)');
   top.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = top;
-  ctx.fillRect(0, 0, w, h * 0.16);
+  ctx.fillRect(0, 0, w, h * 0.055);
 
-  // ...and one along the bottom wall the card leans on
-  const bottom = ctx.createLinearGradient(0, h, 0, h * 0.9);
-  bottom.addColorStop(0, 'rgba(0,0,0,0.5)');
+  // frosted wash over the apron between the ridge and the card: light comes
+  // through the open window and the moulded lip picks it up. Measured off the
+  // reference (apron centre ~#887b85 vs a black tray at ~#5c4e5b) — centre
+  // weighted, because the rails beside it stay dark.
+  const apron = ctx.createRadialGradient(w * 0.5, 0, 0, w * 0.5, 0, w * 0.82);
+  apron.addColorStop(0, 'rgba(220,228,244,0.42)');
+  apron.addColorStop(0.5, 'rgba(210,218,236,0.26)');
+  apron.addColorStop(1, 'rgba(200,208,226,0)');
+  ctx.save();
+  ctx.fillStyle = apron;
+  ctx.fillRect(0, 0, w, h * 0.16);
+  ctx.restore();
+
+  // ...and one along the bottom wall the card leans on. Kept light: the
+  // reference reads this ledge at ~#43374 1, well above the side troughs, so the
+  // card's contact shadow is a thin line rather than a wide well.
+  const bottom = ctx.createLinearGradient(0, h, 0, h * 0.94);
+  bottom.addColorStop(0, 'rgba(0,0,0,0.07)');
   bottom.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = bottom;
-  ctx.fillRect(0, h * 0.9, w, h * 0.1);
+  ctx.fillRect(0, h * 0.94, w, h * 0.06);
+  // the bottom wall still catches some light through the acrylic
+  const bottomLight = ctx.createLinearGradient(0, h, 0, h * 0.96);
+  bottomLight.addColorStop(0, 'rgba(196,206,224,0.16)');
+  bottomLight.addColorStop(1, 'rgba(196,206,224,0)');
+  ctx.fillStyle = bottomLight;
+  ctx.fillRect(0, h * 0.96, w, h * 0.04);
 
-  // side walls catch a little light
-  const sideL = ctx.createLinearGradient(0, 0, w * 0.06, 0);
-  sideL.addColorStop(0, 'rgba(190,200,216,0.16)');
+  // side walls: a thin lit rail, then the tray falls away into shadow — the
+  // reference reads the rails *darker* than the plate, not brighter
+  const sideL = ctx.createLinearGradient(0, 0, w * 0.075, 0);
+  sideL.addColorStop(0, 'rgba(198,208,226,0.16)');
+  sideL.addColorStop(0.3, 'rgba(0,0,0,0.12)');
   sideL.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sideL;
-  ctx.fillRect(0, 0, w * 0.06, h);
-  const sideR = ctx.createLinearGradient(w, 0, w * 0.94, 0);
-  sideR.addColorStop(0, 'rgba(190,200,216,0.12)');
+  ctx.fillRect(0, 0, w * 0.075, h);
+  // light piped down the acrylic wall, just inside each rail — the streaks the
+  // reference shows running the height of the window
+  const streakL = ctx.createLinearGradient(w * 0.04, 0, w * 0.115, 0);
+  streakL.addColorStop(0, 'rgba(210,220,238,0)');
+  streakL.addColorStop(0.45, 'rgba(214,224,242,0.2)');
+  streakL.addColorStop(1, 'rgba(210,220,238,0)');
+  ctx.fillStyle = streakL;
+  ctx.fillRect(w * 0.04, 0, w * 0.075, h);
+  // the right rail runs brighter than the left all the way to the moulding —
+  // the reference's key light is off to that side
+  const streakR = ctx.createLinearGradient(w * 0.885, 0, w, 0);
+  streakR.addColorStop(0, 'rgba(210,220,238,0)');
+  streakR.addColorStop(0.45, 'rgba(218,228,244,0.22)');
+  streakR.addColorStop(0.85, 'rgba(222,232,248,0.2)');
+  streakR.addColorStop(1, 'rgba(222,232,248,0.22)');
+  ctx.fillStyle = streakR;
+  ctx.fillRect(w * 0.885, 0, w * 0.115, h);
+
+  const sideR = ctx.createLinearGradient(w, 0, w * 0.925, 0);
+  sideR.addColorStop(0, 'rgba(212,222,238,0.26)');
+  sideR.addColorStop(0.3, 'rgba(0,0,0,0.04)');
   sideR.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sideR;
-  ctx.fillRect(w * 0.94, 0, w * 0.06, h);
+  ctx.fillRect(w * 0.925, 0, w * 0.075, h);
 }
 
 export function buildTrayTexture(w = 512, h = 768, layout: TrayLayout = trayLayout()): THREE.CanvasTexture {

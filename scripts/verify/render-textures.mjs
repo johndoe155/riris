@@ -71,20 +71,69 @@ grad.addColorStop(1, '#1a1319');
 ctx.fillStyle = grad;
 ctx.fillRect(0, 0, W, H);
 
-// shell silhouette (same squircle the geometry uses)
+// shell silhouette (same squircle the geometry uses). Not a real render — the
+// studio env is what actually lights the shell — so this paints the *character*
+// of that lighting: a bright top rim, a specular down the right edge, and a
+// glow bleeding in from the left, which is what the reference photo shows.
 const shellPts = textures.clipSquircle;
 ctx.save();
 shellPts(ctx, W, H, (SLAB_SPEC.radius / SLAB_SPEC.w) * W, SLAB_SPEC.cornerPower);
-ctx.fillStyle = 'rgba(150,140,155,0.35)';
+ctx.clip();
+ctx.fillStyle = 'rgba(148,138,153,0.34)';
 ctx.fillRect(0, 0, W, H);
+const topRim = ctx.createLinearGradient(0, 0, 0, H * 0.07);
+topRim.addColorStop(0, 'rgba(238,232,240,0.72)');
+topRim.addColorStop(0.4, 'rgba(232,226,236,0.4)');
+topRim.addColorStop(1, 'rgba(232,226,236,0)');
+ctx.fillStyle = topRim;
+ctx.fillRect(0, 0, W, H * 0.07);
+const leftGlow = ctx.createLinearGradient(0, 0, W * 0.022, 0);
+leftGlow.addColorStop(0, 'rgba(214,206,222,0.13)');
+leftGlow.addColorStop(1, 'rgba(214,206,222,0)');
+ctx.fillStyle = leftGlow;
+ctx.fillRect(0, 0, W * 0.022, H);
+const leftShade = ctx.createLinearGradient(0, 0, W * 0.07, 0);
+leftShade.addColorStop(0, 'rgba(20,16,22,0)');
+leftShade.addColorStop(0.45, 'rgba(20,16,22,0.36)');
+leftShade.addColorStop(1, 'rgba(20,16,22,0)');
+ctx.fillStyle = leftShade;
+ctx.fillRect(0, 0, W * 0.085, H);
+const rightSpec = ctx.createLinearGradient(W, 0, W * 0.9, 0);
+rightSpec.addColorStop(0, 'rgba(244,238,246,0.8)');
+rightSpec.addColorStop(0.4, 'rgba(232,226,236,0.36)');
+rightSpec.addColorStop(1, 'rgba(232,226,236,0)');
+ctx.fillStyle = rightSpec;
+ctx.fillRect(W * 0.9, 0, W * 0.1, H);
+const bottomRim = ctx.createLinearGradient(0, H, 0, H * 0.955);
+bottomRim.addColorStop(0, 'rgba(24,20,26,0.35)');
+bottomRim.addColorStop(0.5, 'rgba(120,112,124,0.04)');
+bottomRim.addColorStop(1, 'rgba(120,112,124,0)');
+ctx.fillStyle = bottomRim;
+ctx.fillRect(0, H * 0.955, W, H * 0.045);
 ctx.restore();
 
-// window recess
+// window recess: the tray, masked to the window's own squircle. clipSquircle
+// centres the shape on (w/2, h/2) of the *current* space, so translate to the
+// window's top-left first — one world unit is px(W) in both axes here, because
+// px() is "world unit -> px" and the slab is 1.0 x 1.66 units for 664 x 1103 px.
 ctx.save();
-ctx.translate(W / 2, py(L.windowY));
-shellPts(ctx, px(SLAB_SPEC.windowW), px(SLAB_SPEC.windowH), (SLAB_SPEC.windowRadius / SLAB_SPEC.w) * W, SLAB_SPEC.cornerPower, 4);
-ctx.translate(-W / 2, 0);
-ctx.drawImage(use.getTrayTexture().image, px(-SLAB_SPEC.windowW / 2), px(-SLAB_SPEC.windowH / 2), px(SLAB_SPEC.windowW), px(SLAB_SPEC.windowH));
+const winPxW = px(SLAB_SPEC.windowW);
+const winPxH = px(SLAB_SPEC.windowH);
+ctx.translate(W / 2 - winPxW / 2, py(L.windowY) - winPxH / 2);
+shellPts(ctx, winPxW, winPxH, (SLAB_SPEC.windowRadius / SLAB_SPEC.w) * W, SLAB_SPEC.cornerPower, 48);
+ctx.drawImage(use.getTrayTexture().image, 0, 0, winPxW, winPxH);
+// frosted band: the moulded rim the shell melts into around the window. In 3D
+// this is the `band` mesh, not part of the tray texture, so it has to be painted
+// here too — stroke the window outline with 2x the band width, clipped to the
+// outline itself, which leaves a band of exactly `windowBand` inside the edge.
+const bandPx = (SLAB_SPEC.windowBand / SLAB_SPEC.w) * W;
+shellPts(ctx, winPxW, winPxH, (SLAB_SPEC.windowRadius / SLAB_SPEC.w) * W, SLAB_SPEC.cornerPower, 48);
+ctx.lineWidth = bandPx * 2;
+ctx.strokeStyle = 'rgba(238,244,252,0.5)';
+ctx.stroke();
+ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+ctx.lineWidth = Math.max(1, bandPx * 0.5);
+ctx.stroke();
 ctx.restore();
 
 // card
