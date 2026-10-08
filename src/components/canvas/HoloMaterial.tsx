@@ -21,6 +21,12 @@ export const FINISH_INDEX: Record<FinishName, number> = {
 
 /* ------------------------------------------------------------------ *
  * Shader
+ *
+ * Two modes:
+ *   0 base     — draws the art itself with the finish mixed in (legacy path)
+ *   1 overlay  — a transparent foil pass that sits on the card plane and is
+ *                masked to the art window, so the frame, title and attributes
+ *                keep their own inks
  * ------------------------------------------------------------------ */
 
 const HoloShaderMaterial = shaderMaterial(
@@ -30,10 +36,17 @@ const HoloShaderMaterial = shaderMaterial(
     uImage: null as THREE.Texture | null,
     /** source width / height — drives the cover-fit crop */
     uImageAspect: 1,
-    /** card face width / height (a 3:4 slab by default) */
-    uCardAspect: 0.75,
-    uFinish: 0, // 0 base, 1 holo, 2 cracked, 3 gold
+    /** card face width / height */
+    uCardAspect: 0.709,
+    uFinish: 0,
     uIntensity: 1,
+    /** 0 = draw the art, 1 = foil overlay */
+    uMode: 0,
+    /** x0, y0, x1, y1 of the foil mask, in card UV (v measured from the bottom) */
+    uMask: new THREE.Vector4(0.071, 0.336, 0.929, 0.964),
+    uMaskFeather: 0.06,
+    /** how strongly the foil shows outside the mask (0 = card plane only) */
+    uOutside: 0.12,
   },
   // vertex
   /* glsl */ `
@@ -58,6 +71,10 @@ const HoloShaderMaterial = shaderMaterial(
     uniform float uCardAspect;
     uniform float uFinish;
     uniform float uIntensity;
+    uniform float uMode;
+    uniform vec4 uMask;
+    uniform float uMaskFeather;
+    uniform float uOutside;
 
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -89,25 +106,29 @@ const HoloShaderMaterial = shaderMaterial(
       return mix(c3, c4, (t2 - 0.66) / 0.34);
     }
 
-    // Cover-fit: crop the source instead of squashing it into the card face,
-    // so a square NFT keeps its aspect on a 3:4 slab.
+    // Cover-fit: crop the source rather than squashing it into the card face.
     vec2 coverUv(vec2 uv, float imageAspect, float cardAspect) {
       float ratio = imageAspect / max(cardAspect, 0.0001);
       vec2 scale = ratio > 1.0 ? vec2(1.0 / ratio, 1.0) : vec2(1.0, ratio);
       return (uv - 0.5) * scale + 0.5;
     }
 
+    // Soft rectangle mask: 1 inside the art window, fading to uOutside beyond.
+    float artMask(vec2 uv) {
+      vec4 m = uMask;
+      float dx = max(max(m.x - uv.x, uv.x - m.z), 0.0);
+      float dy = max(max(m.y - uv.y, uv.y - m.w), 0.0);
+      float d = length(vec2(dx, dy));
+      return 1.0 - smoothstep(0.0, max(uMaskFeather, 0.001), d);
+    }
+
     void main() {
       vec3 n = normalize(vNormal);
       vec3 v = normalize(vViewDir);
-
       vec3 img = texture2D(uImage, coverUv(vUv, uImageAspect, uCardAspect)).rgb;
 
-      // View-angle terms. Fresnel gives the grazing sheen, the half vector gives
-      // the tight highlight: both ride the surface normal, so tilting the card —
-      // or the phone — shifts the foil with no pointer motion at all.
       float fresnel = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 3.0);
-      vec3 lightDir = normalize(vec3(0.35, 0.6, 0.72)); // view space
+      vec3 lightDir = normalize(vec3(0.35, 0.6, 0.72));
       vec3 halfVec = normalize(lightDir + v);
       float spec = pow(clamp(dot(n, halfVec), 0.0, 1.0), 28.0);
       float viewShift = (1.0 - abs(dot(n, v))) * 0.6 + spec * 0.5;
@@ -120,52 +141,71 @@ const HoloShaderMaterial = shaderMaterial(
                      + uTime * 0.5 + dist * 10.0 + viewShift * 6.0) * 0.5 + 0.5;
       vec3 foil = holoGradient(bands + viewShift + pointer.x * 0.4 + uTime * 0.05);
 
-      // --- the four finish tiers -------------------------------------
-      // 0 base: the art, plus a whisper of glass sheen
-      vec3 baseTier = img * (0.97 + fresnel * 0.1);
-
-      // 1 holo foil
-      float foilMask = clamp(fresnel * 0.8 + pointerGlow * 0.55 + 0.12, 0.0, 1.0);
-      foilMask *= 0.55 + noise(vUv * 8.0 + uTime * 0.08) * 0.45;
-      vec3 holoTier = mix(img, foil, foilMask * 0.75);
-      holoTier += foil * (fresnel * 0.35 + spec * 0.45);
-
-      // 2 cracked ice
-      float n1 = noise(vUv * 12.0 + 3.1);
-      float n2 = noise(vUv * 27.0 + 11.0);
-      float crack = 1.0 - smoothstep(0.0, 0.16, abs(n1 - n2));
-      vec3 ice = vec3(0.78, 0.88, 1.0);
-      vec3 iceTier = mix(img, ice, clamp(0.18 + n1 * 0.22 + fresnel * 0.45, 0.0, 1.0));
-      iceTier += ice * crack * (0.35 + pointerGlow * 0.5 + spec * 0.6);
-      iceTier += ice * fresnel * 0.25;
-
-      // 3 gold
-      vec3 goldA = vec3(1.0, 0.86, 0.36);
-      vec3 goldB = vec3(0.62, 0.42, 0.09);
-      vec3 gold = mix(goldB, goldA, sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0) * 0.5 + 0.5);
-      float goldMask = clamp(fresnel * 0.85 + pointerGlow * 0.45 + 0.15, 0.0, 1.0);
-      vec3 goldTier = mix(img, gold, goldMask * 0.6);
-      goldTier += gold * (fresnel * 0.45 + spec * 0.6);
-
-      // --- blend by weight so a finish change morphs instead of cutting
+      /* ---- per-finish colour + strength ---- */
       float w0 = max(0.0, 1.0 - abs(uFinish - 0.0));
       float w1 = max(0.0, 1.0 - abs(uFinish - 1.0));
       float w2 = max(0.0, 1.0 - abs(uFinish - 2.0));
       float w3 = max(0.0, 1.0 - abs(uFinish - 3.0));
       float wSum = max(w0 + w1 + w2 + w3, 0.0001);
-      vec3 tinted = (baseTier * w0 + holoTier * w1 + iceTier * w2 + goldTier * w3) / wSum;
 
-      vec3 col = mix(img, tinted, uIntensity);
+      float foilMask = clamp(fresnel * 0.8 + pointerGlow * 0.55 + 0.12, 0.0, 1.0);
+      foilMask *= 0.55 + noise(vUv * 8.0 + uTime * 0.08) * 0.45;
 
-      // Vignette + micro scratches (kept subtle to avoid moiré)
-      float vignette = 1.0 - smoothstep(0.5, 1.2, length(vUv - 0.5) * 1.5);
-      col *= 0.88 + vignette * 0.12;
-      col *= sin(vUv.y * 420.0) * 0.015 + 0.985;
+      float n1 = noise(vUv * 12.0 + 3.1);
+      float n2 = noise(vUv * 27.0 + 11.0);
+      float crack = 1.0 - smoothstep(0.0, 0.16, abs(n1 - n2));
+      vec3 ice = vec3(0.78, 0.88, 1.0);
+      vec3 goldA = vec3(1.0, 0.86, 0.36);
+      vec3 goldB = vec3(0.62, 0.42, 0.09);
+      vec3 gold = mix(goldB, goldA, sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0) * 0.5 + 0.5);
 
-      gl_FragColor = vec4(col, 1.0);
+      vec3 baseTint = vec3(1.0);
+      float baseAmt = 0.04 + fresnel * 0.05;
+
+      vec3 holoTint = foil;
+      float holoAmt = clamp(foilMask * 0.85 + spec * 0.5 + fresnel * 0.25, 0.0, 0.95);
+
+      vec3 iceTint = ice * (0.6 + crack * 0.4) + vec3(crack * 0.35);
+      float iceAmt = clamp(0.24 + fresnel * 0.3 + crack * 0.45 + spec * 0.3, 0.0, 0.8);
+
+      vec3 goldTint = gold;
+      float goldAmt = clamp(0.4 + fresnel * 0.3 + spec * 0.5, 0.0, 0.95);
+
+      vec3 effectColor = (baseTint * baseAmt * w0 + holoTint * holoAmt * w1 +
+                          iceTint * iceAmt * w2 + goldTint * goldAmt * w3) / wSum;
+      float effectAmt = (baseAmt * w0 + holoAmt * w1 + iceAmt * w2 + goldAmt * w3) / wSum;
+
+      if (uMode > 0.5) {
+        /* ---- foil overlay: masked to the card plane ---- */
+        float m = artMask(vUv);
+        float alpha = effectAmt * mix(uOutside, 1.0, m) * uIntensity;
+        vec3 col = effectColor / max(effectAmt, 0.0001);
+        // keep the very top end of the foil from clipping to flat white
+        col = min(col, vec3(1.6));
+        gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
+      } else {
+        /* ---- base: the art itself, with the finish mixed in ---- */
+        vec3 baseTier = img * (0.97 + fresnel * 0.1);
+        vec3 holoTier = mix(img, foil, clamp(foilMask * 0.75, 0.0, 1.0));
+        holoTier += foil * (fresnel * 0.35 + spec * 0.45);
+        vec3 iceTier = mix(img, ice, clamp(0.18 + n1 * 0.22 + fresnel * 0.45, 0.0, 1.0));
+        iceTier += ice * crack * (0.35 + pointerGlow * 0.5 + spec * 0.6);
+        iceTier += ice * fresnel * 0.25;
+        vec3 goldTier = mix(img, gold, clamp(fresnel * 0.85 + pointerGlow * 0.45 + 0.15, 0.0, 1.0) * 0.6);
+        goldTier += gold * (fresnel * 0.45 + spec * 0.6);
+
+        vec3 tinted = (baseTier * w0 + holoTier * w1 + iceTier * w2 + goldTier * w3) / wSum;
+        vec3 col = mix(img, tinted, uIntensity);
+
+        float vignette = 1.0 - smoothstep(0.5, 1.2, length(vUv - 0.5) * 1.5);
+        col *= 0.88 + vignette * 0.12;
+        col *= sin(vUv.y * 420.0) * 0.015 + 0.985;
+
+        gl_FragColor = vec4(col, 1.0);
+      }
 
       // Encode for wherever we are: identity when a composer owns the buffer,
-      // linear → sRGB when this draws straight to the canvas.
+      // linear -> sRGB when this draws straight to the canvas.
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
     }
@@ -187,7 +227,6 @@ declare module '@react-three/fiber' {
 export interface DeviceTiltState {
   x: number;
   y: number;
-  /** true once a real orientation event has landed */
   active: boolean;
 }
 
@@ -202,17 +241,14 @@ const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 function onDeviceOrientation(event: DeviceOrientationEvent) {
   const { beta, gamma } = event;
   if (beta == null && gamma == null) return;
-
-  // Rotate the raw device tilt into screen space so landscape holds up too.
   const angle = typeof screen !== 'undefined' && screen.orientation ? screen.orientation.angle ?? 0 : 0;
   const rad = (angle * Math.PI) / 180;
   const b = beta ?? 0;
   const g = gamma ?? 0;
   const x = g * Math.cos(rad) + b * Math.sin(rad);
   const y = -g * Math.sin(rad) + b * Math.cos(rad);
-
-  tiltState.x = clamp01(0.5 + x / 70); // ±35° of roll → full width
-  tiltState.y = clamp01((y - 25) / 60); // flat-ish → bottom of the card, upright → top
+  tiltState.x = clamp01(0.5 + x / 70);
+  tiltState.y = clamp01((y - 25) / 60);
   tiltState.active = true;
 }
 
@@ -222,10 +258,7 @@ function bindOrientation() {
   window.addEventListener('deviceorientation', onDeviceOrientation, true);
 }
 
-/**
- * iOS 13+ gates motion sensors behind an explicit prompt that has to run inside
- * a user gesture. Everywhere else this just starts listening.
- */
+/** iOS 13+ gates motion sensors behind a prompt that must run in a gesture. */
 export function requestDeviceTilt() {
   if (permission !== 'unknown' || typeof window === 'undefined') return;
   const DeviceOrientation = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } })
@@ -250,7 +283,6 @@ export function requestDeviceTilt() {
     });
 }
 
-/** Ask on the first tap — the same gesture the page already uses to wake audio. */
 function bindFirstGesture() {
   if (gestureBound || typeof window === 'undefined') return;
   gestureBound = true;
@@ -261,7 +293,6 @@ function bindFirstGesture() {
   window.addEventListener('pointerdown', onGesture, { capture: true, passive: true });
 }
 
-/** The shared, mutable tilt reading. Read it in a frame loop, not in render. */
 export function useDeviceTilt(): DeviceTiltState {
   useEffect(() => {
     bindOrientation();
@@ -271,8 +302,7 @@ export function useDeviceTilt(): DeviceTiltState {
 }
 
 /* ------------------------------------------------------------------ *
- * Pointer binding — R3F's onPointerMove + e.uv, so the glow tracks the
- * cursor on the card instead of the whole window.
+ * Pointer binding
  * ------------------------------------------------------------------ */
 
 export interface CardPointer {
@@ -282,21 +312,32 @@ export interface CardPointer {
   bind: {
     onPointerMove: (event: ThreeEvent<PointerEvent>) => void;
     onPointerEnter: (event: ThreeEvent<PointerEvent>) => void;
-    onPointerLeave: (event: ThreeEvent<PointerEvent>) => void;
+    onPointerLeave: () => void;
   };
 }
 
-export function useCardPointer(): CardPointer {
+/**
+ * Pointer in card space. Extruded geometry carries shape-space UVs, so when the
+ * card's size is known the UV is rebuilt from the local hit point instead —
+ * that keeps the foil highlight exactly under the cursor.
+ */
+export function useCardPointer(sizeW?: number, sizeH?: number): CardPointer {
   const pointer = useMemo(() => new THREE.Vector2(0.5, 0.5), []);
   const [hovered, setHovered] = useState(false);
   const setHover = useCallback((next: boolean) => setHovered(next), []);
+  const local = useMemo(() => new THREE.Vector3(), []);
 
   const bind = useMemo(
     () => ({
       onPointerMove: (event: ThreeEvent<PointerEvent>) => {
-        if (!event.uv) return;
         event.stopPropagation();
-        pointer.set(event.uv.x, event.uv.y);
+        if (sizeW && sizeH) {
+          local.copy(event.point);
+          event.object.worldToLocal(local);
+          pointer.set(clamp01(local.x / sizeW + 0.5), clamp01(local.y / sizeH + 0.5));
+        } else if (event.uv) {
+          pointer.set(event.uv.x, event.uv.y);
+        }
       },
       onPointerEnter: (event: ThreeEvent<PointerEvent>) => {
         event.stopPropagation();
@@ -304,7 +345,7 @@ export function useCardPointer(): CardPointer {
       },
       onPointerLeave: () => setHover(false),
     }),
-    [pointer, setHover]
+    [pointer, setHover, local, sizeW, sizeH]
   );
 
   return { pointer, hovered, bind };
@@ -326,16 +367,19 @@ function textureAspect(texture: THREE.Texture | null | undefined): number {
 export interface HoloCardMaterialProps {
   image?: THREE.Texture | null;
   finish?: FinishName;
-  /** damped target for the foil highlight, in card UV space */
   pointer?: THREE.Vector2 | null;
   hovered?: boolean;
-  /** baseline strength; `hoverBoost` multiplies it while hovered */
   intensity?: number;
   hoverBoost?: number;
-  /** card face width / height — match the geometry so the crop is right */
   cardAspect?: number;
-  /** phase offset so cards don't animate in lockstep */
   timeOffset?: number;
+  /** 1 = foil overlay (transparent, mask-driven), 0 = draw the art */
+  overlay?: boolean;
+  /** art window rect in card UV for the overlay mask */
+  mask?: [number, number, number, number];
+  maskFeather?: number;
+  /** foil strength outside the mask (0 = card plane only) */
+  outside?: number;
 }
 
 export function HoloCardMaterial({
@@ -345,8 +389,12 @@ export function HoloCardMaterial({
   hovered = false,
   intensity = 1,
   hoverBoost = 1.4,
-  cardAspect = 0.75,
+  cardAspect = 0.709,
   timeOffset = 0,
+  overlay = false,
+  mask = [0.071, 0.036, 0.929, 0.664],
+  maskFeather = 0.06,
+  outside = 0.12,
 }: HoloCardMaterialProps) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const gl = useThree((state) => state.gl);
@@ -357,8 +405,6 @@ export function HoloCardMaterial({
     []
   );
 
-  // Damped, per-instance state. `useRef` initialisers only run once, so the
-  // first finish/intensity is applied instantly and later ones animate.
   const anim = useRef({
     pointer: new THREE.Vector2(0.5, 0.5),
     finish: FINISH_INDEX[finish],
@@ -367,8 +413,7 @@ export function HoloCardMaterial({
 
   const imageAspect = useMemo(() => textureAspect(image), [image]);
 
-  // sRGB decode + filtering: the pit used to skip this and looked different
-  // from the Forge even with identical art.
+  // sRGB decode + filtering for the legacy image path.
   useLayoutEffect(() => {
     if (!image) return;
     applyProps(image, {
@@ -381,27 +426,32 @@ export function HoloCardMaterial({
   useLayoutEffect(() => {
     const material = materialRef.current;
     if (!material) return;
-    material.uniforms.uImage.value = image;
-    material.uniforms.uImageAspect.value = textureAspect(image);
-    material.uniforms.uCardAspect.value = cardAspect;
-  }, [image, cardAspect]);
+    const u = material.uniforms;
+    u.uImage.value = image;
+    u.uImageAspect.value = textureAspect(image);
+    u.uCardAspect.value = cardAspect;
+    u.uMode.value = overlay ? 1 : 0;
+    u.uMask.value.set(mask[0], mask[1], mask[2], mask[3]);
+    u.uMaskFeather.value = maskFeather;
+    u.uOutside.value = outside;
+    material.transparent = overlay;
+    material.depthWrite = !overlay;
+    material.needsUpdate = true;
+  }, [image, cardAspect, overlay, mask, maskFeather, outside]);
 
   useFrame((state, rawDelta) => {
     const material = materialRef.current;
     if (!material) return;
-
     const a = anim.current;
-    const delta = Math.min(rawDelta, 1 / 30); // clamp so a tab hitch can't pop the damping
+    const delta = Math.min(rawDelta, 1 / 30);
     const u = material.uniforms;
 
-    // textures can arrive after the layout effect (suspense / uploads)
     if (u.uImage.value !== image) {
       u.uImage.value = image;
       u.uImageAspect.value = imageAspect;
     }
     u.uCardAspect.value = cardAspect;
 
-    // Phones have no pointer: fall back to the gyro, then to centre.
     let targetX = 0.5;
     let targetY = 0.5;
     if (coarsePointer && tilt.active) {

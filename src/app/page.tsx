@@ -5,7 +5,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useVaultStore, FinishType } from '@/store/useVaultStore';
 import { fetchNFT, DEMO_NFTS } from '@/lib/utils';
-import { galleryData } from '@/data/gallery';
+import { slabCards } from '@/data/slabCards';
 import { ForgePreviewCanvas } from '@/components/canvas/ForgePreview';
 
 // GalleryPitPhysics calls ScrollTrigger.refresh(); in the main project the
@@ -17,6 +17,7 @@ if (typeof window !== 'undefined') {
 // Same loading pattern as the main project (Forge.tsx / Gallery.tsx).
 const ForgePreview = dynamic(() => Promise.resolve(ForgePreviewCanvas), { ssr: false });
 const GalleryPitPhysics = dynamic(() => import('@/components/canvas/GalleryPitPhysics'), { ssr: false });
+const ReferenceCompare = dynamic(() => import('@/components/canvas/ReferenceCompare'), { ssr: false });
 
 const FINISHES: FinishType[] = ['base', 'holo', 'cracked-ice', 'gold'];
 type PitFilter = 'all' | FinishType;
@@ -43,6 +44,7 @@ export default function Lab() {
   const setNftData = useVaultStore((s) => s.setNftData);
   const [busy, setBusy] = useState(false);
   const [pitFilter, setPitFilter] = useState<PitFilter>('all');
+  const [showCompare, setShowCompare] = useState(false);
 
   // Same pointer listener as the main project's Providers.tsx: writes the
   // normalized pointer into the store; the shaders read it each frame.
@@ -53,8 +55,9 @@ export default function Lab() {
     return () => window.removeEventListener('pointermove', onMove);
   }, []);
 
+  // the slab set is the source of truth now: 42 pieces, ~1 art image each
   const pitCards = useMemo(
-    () => (pitFilter === 'all' ? galleryData : galleryData.filter((c) => c.style === pitFilter)),
+    () => (pitFilter === 'all' ? slabCards : slabCards.filter((c) => c.style === pitFilter)),
     [pitFilter]
   );
 
@@ -109,10 +112,19 @@ export default function Lab() {
       </header>
 
       <section id="forge" className="mx-auto max-w-[1400px] scroll-mt-16 px-6 py-10">
-        <h2 className="mb-4 font-mono text-sm text-[#F5F3EF]/70">Forge preview</h2>
-        <div className="mx-auto aspect-[3/4] max-w-md bg-[#050505]">
-          <ForgePreview />
+        <div className="mb-4 flex items-center gap-3">
+          <h2 className="font-mono text-sm text-[#F5F3EF]/70">Forge preview</h2>
+          <Chip active={showCompare} onClick={() => setShowCompare((v) => !v)}>
+            reference compare
+          </Chip>
         </div>
+        {showCompare ? (
+          <ReferenceCompare />
+        ) : (
+          <div className="mx-auto aspect-[3/4] max-w-md bg-[#050505]">
+            <ForgePreview />
+          </div>
+        )}
       </section>
 
       <section id="pit" className="mx-auto max-w-[1400px] px-6 pb-16">

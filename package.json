@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:geometry": "node scripts/verify/geo-smoke.mjs",
+    "verify:textures": "node scripts/verify/canvas-smoke.mjs",
+    "verify:shaders": "node scripts/verify/glsl-check.mjs",
+    "verify": "npm run verify:geometry && npm run verify:textures"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",

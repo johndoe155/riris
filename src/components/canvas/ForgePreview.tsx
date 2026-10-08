@@ -1,178 +1,171 @@
 'use client';
-import { useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
-import { useTexture, OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@react-three/drei';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useVaultStore } from '@/store/useVaultStore';
-import { HoloCardMaterial, useCardPointer } from '@/components/canvas/HoloMaterial';
+import { Slab } from '@/components/canvas/slab/Slab';
+import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
 
-/** Slab face in world units — 3:4, which is why the art needs a cover-fit. */
-const SLAB = { w: 2.2, h: 3.0, d: 0.12 } as const;
+/**
+ * The baked environment is rotated by the pointer, so highlights slide across
+ * the glass instead of sitting still. `environmentRotation` is read by the
+ * renderer every frame, so mutating one Euler object is all it takes - no
+ * per-frame React state and no re-bake of the cubemap.
+ */
+const ENV_ROTATION = new THREE.Euler(0, 0, 0);
 
-/** Overlays must not steal raycasts from the slab underneath. */
-const noRaycast = () => null;
-
-const damp = THREE.MathUtils.damp;
-
-function SlabMesh() {
-  const groupRef = useRef<THREE.Group>(null);
-  const meshRef = useRef<THREE.Mesh>(null);
-  const finishType = useVaultStore((s) => s.finishType);
-  const nftData = useVaultStore((s) => s.nftData);
-
-  // Hover comes from the mesh itself (e.uv), not from the window, so the foil
-  // highlight sits exactly under the cursor.
-  const { pointer, hovered, bind } = useCardPointer();
-
-  const imageUrl = nftData?.image || 'https://picsum.photos/seed/forge/800/800';
-  const texture = useTexture(imageUrl);
-
-  useFrame((state, delta) => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-
-    const time = state.clock.elapsedTime;
-    const dt = Math.min(delta, 1 / 30);
-
-    // Gentle idle rotation, plus a parallax lean towards the cursor: the lean
-    // alone re-angles the normals, which is what makes the foil breathe.
-    mesh.rotation.y += dt * 0.15;
-    mesh.rotation.x = Math.sin(time * 0.3) * 0.1;
-    mesh.position.y = Math.sin(time * 0.5) * 0.05;
-
-    const group = groupRef.current;
-    if (group) {
-      const leanX = (pointer.x - 0.5) * (hovered ? 0.5 : 0.25);
-      const leanY = (pointer.y - 0.5) * (hovered ? 0.35 : 0.18);
-      group.rotation.y = damp(group.rotation.y, leanX, 4, dt);
-      group.rotation.x = damp(group.rotation.x, -leanY, 4, dt);
-    }
-  });
-
-  return (
-    <group ref={groupRef}>
-      <mesh ref={meshRef} position={[0, 0, 0]} {...bind}>
-        <boxGeometry args={[SLAB.w, SLAB.h, SLAB.d]} />
-        <HoloCardMaterial
-          image={texture}
-          finish={finishType}
-          pointer={pointer}
-          hovered={hovered}
-          intensity={1.2}
-          cardAspect={SLAB.w / SLAB.h}
-        />
-      </mesh>
-
-      {/* Slab border */}
-      <mesh position={[0, 0, -0.02]} scale={[1.08, 1.06, 1]} raycast={noRaycast}>
-        <boxGeometry args={[SLAB.w, SLAB.h, 0.1]} />
-        <meshPhysicalMaterial
-          color="#1a1a1a"
-          roughness={0.2}
-          metalness={0.1}
-          clearcoat={1}
-          clearcoatRoughness={0.1}
-          envMapIntensity={1.1}
-          transparent
-          opacity={0.9}
-        />
-      </mesh>
-
-      {/* Label */}
-      <mesh position={[0, -1.1, 0.07]} raycast={noRaycast}>
-        <planeGeometry args={[1.8, 0.45]} />
-        <meshStandardMaterial color="#0a0a0a" roughness={0.8} />
-      </mesh>
-
-      {/* Acrylic case: transmission reads the Lightformer environment back into
-          the glass, which is why this only lives in the contained Forge canvas. */}
-      <mesh position={[0, 0, -0.06]} raycast={noRaycast}>
-        <boxGeometry args={[SLAB.w + 0.34, SLAB.h + 0.34, 0.46]} />
-        <meshPhysicalMaterial
-          transmission={1}
-          thickness={0.6}
-          roughness={0.06}
-          ior={1.46}
-          clearcoat={1}
-          clearcoatRoughness={0.08}
-          attenuationColor="#cfe3ff"
-          attenuationDistance={1.6}
-          envMapIntensity={1.4}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-/** A handful of Lightformers is enough to give the glass and the clearcoat something to catch. */
+/**
+ * Long strip lights are what real plastic shows: a soft body reflection with
+ * one hard streak down the edge.
+ */
 function StudioEnvironment() {
   return (
-    <Environment resolution={256} frames={1} environmentIntensity={0.85}>
-      <Lightformer form="rect" intensity={3} color="#ffffff" position={[0, 4, -6]} scale={[8, 8, 1]} target={[0, 0, 0]} />
-      <Lightformer form="ring" intensity={5} color="#FF4D00" position={[-5, 1, -2]} scale={4} target={[0, 0, 0]} />
-      <Lightformer form="circle" intensity={4} color="#00E5FF" position={[5, -2, 1]} scale={3} target={[0, 0, 0]} />
-      <Lightformer form="rect" intensity={1.2} color="#8899aa" position={[0, -5, 3]} scale={[10, 3, 1]} target={[0, 0, 0]} />
+    <Environment resolution={256} frames={1} environmentIntensity={0.9} environmentRotation={ENV_ROTATION}>
+      <Lightformer form="rect" intensity={2.6} color="#ffffff" position={[0, 5.5, -4]} rotation={[Math.PI * 0.1, 0, 0]} scale={[14, 1.6, 1]} />
+      <Lightformer form="rect" intensity={1.8} color="#e8f1ff" position={[-6, 0.5, -3]} rotation={[0, Math.PI * 0.35, 0]} scale={[12, 2.2, 1]} />
+      <Lightformer form="rect" intensity={1.5} color="#fff0e6" position={[6, -0.5, -3]} rotation={[0, -Math.PI * 0.35, 0]} scale={[12, 2.2, 1]} />
+      <Lightformer form="ring" intensity={4} color="#FF4D00" position={[-4.5, 2.5, 2]} scale={3} target={[0, 0, 0]} />
+      <Lightformer form="circle" intensity={3} color="#00E5FF" position={[4.5, -2, 1.5]} scale={2.4} target={[0, 0, 0]} />
+      <Lightformer form="rect" intensity={0.7} color="#8fa2b8" position={[0, -6, 2]} rotation={[-Math.PI * 0.4, 0, 0]} scale={[16, 3, 1]} />
     </Environment>
   );
 }
 
-function FinishBloom() {
-  const finishType = useVaultStore((s) => s.finishType);
-  const intensity =
-    finishType === 'gold' ? 1.0 :
-    finishType === 'holo' ? 0.85 :
-    finishType === 'cracked-ice' ? 0.45 :
-    0.12;
+/** Rotates the baked environment with the pointer so the streaks slide. */
+function MovingHighlights() {
+  useFrame((state, delta) => {
+    const dt = Math.min(delta, 1 / 30);
+    const p = state.pointer; // -1..1, R3F keeps this updated
+    ENV_ROTATION.x = THREE.MathUtils.damp(ENV_ROTATION.x, -p.y * 0.22, 3, dt);
+    ENV_ROTATION.y = THREE.MathUtils.damp(ENV_ROTATION.y, p.x * 0.3, 3, dt);
+  });
+  return null;
+}
+
+/** Orbit with a spring-back: drag to inspect, and it settles straight-on. */
+function SpringOrbit() {
+  const controls = useRef<OrbitControlsImpl | null>(null);
+  const interacting = useRef(false);
+  const target = useMemo(() => ({ azimuth: 0, polar: Math.PI / 2 }), []);
+  useFrame((_, delta) => {
+    const c = controls.current;
+    if (!c || interacting.current) return;
+    const dt = Math.min(delta, 1 / 30);
+    const az = c.getAzimuthalAngle();
+    const pol = c.getPolarAngle();
+    if (Math.abs(az - target.azimuth) > 1e-4) {
+      c.setAzimuthalAngle(THREE.MathUtils.damp(az, target.azimuth, 2.4, dt));
+    }
+    if (Math.abs(pol - target.polar) > 1e-4) {
+      c.setPolarAngle(THREE.MathUtils.damp(pol, target.polar, 2.4, dt));
+    }
+  });
   return (
-    <EffectComposer multisampling={0}>
-      <Bloom mipmapBlur intensity={intensity} luminanceThreshold={0.85} luminanceSmoothing={0.15} radius={0.72} />
-    </EffectComposer>
+    <OrbitControls
+      ref={controls}
+      makeDefault
+      enablePan={false}
+      enableZoom={false}
+      minPolarAngle={Math.PI / 3}
+      maxPolarAngle={Math.PI / 1.8}
+      rotateSpeed={0.5}
+      onStart={() => {
+        interacting.current = true;
+      }}
+      onEnd={() => {
+        interacting.current = false;
+      }}
+    />
   );
 }
 
 export function ForgePreviewCanvas() {
+  const finishType = useVaultStore((s) => s.finishType);
+  const nftData = useVaultStore((s) => s.nftData);
+  const [flipped, setFlipped] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  // an uploaded / fetched NFT becomes a card of its own; otherwise show the
+  // default slab from the gallery set
+  const card = useMemo(
+    () => (nftData ? cardFromNft(nftData, finishType) : { ...DEFAULT_SLAB, style: finishType }),
+    [nftData, finishType]
+  );
+
+  const toggleFlip = useCallback(() => setFlipped((f) => !f), []);
+  const handlers = useMemo(() => ({ onDoubleClick: () => toggleFlip() }), [toggleFlip]);
+
   return (
     <div className="w-full h-full min-h-[500px] relative bg-[#050505] overflow-hidden">
       <Canvas
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
-        camera={{ position: [0, 0, 4], fov: 35 }}
+        camera={{ position: [0, 0, 4.2], fov: 32 }}
       >
-        <PerspectiveCamera makeDefault position={[0, 0, 4]} fov={35} />
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[5, 5, 5]} intensity={1.2} />
-        <directionalLight position={[-5, -2, 3]} intensity={0.5} color="#FF4D00" />
-        <pointLight position={[0, 2, 2]} intensity={0.8} color="#00E5FF" />
+        <PerspectiveCamera makeDefault position={[0, 0, 4.2]} fov={32} />
+        <ambientLight intensity={0.35} />
+        <directionalLight position={[4, 5, 6]} intensity={0.9} />
+        <pointLight position={[0, 2.2, 2.4]} intensity={0.5} color="#00E5FF" />
 
         <StudioEnvironment />
-        <SlabMesh />
+        <MovingHighlights />
+
+        <group
+          onPointerOver={() => setHovered(true)}
+          onPointerOut={() => setHovered(false)}
+        >
+          <Slab
+            card={card}
+            quality="hero"
+            intensity={1.15}
+            flipped={flipped}
+            active={hovered}
+            cardHandlers={handlers}
+          />
+        </group>
+
         <FinishBloom />
-
-        <OrbitControls
-          enablePan={false}
-          enableZoom={false}
-          minPolarAngle={Math.PI / 3}
-          maxPolarAngle={Math.PI / 1.8}
-          autoRotate={false}
-          rotateSpeed={0.5}
-        />
-
-        <fog attach="fog" args={['#050505', 5, 12]} />
+        <SpringOrbit />
+        <fog attach="fog" args={['#050505', 6, 14]} />
       </Canvas>
 
       <div className="absolute top-4 left-4 font-mono text-[9px] px-2 py-1 bg-black/60 text-white/60 border border-white/10 backdrop-blur">
         ● LIVE • WEBGL • DRAG TO SPIN
       </div>
 
+      <div className="absolute top-4 right-4 flex gap-2">
+        <button
+          type="button"
+          onClick={toggleFlip}
+          className="font-mono text-[9px] px-2 py-1 bg-black/60 text-white/70 border border-white/15 backdrop-blur hover:text-white"
+        >
+          {flipped ? '● SHOW FRONT' : '○ FLIP CARD'}
+        </button>
+      </div>
+
       <div className="absolute bottom-4 left-4 right-4 flex justify-between">
         <div className="font-mono text-[9px] text-[#F5F3EF]/30">
-          SHADER: GLSL • 60FPS • POINTER REACTIVE
+          SHADER: GLSL • {`${card.title}`} • {card.style.toUpperCase()}
         </div>
-        <div className="font-mono text-[9px] text-[#FF4D00]">
-          TRUE OPTICAL PREVIEW
-        </div>
+        <div className="font-mono text-[9px] text-[#FF4D00]">TRUE OPTICAL PREVIEW</div>
       </div>
     </div>
+  );
+}
+
+function FinishBloom() {
+  const finishType = useVaultStore((s) => s.finishType);
+  const intensity =
+    finishType === 'gold' ? 0.85 :
+    finishType === 'holo' ? 0.7 :
+    finishType === 'cracked-ice' ? 0.4 :
+    0.12;
+  return (
+    <EffectComposer multisampling={0}>
+      <Bloom mipmapBlur intensity={intensity} luminanceThreshold={0.9} luminanceSmoothing={0.18} radius={0.7} />
+    </EffectComposer>
   );
 }
