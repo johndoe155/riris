@@ -30,6 +30,18 @@ export function loadImage(src: string): Promise<HTMLImageElement | null> {
   return imageCache.get(src)!;
 }
 
+/** "Bored Ape Yacht Club" -> "Bored Ape": what fits on a label line. */
+function shortCollection(collection: string, max = 14) {
+  const words = collection.split(' ');
+  let out = '';
+  for (const w of words) {
+    const next = out ? `${out} ${w}` : w;
+    if (next.length > max) break;
+    out = next;
+  }
+  return out || collection.slice(0, max);
+}
+
 /** Pixel box of the art panel inside the drawn face. */
 function artBox(o: CardFaceText) {
   return {
@@ -60,9 +72,10 @@ function canvasTexture(draw: (ctx: CanvasRenderingContext2D) => void, w: number,
 const faceCache = new Map<string, THREE.CanvasTexture>();
 
 export const FACE_TIERS = { hero: 640, cheap: 320 } as const;
-export const LABEL_TIERS = { hero: 512, cheap: 320 } as const;
-const FACE_ASPECT = 928 / 640; // h / w
-const LABEL_ASPECT = 384 / 512;
+export const LABEL_TIERS = { hero: 1024, cheap: 512 } as const;
+/** canvas aspects follow the slab spec, or the drawn text comes out stretched */
+const FACE_ASPECT = SLAB_SPEC.cardH / SLAB_SPEC.cardW;
+const LABEL_ASPECT = SLAB_SPEC.labelH / SLAB_SPEC.labelW;
 
 export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): CardFaceText {
   const traits: [string, string][] = [
@@ -202,9 +215,10 @@ export function getLabelTexture(
   const hit = labelCache.get(key);
   if (hit) return hit;
   const accent = blank ? '#D8D5D0' : card.color;
+  const collection = shortCollection(card.collection);
   const width = LABEL_TIERS[tier];
   const o: LabelText = {
-    title: `${card.title.split(' #')[0]}\n${card.collection}`.toUpperCase(),
+    title: `${card.title.replace(/\s*#?\d+$/, '')}\n${collection}`.toUpperCase(),
     grade: card.grade,
     serial: card.serial,
     width,

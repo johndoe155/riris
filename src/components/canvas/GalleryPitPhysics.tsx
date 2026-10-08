@@ -430,7 +430,9 @@ export default function GalleryPitPhysics({ cards = slabCards }: { cards?: SlabC
 
   return (
     <div className="w-full h-[75vh] relative border border-[#1A1A1A] bg-[#050505] overflow-hidden">
-      <Canvas camera={{ position: [0, 0, 7], fov: 50 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
+      {/* close enough that a 1.66-tall slab reads as a slab, wide enough that
+          the whole deck is in frame when it pours */}
+      <Canvas camera={{ position: [0, 0, 5], fov: 50 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
         <Scene cards={cards} />
       </Canvas>
 

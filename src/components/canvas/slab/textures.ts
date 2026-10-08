@@ -252,21 +252,27 @@ export function drawCardFace(
   ctx.strokeStyle = ink;
   ctx.strokeRect(ax, ay, aw, ah);
 
+  /* ---- furniture below the art window -----------------------------------
+   * The art takes 0.036..0.664 of the card height, so everything else has to
+   * live in the bottom third. The positions below are walked down from the art
+   * in fractions of that band, which is why nothing can overlap. */
+  const bandTop = ay + ah;
+  const band = H - bandTop;
+
   // ---- title under the art
-  const titleY = ay + ah + ah * 0.08;
+  const titleSize = Math.max(11, Math.min(W * 0.048, band * 0.11));
   ctx.fillStyle = ink;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  const titleSize = W * 0.045;
   ctx.font = `700 ${titleSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.title, ax, titleY);
+  ctx.fillText(o.title, ax, bandTop + band * 0.05);
 
   // ---- attribute grid (2 columns x 3 rows), hairline rules like the photo
-  const gridTop = titleY + titleSize * 1.6;
-  const rowH = (H * 0.997 - gridTop) * 0.32;
+  const gridTop = bandTop + band * 0.2;
+  const rowH = (band * 0.44) / 3;
   const colW = (aw - W * 0.03) / 2;
-  const attrSize = W * 0.0225;
-  const valSize = W * 0.021;
+  const attrSize = Math.max(7, W * 0.021);
+  const valSize = Math.max(7, W * 0.0195);
   const traits = o.traits ?? [];
   for (let i = 0; i < 6; i++) {
     const cx = ax + (i % 2) * (colW + W * 0.03);
@@ -281,48 +287,29 @@ export function drawCardFace(
     ctx.fillText(label.toUpperCase(), cx + W * 0.012, cy);
     ctx.font = `400 ${valSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
     ctx.globalAlpha = 0.78;
-    ctx.fillText(value, cx + W * 0.012, cy + attrSize * 1.35);
+    ctx.fillText(value, cx + W * 0.012, cy + attrSize * 1.5);
     ctx.globalAlpha = 1;
   }
 
   // ---- bottom rows: contract / token id / standard / chain + owner bar
-  const footTop = gridTop + rowH * 3 + H * 0.012;
-  const footSize = W * 0.021;
+  const footTop = gridTop + rowH * 3 + band * 0.04;
+  const footSize = Math.max(7, W * 0.0195);
   ctx.font = `400 ${footSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
   ctx.globalAlpha = 0.72;
   ctx.fillText(`COLLECTION: ${o.collection}`, ax, footTop);
-  ctx.fillText(`TOKEN ID: ${o.serial.split('/')[0]}`, ax, footTop + footSize * 1.5);
+  ctx.fillText(`TOKEN ID: ${String(o.serial).split('/')[0]}`, ax, footTop + footSize * 1.5);
   ctx.fillText(`STANDARD: ERC-721`, ax + colW + W * 0.03, footTop);
   ctx.fillText(`CHAIN: Ethereum`, ax + colW + W * 0.03, footTop + footSize * 1.5);
   ctx.globalAlpha = 1;
 
   // owner strip along the bottom edge
-  const barY = H * 0.955;
-  ctx.font = `700 ${W * 0.0235}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(`OWNED BY: ${o.handle}`, ax, barY - W * 0.0235);
+  const barY = H - band * 0.13;
+  ctx.font = `700 ${Math.max(8, W * 0.022)}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.fillText(`OWNED BY: ${o.handle}`, ax, barY);
   ctx.textAlign = 'right';
-  ctx.fillText(o.serial, ax + aw, barY - W * 0.0235);
+  ctx.fillText(o.serial, ax + aw, barY);
   ctx.textAlign = 'left';
 
-  // grade badge, top-right of the ring frame (like a real slab's grade sticker)
-  const gR = W * 0.055;
-  ctx.save();
-  ctx.translate(rx + rw - gR * 1.1, ry + gR * 1.1);
-  ctx.fillStyle = ink;
-  ctx.globalAlpha = 0.92;
-  ctx.beginPath();
-  ctx.arc(0, 0, gR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = paper;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = `700 ${gR * 0.85}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.grade, 0, gR * 0.06);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.restore();
-  ctx.restore(); // silhouette clip
 }
 
 /** Canvas facing the card's front: face text + art. */
@@ -454,54 +441,84 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   ctx.strokeStyle = o.accent;
   ctx.globalAlpha = 0.5;
   ctx.lineWidth = Math.max(1, W * 0.0045);
-  roundRect(ctx, W * 0.028, H * 0.11, W * 0.944, H * 0.78, H * 0.1);
+  roundRect(ctx, W * 0.022, H * 0.1, W * 0.956, H * 0.8, H * 0.11);
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // two-line heavy title, left aligned
-  const lines = o.title.split('\n').slice(0, 2);
-  const size = H * (lines.length > 1 ? 0.27 : 0.34);
-  ctx.fillStyle = o.ink;
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
-  ctx.font = `800 ${size}px "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  const blockH = lines.length * size * 1.06;
-  const startY = H / 2 - blockH / 2 + size * 0.53;
-  lines.forEach((line, i) => ctx.fillText(line.toUpperCase(), W * 0.065, startY + i * size * 1.06));
+  const pad = W * 0.038;
+  const centreY = H / 2;
 
-  // right side: grade + serial, and the QR block
-  const rightX = W * (o.qr ? 0.7 : 0.94);
-  if (o.qr) {
-    const q = H * 0.52;
-    const qx = W * 0.985 - q;
-    const qy = H / 2 - q / 2;
-    ctx.fillStyle = o.ink;
-    ctx.fillRect(qx, qy, q, q);
-    ctx.fillStyle = o.plate;
-    ctx.fillRect(qx + q * 0.06, qy + q * 0.06, q * 0.88, q * 0.88);
-    // a QR-ish hatch: deterministic blocks
-    ctx.fillStyle = o.ink;
-    const n = 9;
-    const cell = (q * 0.88) / n;
-    const r = rng(0x9e37);
-    for (let y = 0; y < n; y++) {
-      for (let x = 0; x < n; x++) {
-        const corner = (x < 3 && y < 3) || (x > n - 4 && y < 3) || (x < 3 && y > n - 4);
-        if (corner ? !(x === 1 && y === 1) && !(x === 0 && y === 0) : r() > 0.52) {
-          ctx.fillRect(qx + q * 0.06 + x * cell, qy + q * 0.06 + y * cell, cell * 0.92, cell * 0.92);
-        }
+  /* ---- right: the QR block, with the grade and serial stacked to its left */
+  const q = H * 0.6;
+  const qx = W - pad - q;
+  const qy = centreY - q / 2;
+  ctx.fillStyle = o.ink;
+  ctx.fillRect(qx, qy, q, q);
+  ctx.fillStyle = o.plate;
+  ctx.fillRect(qx + q * 0.06, qy + q * 0.06, q * 0.88, q * 0.88);
+  ctx.fillStyle = o.ink;
+  const n = 9;
+  const cell = (q * 0.88) / n;
+  const r = rng(0x9e37);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const corner = (x < 3 && y < 3) || (x > n - 4 && y < 3) || (x < 3 && y > n - 4);
+      if (corner ? !(x === 1 && y === 1) && !(x === 0 && y === 0) : r() > 0.52) {
+        ctx.fillRect(qx + q * 0.06 + x * cell, qy + q * 0.06 + y * cell, cell * 0.92, cell * 0.92);
       }
     }
   }
+
+  /* ---- zones: title | grade + serial | QR, so nothing can collide ---- */
+  const titleZone = W * 0.5;
+  const markRight = W * 0.795;
   ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = o.ink;
-  ctx.font = `800 ${H * 0.2}px "Arial Black", system-ui, sans-serif`;
-  ctx.fillText(o.grade, rightX, H * 0.42);
-  ctx.globalAlpha = 0.62;
-  ctx.font = `400 ${H * 0.13}px system-ui, sans-serif`;
-  ctx.fillText(o.serial, rightX, H * 0.66);
+  ctx.globalAlpha = 0.9;
+  ctx.font = `800 ${H * 0.3}px "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.fillText(o.grade, markRight, centreY - H * 0.09);
+  ctx.globalAlpha = 0.6;
+  ctx.font = `600 ${H * 0.15}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.fillText(o.serial, markRight, centreY + H * 0.19);
   ctx.globalAlpha = 1;
   ctx.textAlign = 'left';
+
+  // hairline divider between the title and the marks
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = o.accent;
+  ctx.fillRect(W * 0.535, H * 0.2, Math.max(1, W * 0.0016), H * 0.6);
+  ctx.globalAlpha = 1;
+
+  /* ---- left: a two-line heavy title, shrunk and then trimmed to fit ---- */
+  const heavy = (px: number) =>
+    `800 ${px}px "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  const lines = o.title
+    .split('\n')
+    .slice(0, 2)
+    .map((l) => l.toUpperCase());
+  const avail = titleZone - pad;
+  let size = H * 0.28;
+  for (; size > H * 0.12; size -= 2) {
+    ctx.font = heavy(size);
+    if (Math.max(...lines.map((l) => ctx.measureText(l).width)) <= avail) break;
+  }
+  ctx.font = heavy(size);
+  const fitted = lines.map((l) => {
+    if (ctx.measureText(l).width <= avail) return l;
+    let cut = l;
+    while (cut.length > 1 && ctx.measureText(`${cut}…`).width > avail) cut = cut.slice(0, -1);
+    return `${cut}…`;
+  });
+
+  const lead = size * 1.14;
+  const blockTop = centreY - ((fitted.length - 1) * lead) / 2;
+  ctx.fillStyle = o.ink;
+  fitted.forEach((line, i) => {
+    ctx.globalAlpha = i === 0 ? 1 : 0.72;
+    ctx.fillText(line, pad, blockTop + i * lead);
+  });
+  ctx.globalAlpha = 1;
   ctx.textBaseline = 'top';
 }
 
