@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, applyProps } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@react-three/drei';
@@ -11,20 +11,12 @@ import { Backdrop } from '@/components/canvas/slab/Backdrop';
 import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
 
 /**
- * The baked environment is rotated by the pointer, so highlights slide across
- * the glass instead of sitting still. `environmentRotation` is read by the
- * renderer every frame, so mutating one Euler object is all it takes - no
- * per-frame React state and no re-bake of the cubemap.
- */
-const ENV_ROTATION = new THREE.Euler(0, 0, 0);
-
-/**
  * Long strip lights are what real plastic shows: a soft body reflection with
  * one hard streak down the edge.
  */
 function StudioEnvironment() {
   return (
-    <Environment resolution={256} frames={1} environmentIntensity={0.9} environmentRotation={ENV_ROTATION}>
+    <Environment resolution={256} frames={1} environmentIntensity={0.9}>
       <Lightformer form="rect" intensity={2.6} color="#ffffff" position={[0, 5.5, -4]} rotation={[Math.PI * 0.1, 0, 0]} scale={[14, 1.6, 1]} />
       <Lightformer form="rect" intensity={1.8} color="#e8f1ff" position={[-6, 0.5, -3]} rotation={[0, Math.PI * 0.35, 0]} scale={[12, 2.2, 1]} />
       <Lightformer form="rect" intensity={1.5} color="#fff0e6" position={[6, -0.5, -3]} rotation={[0, -Math.PI * 0.35, 0]} scale={[12, 2.2, 1]} />
@@ -35,13 +27,21 @@ function StudioEnvironment() {
   );
 }
 
-/** Rotates the baked environment with the pointer so the streaks slide. */
+/**
+ * Rotates the baked environment with the pointer, so the strip highlights
+ * slide across the glass instead of sitting still. No re-bake and no React
+ * state: the renderer reads scene.environmentRotation every frame, and
+ * applyProps writes through to the scene's own Euler.
+ */
 function MovingHighlights() {
+  const scene = useThree((s) => s.scene);
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     const p = state.pointer; // -1..1, R3F keeps this updated
-    ENV_ROTATION.x = THREE.MathUtils.damp(ENV_ROTATION.x, -p.y * 0.22, 3, dt);
-    ENV_ROTATION.y = THREE.MathUtils.damp(ENV_ROTATION.y, p.x * 0.3, 3, dt);
+    const rot = scene.environmentRotation;
+    const x = THREE.MathUtils.damp(rot.x, -p.y * 0.22, 3, dt);
+    const y = THREE.MathUtils.damp(rot.y, p.x * 0.3, 3, dt);
+    applyProps(scene, { environmentRotation: [x, y, 0] });
   });
   return null;
 }

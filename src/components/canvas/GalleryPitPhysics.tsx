@@ -77,7 +77,6 @@ function Card({
   onSelect: () => void;
 }) {
   const rigidRef = useRef<RapierRigidBody>(null);
-  const bodyRef = useRef<THREE.Group>(null);
   const colliderRef = useRef<ComponentRef<typeof CuboidCollider>>(null);
   const gl = useThree((s) => s.gl);
   const camera = useThree((s) => s.camera);
@@ -276,7 +275,6 @@ function Card({
     >
       <CuboidCollider ref={colliderRef} args={[BODY.w / 2, BODY.h / 2, BODY.d / 2]} />
       <group
-        ref={bodyRef}
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
       >
