@@ -190,7 +190,9 @@ export function slabLayers(spec: SlabSpec = SLAB_SPEC): SlabLayers {
     trayFront: zTrayFront,
     trayBack: zCardBack,
     labelPlate: zFront - labelD,
-    labelFace: zFront - labelD + 0.008,
+    // the printed face sits 1mm under the shell's front plane, inside the
+    // label hole, so it is neither buried in the plate nor above the case
+    labelFace: zFront - 0.001,
     labelY,
     ridge: zFront - 0.004,
     ridgeY,

@@ -201,6 +201,14 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   } = spec;
 
   const windowRect: Rect = { w: windowW, h: windowH, r: windowRadius, x: 0, y: L.windowY };
+  /**
+   * The label is a dark plate *let into* the case: the shell gets a hole the
+   * size of the measured plate, and the plate behind it is slightly larger so
+   * it fills the hole from any angle. Printing sits a millimetre under the
+   * front plane, which is what gives the label its hairline shadow.
+   */
+  const labelHole: Rect = { w: labelW, h: labelH, r: labelRadius, x: 0, y: L.labelY };
+  const labelPlateRect: Rect = { w: labelW + 0.024, h: labelH + 0.024, r: labelRadius + 0.012 };
   const plain = (rect: Rect, b: number, dir: 1 | -1 = 1) => {
     const f = fit(rect, b, dir);
     return squircle(f.w, f.h, f.r, P, q.corner, f.x ?? 0, f.y ?? 0);
@@ -209,6 +217,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   // --- shell: full silhouette, window cut through, bevel wraps front + back
   const shellShape = plain({ w, h, r: radius }, bevel);
   addHole(shellShape, fit(windowRect, bevel, -1), P, q.corner);
+  addHole(shellShape, fit(labelHole, bevel, -1), P, q.corner);
   const shell = extrudedLayer(shellShape, {
     depth: zFront - zBack,
     bevel,
@@ -246,13 +255,13 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   });
 
   // --- label plate + its inner border (doubles as the ridge under the label)
-  const labelPlate = extrudedLayer(plain({ w: labelW, h: labelH, r: labelRadius }, 0.005), {
+  const labelPlate = extrudedLayer(plain(labelPlateRect, 0.005), {
     depth: spec.labelD,
     bevel: 0.005,
     bevelSegments: q.bevel,
     curveSegments: q.curve,
   });
-  const ridgeShape = plain({ w: labelW, h: labelH, r: labelRadius }, 0.004);
+  const ridgeShape = plain({ w: labelPlateRect.w, h: labelPlateRect.h, r: labelPlateRect.r }, 0.004);
   addHole(
     ridgeShape,
     fit(
@@ -312,7 +321,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
       backPlate: (zBackPlateFront + zBack) / 2,
       tray: (zTrayFront + zCardBack) / 2,
       band: zFront + 0.004,
-      labelPlate: zFront - spec.labelD / 2 - 0.001,
+      labelPlate: zFront - spec.labelD / 2 - 0.002,
       ridge: zFront + 0.002,
       card: zCardBack + cardD / 2,
       slot: zTrayFront + 0.006,

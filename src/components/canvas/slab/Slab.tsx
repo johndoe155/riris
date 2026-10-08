@@ -261,7 +261,7 @@ export function Slab({
         {/* label plate + its printed face */}
         <mesh geometry={geo.labelPlate} material={mat.label} position={[0, L.labelY, geo.at.labelPlate]} />
         <mesh position={[0, L.labelY, L.labelFace]}>
-          <planeGeometry args={[SLAB_SPEC.labelW * 0.99, SLAB_SPEC.labelH * 0.94]} />
+          <planeGeometry args={[SLAB_SPEC.labelW, SLAB_SPEC.labelH]} />
           <meshStandardMaterial map={labelTex} roughness={0.5} metalness={0.06} toneMapped={false} />
         </mesh>
         {/* ridge under the label */}
