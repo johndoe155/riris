@@ -6,7 +6,7 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import type { SlabCard } from '@/data/slabCards';
 import { HoloCardMaterial, useCardPointer } from '@/components/canvas/HoloMaterial';
 import { getSlabGeometry } from './geometry';
-import { SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
+import { REF_TONE, SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
 import { getWearMaps } from './textures';
 import {
   ensureBackTexture,
@@ -28,6 +28,8 @@ import {
 interface SlabMaterials {
   glass: THREE.MeshPhysicalMaterial;
   glassCheap: THREE.MeshPhysicalMaterial;
+  /** the front face plate: the layer the reference's moulded step exposes */
+  face: THREE.MeshPhysicalMaterial;
   band: THREE.MeshPhysicalMaterial;
   label: THREE.MeshStandardMaterial;
   ridge: THREE.MeshPhysicalMaterial;
@@ -43,33 +45,63 @@ function getMaterials(): SlabMaterials {
   if (materials) return materials;
   const wear = getWearMaps();
   materials = {
-    // real transmission — the Forge canvas is contained, so the pass is bounded
+    // real transmission — the Forge canvas is contained, so the pass is bounded.
+    // The tint is the reference's own mauve cast (#91808c, sat ~18%) rather than
+    // the blue-white this used to carry, and the attenuation is short enough
+    // that the case reads as tinted acrylic instead of clear glass.
     glass: new THREE.MeshPhysicalMaterial({
       transmission: 1,
-      thickness: 0.5,
-      roughness: 0.075,
+      thickness: 0.42,
+      roughness: 0.16,
       metalness: 0,
       ior: 1.46,
-      clearcoat: 1,
-      clearcoatRoughness: 0.06,
-      attenuationColor: new THREE.Color('#cfe3ff'),
-      attenuationDistance: 2.2,
-      envMapIntensity: 1.65,
+      clearcoat: 0.85,
+      clearcoatRoughness: 0.12,
+      color: new THREE.Color('#e8dfe8'),
+      attenuationColor: new THREE.Color('#b7a2b4'),
+      attenuationDistance: 1.35,
+      envMapIntensity: 0.95,
       roughnessMap: wear.roughness,
       bumpMap: wear.bump,
       bumpScale: 0.01,
       side: THREE.DoubleSide,
     }),
+    /**
+     * The front face plate. Physically the same acrylic as the shell, but its
+     * job in the render is to hold the reference's two measured edges: the
+     * chamfer step (10 px of *dark*, #42333f on the left and #8a7685 on the
+     * lit right, against a face of #91808c) and the bright hairline where the
+     * plate's own bevel turns. Reusing `glass` for it left the case looking
+     * like one flat slab; a separate, slightly cooler and less transmissive
+     * pass is what separates the face from the rim.
+     */
+    face: new THREE.MeshPhysicalMaterial({
+      transmission: 0.92,
+      thickness: 0.24,
+      roughness: 0.1,
+      metalness: 0,
+      ior: 1.46,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      color: new THREE.Color('#efe6ee'),
+      attenuationColor: new THREE.Color('#c3aec0'),
+      attenuationDistance: 1.1,
+      envMapIntensity: 1.15,
+      roughnessMap: wear.roughness,
+      bumpMap: wear.bump,
+      bumpScale: 0.008,
+      side: THREE.DoubleSide,
+    }),
     // pit fake: low opacity + env map, no transmission pass
     glassCheap: new THREE.MeshPhysicalMaterial({
-      color: '#e6ecf4',
-      roughness: 0.16,
-      metalness: 0.06,
+      color: '#e4dbe4',
+      roughness: 0.2,
+      metalness: 0.04,
       clearcoat: 1,
-      clearcoatRoughness: 0.08,
+      clearcoatRoughness: 0.1,
       transparent: true,
-      opacity: 0.2,
-      envMapIntensity: 1.9,
+      opacity: 0.22,
+      envMapIntensity: 1.15,
       ior: 1.46,
       roughnessMap: wear.roughness,
       side: THREE.DoubleSide,
@@ -78,36 +110,40 @@ function getMaterials(): SlabMaterials {
     // reads it *brighter* than the tray it sits on, so it stays near-white and
     // semi-transparent rather than tinted.
     band: new THREE.MeshPhysicalMaterial({
-      color: '#f4f8fd',
-      roughness: 0.24,
-      metalness: 0.12,
+      color: '#eef1f7',
+      roughness: 0.26,
+      metalness: 0.1,
       clearcoat: 1,
-      clearcoatRoughness: 0.12,
+      clearcoatRoughness: 0.14,
       transparent: true,
-      opacity: 0.68,
-      envMapIntensity: 1.75,
+      opacity: 0.5,
+      envMapIntensity: 1.2,
     }),
-    label: new THREE.MeshStandardMaterial({ color: '#15151a', roughness: 0.6, metalness: 0.05 }),
+    // measured off the reference's plate: #3b2a36, not the near-black it was
+    label: new THREE.MeshStandardMaterial({ color: REF_TONE.plate, roughness: 0.62, metalness: 0.05 }),
     // the ridge under the label is the brightest moulded edge on the part: let
     // it carry a proper specular so the environment paints a highlight on it
+    // the ridge reads #afa6af against a #91808c face: a lit edge, but only
+    // ~20% above the face it sits on, so the highlight stays tight
     ridge: new THREE.MeshPhysicalMaterial({
-      color: '#f2f5fa',
-      roughness: 0.12,
-      metalness: 0.16,
+      color: '#dfd8e2',
+      roughness: 0.18,
+      metalness: 0.14,
       clearcoat: 1,
-      clearcoatRoughness: 0.05,
-      envMapIntensity: 1.8,
+      clearcoatRoughness: 0.08,
+      envMapIntensity: 1.25,
     }),
-    tray: new THREE.MeshStandardMaterial({ color: '#232329', roughness: 0.84, metalness: 0.05 }),
+    // the tray underneath the window texture: the measured floor tone
+    tray: new THREE.MeshStandardMaterial({ color: REF_TONE.tray, roughness: 0.86, metalness: 0.04 }),
     cardBody: new THREE.MeshPhysicalMaterial({
-      color: '#fbfbfb',
-      roughness: 0.44,
+      color: REF_TONE.cardBodyInk,
+      roughness: 0.48,
       metalness: 0.02,
-      clearcoat: 0.5,
-      clearcoatRoughness: 0.28,
-      envMapIntensity: 0.85,
+      clearcoat: 0.4,
+      clearcoatRoughness: 0.3,
+      envMapIntensity: 0.7,
     }),
-    slot: new THREE.MeshStandardMaterial({ color: '#2b2b33', roughness: 0.7, metalness: 0.12 }),
+    slot: new THREE.MeshStandardMaterial({ color: '#6d6272', roughness: 0.55, metalness: 0.1 }),
     wear,
   };
   return materials;
@@ -252,6 +288,9 @@ export function Slab({
       <group ref={innerRef}>
         {/* outer case: silhouette with the window cut through */}
         <mesh geometry={geo.shell} material={glassMat} position={[0, 0, geo.at.shell]} />
+        {/* front face plate: the silhouette inset one moulding step. Its
+            bevelled edge is the reference's 10 px chamfer + hairline */}
+        <mesh geometry={geo.face} material={quality === 'hero' || upgradeGlass || isActive ? mat.face : glassMat} position={[0, 0, geo.at.face]} />
         {/* back plate closes the case */}
         <mesh geometry={geo.backPlate} material={mat.tray} position={[0, 0, geo.at.backPlate]} />
         {/* tray ring — a plate with the card's cutout */}
@@ -268,9 +307,10 @@ export function Slab({
         <mesh geometry={geo.labelPlate} material={mat.label} position={[0, L.labelY, geo.at.labelPlate]} />
         <mesh position={[0, L.labelY, L.labelFace]}>
           <planeGeometry args={[SLAB_SPEC.labelW, SLAB_SPEC.labelH]} />
-          <meshStandardMaterial map={labelTex} roughness={0.5} metalness={0.06} toneMapped={false} />
+          <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />
         </mesh>
-        {/* ridge under the label */}
+        {/* ridge: one full-width moulding line between the label and the
+            window (measured y 418..427 of the case) */}
         <mesh geometry={geo.ridge} material={mat.ridge} position={[0, L.ridgeY, geo.at.ridge]} />
         {/* retaining wells */}
         {geo.slots.map((g, i) => (
@@ -307,10 +347,11 @@ export function Slab({
               hoverBoost={1.5}
               cardAspect={SLAB_SPEC.cardW / SLAB_SPEC.cardH}
               // UV space: v runs from the bottom, so the art window is
-              // [artBottom, 1 - artTop] vertically
+              // [artBottom, 1 - artTop] vertically. The art frame is a hard
+              // 0.0163-wide ink line, so the foil stops on it.
               mask={[SLAB_SPEC.artInset, SLAB_SPEC.artBottom, 1 - SLAB_SPEC.artInset, 1 - SLAB_SPEC.artTop]}
-              maskFeather={0.05}
-              outside={0.1}
+              maskFeather={0.012}
+              outside={0.015}
               timeOffset={timeOffset}
             />
           </mesh>

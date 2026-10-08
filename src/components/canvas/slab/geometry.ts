@@ -13,6 +13,13 @@ const CIRCLE_KAPPA = 0.5523;
  * Rounded-rectangle outline whose corners are cubic Béziers. The handles grow
  * past the circular value with `power`, so curvature eases out of the straight
  * edges instead of jumping from 0 to 1/r at the join: the moulded-plastic look.
+ *
+ * The reference's corner, measured as the inset of the contour per row from the
+ * top edge (`scripts/analysis/_shape.mjs`), falls 10 px inside the outline by
+ * 1.8% of the way down a 0.115-radius corner — a circular fillet would be at
+ * 2 px there. Power 5.2 reproduces that: the measured profile and the model
+ * agree to within 2 px from the tangent point to the straight edge.
+ *
  * Points run counter-clockwise; any hole must be reversed by the caller.
  */
 export function squircle(
@@ -27,7 +34,7 @@ export function squircle(
   const hw = w / 2;
   const hh = h / 2;
   const rad = Math.max(1e-4, Math.min(r, Math.min(hw, hh) * 0.95));
-  const kappa = THREE.MathUtils.clamp(CIRCLE_KAPPA + (power - 2) * 0.045, 0.5523, 0.8);
+  const kappa = THREE.MathUtils.clamp(CIRCLE_KAPPA + (power - 2) * 0.0485, 0.5523, 0.86);
   const c = rad * kappa;
   const segs = Math.max(2, Math.round(cornerSegs));
 
@@ -183,8 +190,14 @@ export function buildWindowPlate(
  * ------------------------------------------------------------------ */
 
 export interface SlabGeometry {
-  /** outer case: full silhouette, window cut through, bevel front and back */
+  /** outer case: full silhouette, window cut through, chamfered rim */
   shell: THREE.BufferGeometry;
+  /**
+   * Front face plate: the shell's silhouette inset one moulding step, standing
+   * proud of the body by `faceLift`. This is the layer that gives the case its
+   * measured hairline — 10 px of dark chamfer, a highlight, then the face.
+   */
+  face: THREE.BufferGeometry;
   /** solid back plate closing the case */
   backPlate: THREE.BufferGeometry;
   /** tray ring (a plate with a card cutout) the card sits inside */
@@ -193,7 +206,7 @@ export interface SlabGeometry {
   band: THREE.BufferGeometry;
   /** the dark label plate */
   labelPlate: THREE.BufferGeometry;
-  /** light inner border on the label, doubling as the ridge under it */
+  /** the full-width moulding line between the label and the window */
   ridge: THREE.BufferGeometry;
   /** the card body */
   card: THREE.BufferGeometry;
@@ -207,6 +220,7 @@ export interface SlabGeometry {
   /** mesh z positions, so the component never recomputes planes by hand */
   at: {
     shell: number;
+    face: number;
     backPlate: number;
     tray: number;
     band: number;
@@ -230,6 +244,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   const {
     w, h, radius, bevel, labelW, labelH, labelRadius, cardW, cardH, cardRadius, cardD,
     windowW, windowH, windowRadius, windowBand, zFront, zBack, zBackPlateFront, zCardBack, zTrayFront,
+    stepInset, ridgeInset,
   } = spec;
 
   const windowRect: Rect = { w: windowW, h: windowH, r: windowRadius, x: 0, y: L.windowY };
@@ -240,19 +255,32 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
    * front plane, which is what gives the label its hairline shadow.
    */
   const labelHole: Rect = { w: labelW, h: labelH, r: labelRadius, x: 0, y: L.labelY };
-  const labelPlateRect: Rect = { w: labelW + 0.024, h: labelH + 0.024, r: labelRadius + 0.012 };
+  const labelPlateRect: Rect = { w: labelW + 0.02, h: labelH + 0.02, r: labelRadius + 0.01 };
   const plain = (rect: Rect, b: number, dir: 1 | -1 = 1) => {
     const f = fit(rect, b, dir);
     return squircle(f.w, f.h, f.r, P, q.corner, f.x ?? 0, f.y ?? 0);
   };
 
-  // --- shell: full silhouette, window cut through, bevel wraps front + back
+  // --- shell: full silhouette, window + label cut through, chamfered rim
   const shellShape = plain({ w, h, r: radius }, bevel);
   addHole(shellShape, fit(windowRect, bevel, -1), P, q.corner);
   addHole(shellShape, fit(labelHole, bevel, -1), P, q.corner);
   const shell = extrudedLayer(shellShape, {
-    depth: zFront - zBack,
+    depth: L.shellFront - zBack,
     bevel,
+    bevelSegments: q.bevel,
+    curveSegments: q.curve,
+    creaseAngle: 0.3,
+  });
+
+  // --- face plate: the silhouette minus the moulding step, proud of the body
+  // by faceLift. Its bevelled edge is the bright line 10 px inside the case.
+  const faceShape = plain({ w: L.faceW, h: L.faceH, r: L.faceRadius }, 0.006);
+  addHole(faceShape, fit(windowRect, 0.006, -1), P, q.corner);
+  addHole(faceShape, fit(labelHole, 0.006, -1), P, q.corner);
+  const face = extrudedLayer(faceShape, {
+    depth: zFront - L.shellFront + 0.004,
+    bevel: 0.006,
     bevelSegments: q.bevel,
     curveSegments: q.curve,
     creaseAngle: 0.3,
@@ -276,41 +304,37 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     curveSegments: q.curve,
   });
 
-  // --- frosted band around the window, proud of the front face by a hair
-  const bandShape = plain({ w: windowW + windowBand * 2, h: windowH + windowBand * 2, r: windowRadius + windowBand, y: L.windowY }, 0.005);
-  addHole(bandShape, fit(windowRect, 0.005, -1), P, q.corner);
+  // --- frosted band: the moulded lip hugging the window's opening
+  const bandShape = plain({ w: windowW + windowBand * 2, h: windowH + windowBand * 2, r: windowRadius + windowBand, y: L.windowY }, 0.004);
+  addHole(bandShape, fit(windowRect, 0.004, -1), P, q.corner);
   const band = extrudedLayer(bandShape, {
-    depth: 0.012,
-    bevel: 0.005,
+    depth: 0.008,
+    bevel: 0.004,
     bevelSegments: q.bevel,
     curveSegments: q.curve,
   });
 
-  // --- label plate + its inner border (doubles as the ridge under the label)
+  // --- label plate + the thin pale lip printed inside it
   const labelPlate = extrudedLayer(plain(labelPlateRect, 0.005), {
     depth: spec.labelD,
     bevel: 0.005,
     bevelSegments: q.bevel,
     curveSegments: q.curve,
   });
-  const ridgeShape = plain({ w: labelPlateRect.w, h: labelPlateRect.h, r: labelPlateRect.r }, 0.004);
-  addHole(
-    ridgeShape,
-    fit(
-      {
-        w: Math.max(0.02, labelW - spec.labelBorder * 2),
-        h: Math.max(0.02, labelH - spec.labelBorder * 2),
-        r: Math.max(0.005, labelRadius - spec.labelBorder),
-      },
-      0.004,
-      -1
-    ),
-    P,
-    q.corner
-  );
-  const ridge = extrudedLayer(ridgeShape, {
-    depth: 0.014,
-    bevel: 0.004,
+  /*
+   * NOTE: the pale lip inside the plate is *painted*, not modelled. It is a
+   * 6 px printed highlight in the reference (y 263..267 of a 153 px plate), and
+   * an extruded ring at any depth that reads at this scale pokes through the
+   * front plane. `drawLabel` draws it with its own hairline shadow.
+   */
+
+  // --- ridge: one full-width moulding line, centred in the gap between the
+  // label's underside and the window's top edge (measured: 40 px of face above
+  // it, 41 px below it)
+  const ridgeW = w - ridgeInset * 2;
+  const ridge = extrudedLayer(plain({ w: ridgeW, h: spec.ridgeH, r: spec.ridgeH / 2 }, 0.003), {
+    depth: 0.01,
+    bevel: 0.003,
     bevelSegments: q.bevel,
     curveSegments: q.curve,
   });
@@ -330,11 +354,20 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     q.corner
   );
 
-  // --- retaining wells in the apron above the card. The apron is the strip of
-  // tray between the window's top edge and the card's top edge; a well that
-  // reached past the card would float in front of the art.
+  /*
+   * --- hanger ledges in the apron above the card ---
+   * The apron is the strip of tray between the window's top edge and the card's
+   * top edge — 38 px of the case, measured. The ledges sit at the window's top
+   * edge and must stay clear of the card: an earlier version clamped them with
+   * `min(...)` against the card's top edge, which placed them *below* it, so the
+   * well floated in front of the card's own artwork.
+   */
   const apronTop = L.windowY + windowH / 2;
-  const slotY = Math.min(apronTop - spec.slotTop - spec.slotH / 2, spec.cardY + spec.cardH / 2 - spec.slotH / 2 - 0.02);
+  const apronBottom = spec.cardY + spec.cardH / 2; // the card's top edge
+  const slotY = Math.max(
+    apronTop - spec.slotTop - spec.slotH / 2,
+    apronBottom + 0.005 + spec.slotH / 2
+  );
   const slots = L.slotX.map((x) => {
     const g = new THREE.BoxGeometry(spec.slotW, spec.slotH, 0.01);
     g.translate(x, slotY, 0);
@@ -343,11 +376,12 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
 
   const tri = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
   const triangles =
-    tri(trayPlate) + tri(shell) + tri(backPlate) + tri(tray) + tri(band) + tri(labelPlate) + tri(ridge) + tri(card) +
-    tri(cardFace) + slots.reduce((a, s) => a + tri(s), 0);
+    tri(trayPlate) + tri(shell) + tri(face) + tri(backPlate) + tri(tray) + tri(band) + tri(labelPlate) + tri(ridge) +
+    tri(card) + tri(cardFace) + slots.reduce((a, s) => a + tri(s), 0);
 
   return {
     shell,
+    face,
     backPlate,
     tray,
     band,
@@ -359,12 +393,13 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     slots,
     planes: L,
     at: {
-      shell: (zFront + zBack) / 2,
+      shell: (L.shellFront + zBack) / 2,
+      face: (zFront + L.shellFront - 0.004) / 2,
       backPlate: (zBackPlateFront + zBack) / 2,
       tray: (zTrayFront + zCardBack) / 2,
-      band: zFront + 0.004,
+      band: zFront + 0.0005,
       labelPlate: zFront - spec.labelD / 2 - 0.002,
-      ridge: zFront + 0.002,
+      ridge: L.ridge,
       card: zCardBack + cardD / 2,
       slot: zTrayFront + 0.006,
     },

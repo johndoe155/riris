@@ -10,7 +10,9 @@ import { parser } from '@shaderfrog/glsl-parser';
 import * as THREE from 'three';
 import fs from 'node:fs';
 
-const file = process.argv[2];
+// Default to the shared card material: that is where the hand-written GLSL
+// lives, so a bare `npm run verify:shaders` actually checks something.
+const file = process.argv[2] ?? new URL('../../src/components/canvas/HoloMaterial.tsx', import.meta.url);
 const src = fs.readFileSync(file, 'utf8');
 
 /** pull every /* glsl *\/ `...` template out of the file */

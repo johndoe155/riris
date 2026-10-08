@@ -2,20 +2,38 @@
  * Every measurement of the graded-card slab, in one place, so tuning is a
  * one-line change and both scenes follow.
  *
- * The numbers come from the reference photo (slab box 664x1103 px, ratio
- * 0.602:1) and the card-face template recovered from cards.zip:
+ * ALL of these numbers come from `reference-image.jpg`, measured by the
+ * scripts in `scripts/analysis/` (see `docs/reference-parity.md` for the table
+ * and the diffs). The photo is close to orthographic — the slab box is
+ * 665 x 1116 px against a true 1 : 1.678 — so a pixel fraction of that box *is*
+ * the dimension, and every number below is a real measurement rather than a
+ * guess. Two conventions:
  *
- *   slab        0.602 : 1
- *   label       x 0.059..0.941, y 0.0335..0.170 of the slab   (dark plate)
- *   window      x 0.080..0.920, y 0.190..0.955 of the slab
- *   card        x 0.131..0.870, y 0.289..0.918 of the slab -> 0.710 aspect
- *   card ring   hugs the card edge, ~0.0143 of the card width thick
- *   art window  0.071..0.929 of the card width, 0.036..0.664 of its height
+ *   x, z : world units. The slab is 1 wide, so an x fraction of the photo's
+ *          slab box is the world number directly.
+ *   y    : world units, measured DOWN from the slab's top edge. Multiply the
+ *          photo's y fraction by h (1.677) to get it.
+ *
+ * Measured feature table (photo px → slab fractions / world units):
+ *
+ *   case             665 x 1116 px                     1 x 1.677
+ *   corner radius    76.5 px                           R 0.115 (of min(w,h))
+ *   corner profile   superellipse, exponent ~5.2       cornerPower 5.2
+ *   outer chamfer    10 px (a dark band inside the edge) stepInset 0.015
+ *   label plate      x 452..1036, y 227..379           x +-0.4391, top 0.0600, h 0.2284
+ *   ridge            y 418..427, full face width       top 0.3472, h 0.0134
+ *   hanger ledge     x 700..760, y 470..485            w 0.088, h 0.0225
+ *   window opening   x 465..1030, y 470..1295          w 0.8496, top 0.4253, h 1.2396
+ *   card             x 500..991,  y 508..1240          w 0.7384, top 0.4823, h 1.1000
+ *   card ring        hugs the card's edge, 8 px         ringInset 0, stroke 0.0163 card-w
+ *   art window       ink x 532..536 / 957..961,        inset 0.0630 card-w,
+ *                        y 535..541 / 964..970          top 0.0365, bottom 0.3680 card-h
  *
  * The z stack is the real thing, front to back (all world units, slab 1 wide):
  *
- *   zFront        +0.045  flat front face of the shell
- *   zPlateBack    +0.017  back of the front plate (window is this deep)
+ *   zFront        +0.045  front face of the case (the plate that carries the holes)
+ *   zShellFront   +0.037  front of the shell body, one step behind the face
+ *   zPlateBack    +0.017  back of the front plate (the window is this deep)
  *   cardFace      -0.010  the card's front surface
  *   zCardBack     -0.028  the card's back, and the tray's back plane
  *   zTrayFront    -0.012  front of the tray ring that the card sits in
@@ -30,13 +48,23 @@ export interface SlabSpec {
   h: number;
   /** corner radius as a fraction of min(w, h) */
   radius: number;
-  /** 2 = circular fillet, 4-6 = squircle easing into the straight edges */
+  /** 2 = circular fillet, 5.2 = the reference's squircle */
   cornerPower: number;
   /** how far the rounded edge wraps over the front/back faces */
   bevel: number;
+  /**
+   * Inset of the front face plate from the outline. The measured 10 px band
+   * between the silhouette and the first bright line on the front: the case's
+   * moulded rim. It reads *darker* than the face it borders, which is what
+   * makes the slab look like a moulding rather than a flat box.
+   */
+  stepInset: number;
+  /** how far the face plate stands proud of the shell body */
+  faceLift: number;
 
   /* ---- z stack ---- */
   zFront: number;
+  zShellFront: number;
   zPlateBack: number;
   cardD: number;
   zCardBack: number;
@@ -54,9 +82,15 @@ export interface SlabSpec {
   labelD: number;
   /** light inner border drawn on the plate */
   labelBorder: number;
-  /** the ridge that separates label from window */
+
+  /* ---- ridge: the full-width moulding line between label and window ---- */
+  /** how far in from the slab's edge the ridge starts */
+  ridgeInset: number;
   ridgeH: number;
-  ridgeGap: number;
+  /** ridge centre, measured down from the slab's top edge */
+  ridgeTop: number;
+  /** how far the ridge stands proud of the face */
+  ridgeLift: number;
 
   /* ---- window ---- */
   windowW: number;
@@ -77,14 +111,24 @@ export interface SlabSpec {
   cardGap: number;
 
   /* ---- card face layout (fractions of the card) ---- */
+  /** inset of the printed ring at the card's edge */
   ringInset: number;
   ringWidth: number;
+  /** inset of the art frame's stroke (its outer edge) */
   artInset: number;
+  /** stroke width of the art frame */
+  artStroke: number;
   artTop: number;
   artBottom: number;
 
   /* ---- furniture ---- */
-  /** retaining wells in the apron above the card (they must not overlap it) */
+  /**
+   * The retaining ledges in the apron above the card. Measured off the
+   * reference as one small bright notch at the window's top edge, 60 px wide
+   * and 15 px tall (they catch the light rather than reading as dark pockets),
+   * so they are modelled small and near the opening — nothing like the deep
+   * wells the previous spec drew across the whole apron.
+   */
   slotTop: number;
   slotH: number;
   slotW: number;
@@ -93,13 +137,16 @@ export interface SlabSpec {
 
 export const SLAB_SPEC: SlabSpec = {
   w: 1,
-  h: 1.6611,
+  h: 1.6770,
 
   radius: 0.115,
-  cornerPower: 4.6,
-  bevel: 0.02,
+  cornerPower: 5.2,
+  bevel: 0.012,
+  stepInset: 0.015,
+  faceLift: 0.008,
 
   zFront: 0.045,
+  zShellFront: 0.037,
   zPlateBack: 0.017,
   cardD: 0.018,
   zCardBack: -0.028,
@@ -107,42 +154,58 @@ export const SLAB_SPEC: SlabSpec = {
   zBackPlateFront: -0.028,
   zBack: -0.045,
 
-  labelW: 0.881,
-  labelH: 0.2275,
-  labelTop: 0.055,
-  labelRadius: 0.055,
+  /** x 452..1036 px of the 665 px case: 584/665 */
+  labelW: 0.8781,
+  labelH: 0.2284,
+  labelTop: 0.0600,
+  labelRadius: 0.034,
   labelD: 0.026,
   labelBorder: 0.0115,
-  ridgeH: 0.02,
-  ridgeGap: 0.016,
 
-  windowW: 0.84,
-  windowH: 1.27,
-  windowTop: 0.3156,
-  windowRadius: 0.075,
-  windowBand: 0.026,
+  ridgeInset: 0.015,
+  ridgeH: 0.0137,
+  ridgeTop: 0.3472,
+  ridgeLift: 0.004,
 
-  cardW: 0.7395,
-  cardH: 1.0432,
-  cardY: -0.1718,
+  windowW: 0.8496,
+  windowH: 1.2396,
+  windowTop: 0.4253,
+  windowRadius: 0.05,
+  windowBand: 0.014,
+
+  cardW: 0.7384,
+  cardH: 1.1000,
+  // centre y, measured down from the top: (0.2876 + 0.9435) / 2 * 1.677 = 1.0324
+  cardY: 1.6770 / 2 - 1.0324,
   cardRadius: 0.042,
-  cardGap: 0.014,
+  cardGap: 0.012,
 
-  ringInset: 0.008,
-  ringWidth: 0.0143,
-  artInset: 0.071,
-  artTop: 0.036,
-  artBottom: 0.336,
+  ringInset: 0.0,
+  ringWidth: 0.0163,
+  /**
+   * The art frame's *outer* edge, as a fraction of the card width. Measured
+   * from the frame's ink: x 532..536 (left) and 957..961 (right) of a card
+   * spanning 500..991, so the outer edges average 0.0630 of the card width in.
+   */
+  artInset: 0.063,
+  /** the frame's ink line: 4 px on a 492 px card */
+  artStroke: 0.0081,
+  artTop: 0.0365,
+  artBottom: 0.368,
 
-  slotTop: 0.02,
-  slotH: 0.1,
-  slotW: 0.014,
+  slotTop: 0.0015,
+  // 15 px of the 1116 px case, in world y (15/1116 * 1.677)
+  slotH: 0.0225,
+  // 60 px of the 665 px case, in world x
+  slotW: 0.088,
   slots: 4,
 };
 
 export interface SlabLayers {
-  /** front face of the shell */
+  /** front face of the case */
   front: number;
+  /** front of the shell body, one step behind the face plate */
+  shellFront: number;
   /** the window: a well this deep */
   plateDepth: number;
   /** card front / back planes */
@@ -164,18 +227,27 @@ export interface SlabLayers {
   trayW: number;
   trayH: number;
   trayRadius: number;
+  /** the face plate's outline (the shell's silhouette, inset) */
+  faceW: number;
+  faceH: number;
+  faceRadius: number;
 }
 
 /** Derived z planes and y anchors. The small gaps are what catch the light. */
 export function slabLayers(spec: SlabSpec = SLAB_SPEC): SlabLayers {
-  const { h, zFront, zPlateBack, zCardBack, cardD, zTrayFront, labelD, windowW, windowH, slots, cardGap, cardW, cardH, cardRadius } = spec;
+  const { h, zFront, zPlateBack, zCardBack, cardD, zTrayFront, labelD, windowW, windowH, slots, cardGap, cardW, cardH, cardRadius, stepInset } = spec;
 
   const labelY = h / 2 - spec.labelTop - spec.labelH / 2;
-  const ridgeY = labelY - spec.labelH / 2 - spec.ridgeGap - spec.ridgeH / 2;
+  const ridgeY = h / 2 - spec.ridgeTop - spec.ridgeH / 2;
   const windowY = h / 2 - spec.windowTop - windowH / 2;
 
-  // wells sit inside the window, a well's width clear of each side
-  const span = Math.max(0.05, windowW - spec.slotW * 8);
+  /*
+   * The ledges are spread across the middle of the window, each clear of its
+   * neighbours and of the window's walls. (The old rule — `windowW - slotW * 8`
+   * — assumed a 14 px-wide ledge; at the measured 60 px it collapsed the span to
+   * less than one ledge and stacked all four on top of each other.)
+   */
+  const span = Math.max(spec.slotW * 1.5, windowW - spec.slotW * 3.2);
   const slotX: number[] = [];
   for (let i = 0; i < slots; i++) {
     const t = slots === 1 ? 0.5 : i / (slots - 1);
@@ -184,23 +256,27 @@ export function slabLayers(spec: SlabSpec = SLAB_SPEC): SlabLayers {
 
   return {
     front: zFront,
+    shellFront: spec.zShellFront,
     plateDepth: zFront - zPlateBack,
     cardFace: zCardBack + cardD,
     cardBack: zCardBack,
     trayFront: zTrayFront,
     trayBack: zCardBack,
     labelPlate: zFront - labelD,
-    // the printed face sits 1mm under the shell's front plane, inside the
+    // the printed face sits 1mm under the front plane, inside the
     // label hole, so it is neither buried in the plate nor above the case
     labelFace: zFront - 0.001,
     labelY,
-    ridge: zFront - 0.004,
+    ridge: zFront + spec.ridgeLift,
     ridgeY,
     windowY,
     slotX,
     trayW: cardW + cardGap * 2,
     trayH: cardH + cardGap * 2,
     trayRadius: cardRadius + cardGap * 0.5,
+    faceW: spec.w - stepInset * 2,
+    faceH: h - stepInset * 2,
+    faceRadius: spec.radius - stepInset * 0.5,
   };
 }
 
@@ -245,3 +321,34 @@ export function trayLayout(spec: SlabSpec = SLAB_SPEC, layers: SlabLayers = slab
     })),
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Reference tones
+ *
+ * Sampled straight off reference-image.jpg. Keeping them here (rather than in
+ * the material set) means the 2-D painters and the 3-D materials can never
+ * drift apart, and it documents what each surface is supposed to read as.
+ * ------------------------------------------------------------------ */
+
+export const REF_TONE = {
+  /** the case's front face, top strip (catches the overhead light) */
+  faceTop: '#baa9b5',
+  /** the case's front face, mid (beside the window) */
+  faceMid: '#91808c',
+  /** the case's chamfered rim, left edge (in shadow) */
+  rimDark: '#42333f',
+  /** the case's chamfered rim, right edge (lit) */
+  rimLit: '#8a7685',
+  /** the ridge's highlight */
+  ridge: '#afa6af',
+  /** the tray / window floor — mauve smoke, and remarkably flat */
+  tray: '#483a45',
+  /** the label plate */
+  plate: '#3b2a36',
+  /** the card's printed body, as it reads *through* the acrylic */
+  cardInk: '#473642',
+  /** the card's body before the case's veil: cardInk minus the transmission lift */
+  cardBodyInk: '#3a2b35',
+  /** the card's frame ink */
+  cardPaper: '#fbf9fb',
+} as const;

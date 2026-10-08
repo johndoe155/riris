@@ -6,13 +6,13 @@ import * as THREE from 'three';
 import { Slab } from '@/components/canvas/slab/Slab';
 import { SLAB_SPEC } from '@/components/canvas/slab/SlabSpec';
 import { slabCards, type SlabCard } from '@/data/slabCards';
-import { Backdrop } from '@/components/canvas/slab/Backdrop';
+import { Backdrop, REF_BACKDROP } from '@/components/canvas/slab/Backdrop';
 
 /* The reference photo is 1488×1484 with the slab occupying x 413..1077,
    y 191..1294 (measured). Scaling the plane so that box equals the slab's own
    world height lines the photo up with the 3D model exactly, which is what
    makes the slider a real proportion check rather than a vibe check. */
-const REF_PX = { w: 1488, h: 1484, x0: 413, x1: 1077, y0: 191, y1: 1294 };
+const REF_PX = { w: 1488, h: 1484, x0: 412, x1: 1077, y0: 187, y1: 1303 };
 const SLAB_H = SLAB_SPEC.h;
 const IMG_H = SLAB_H / ((REF_PX.y1 - REF_PX.y0) / REF_PX.h);
 const IMG_W = IMG_H * (REF_PX.w / REF_PX.h);
@@ -35,33 +35,43 @@ const GUIDES: { label: string; points: [number, number][] }[] = [
     ],
   },
   {
-    label: 'card ring',
+    label: 'card',
     points: [
-      [nx(0.131), norm(0.289)],
-      [nx(0.87), norm(0.289)],
-      [nx(0.87), norm(0.918)],
-      [nx(0.131), norm(0.918)],
-      [nx(0.131), norm(0.289)],
+      [nx(0.1323), norm(0.2876)],
+      [nx(0.8707), norm(0.2876)],
+      [nx(0.8707), norm(0.9435)],
+      [nx(0.1323), norm(0.9435)],
+      [nx(0.1323), norm(0.2876)],
     ],
   },
   {
     label: 'label plate',
     points: [
-      [nx(0.0587), norm(0.0335)],
-      [nx(0.941), norm(0.0335)],
-      [nx(0.941), norm(0.17)],
-      [nx(0.0587), norm(0.17)],
-      [nx(0.0587), norm(0.0335)],
+      [nx(0.0600), norm(0.0358)],
+      [nx(0.9383), norm(0.0358)],
+      [nx(0.9383), norm(0.1720)],
+      [nx(0.0600), norm(0.1720)],
+      [nx(0.0600), norm(0.0358)],
+    ],
+  },
+  {
+    label: 'ridge',
+    points: [
+      [nx(0.015), norm(0.2070)],
+      [nx(0.985), norm(0.2070)],
+      [nx(0.985), norm(0.2151)],
+      [nx(0.015), norm(0.2151)],
+      [nx(0.015), norm(0.2070)],
     ],
   },
   {
     label: 'window',
     points: [
-      [nx(0.08), norm(0.19)],
-      [nx(0.92), norm(0.19)],
-      [nx(0.92), norm(0.955)],
-      [nx(0.08), norm(0.955)],
-      [nx(0.08), norm(0.19)],
+      [nx(0.0797), norm(0.2543)],
+      [nx(0.9293), norm(0.2543)],
+      [nx(0.9293), norm(0.9933)],
+      [nx(0.0797), norm(0.9933)],
+      [nx(0.0797), norm(0.2543)],
     ],
   },
 ];
@@ -121,8 +131,9 @@ function StraightScene({ card, showPhoto, showGuides }: { card: SlabCard; showPh
         <Lightformer form="rect" intensity={1.7} color="#e8f1ff" position={[-6, 0.5, -3]} scale={[12, 2.2, 1]} />
         <Lightformer form="rect" intensity={1.4} color="#fff0e6" position={[6, -0.5, -3]} scale={[12, 2.2, 1]} />
       </Environment>
-      {/* the reference photo's own background tone, so the slider blends */}
-      <Backdrop height={SLAB_H * 3.4} top="#2b2028" glow="#54404c" bottom="#1a1319" shadow={0.8} />
+      {/* the reference photo's own backdrop: a diagonal mauve ramp, light off
+          to the right, with a tight contact shadow under the case */}
+      <Backdrop height={SLAB_H * 3.4} {...REF_BACKDROP} />
       <Slab card={card} quality="hero" intensity={1} />
       <PhotoOverlay opacity={showPhoto} />
       <Guides show={showGuides} />
@@ -177,14 +188,16 @@ export default function ReferenceCompare() {
           </select>
         </div>
         <ul className="space-y-1 text-[10px] leading-relaxed text-[#F5F3EF]/45">
-          <li>cyan — slab outline (0.6:1)</li>
-          <li>pink — card / white ring box</li>
+          <li>cyan — slab outline (0.5961:1)</li>
+          <li>pink — card box</li>
           <li>orange — header label plate</li>
+          <li>#FF2D9B — ridge line</li>
           <li>green — window recess</li>
           <li>straight-on fov 12° — no perspective skew</li>
         </ul>
         <p className="text-[10px] leading-relaxed text-[#F5F3EF]/35">
-          Reference: 664 × 1103 px slab in a 1488 × 1484 photo, plate 0.881 w, card 0.7395 w, ring line 0.0143 card-w.
+          Reference: 665 × 1116 px case in a 1488 × 1484 photo. Plate 0.878 w, card 0.738 w
+          (y 0.288..0.944), window 0.850 w, ridge y 0.3472 h 0.0134, ring line 0.0163 card-w.
         </p>
       </div>
     </div>

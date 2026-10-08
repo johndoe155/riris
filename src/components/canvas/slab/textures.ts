@@ -1,7 +1,7 @@
 'use client';
 
 import * as THREE from 'three';
-import { trayLayout, type TrayLayout } from './SlabSpec';
+import { REF_TONE, trayLayout, type TrayLayout } from './SlabSpec';
 import { squircle } from './geometry';
 
 /* ------------------------------------------------------------------ *
@@ -214,6 +214,8 @@ export interface CardFaceText {
   artWidth: number;
   artTop: number;
   artHeight: number;
+  /** stroke width of the art frame, as a fraction of the card width */
+  artStroke?: number;
 }
 
 export function drawCardFace(
@@ -225,9 +227,13 @@ export function drawCardFace(
 ) {
   const { width: W, height: H } = o;
   const bodyRadius = (o.bodyRadius ?? 0.0568) * W;
-  const power = o.cornerPower ?? 4.6;
-  const ink = o.dark ? '#F7F5F2' : '#141414';
-  const paper = o.dark ? '#101014' : '#F4F2EE';
+  const power = o.cornerPower ?? 5.2;
+  const ink = o.dark ? REF_TONE.cardPaper : '#141414';
+  // measured on the reference's graded card: the body behind the acrylic reads
+  // #473642, a mauve that is nothing like the near-black the old painter used.
+  // The case's own transmission adds a veil on top of this, so the ink starts a
+  // little under the measured value.
+  const paper = o.dark ? REF_TONE.cardBodyInk : '#F4F2EE';
 
   ctx.clearRect(0, 0, W, H);
   ctx.save();
@@ -237,20 +243,28 @@ export function drawCardFace(
   ctx.fillStyle = paper;
   ctx.fillRect(0, 0, W, H);
 
-  // ---- ring frame
-  const rx = ring.inset * W;
-  const ry = ring.inset * H;
-  const rw = W - rx * 2;
-  const rh = H - ry * 2;
-  const rRad = Math.max(2, ring.radius * W);
-  ctx.lineWidth = Math.max(1.5, ring.width * W);
+  /* ---- ring frame ----
+   * Measured: the ring hugs the card's own edge (card x 0.0000..0.0163 and
+   * 0.9837..1.0000), so it is stroked on a path inset by half its width rather
+   * than being drawn as a separate frame a few percent inside the card. The
+   * road path radius uses the body radius minus the inset, so the stroke stays
+   * concentric with the card's silhouette at the corners. */
+  const ringW = Math.max(1.5, ring.width * W);
+  const ringInset = ring.inset * W + ringW / 2;
+  const rw = W - ringInset * 2;
+  const rh = H - ringInset * 2;
+  const rRad = Math.max(2, bodyRadius - ringInset);
+  ctx.lineWidth = ringW;
   ctx.strokeStyle = ink;
-  roundRect(ctx, rx, ry, rw, rh, rRad);
+  roundRect(ctx, ringInset, ringInset, rw, rh, rRad);
   ctx.stroke();
 
   // ---- art window with a thin border
   const { x: ax, y: ay, w: aw, h: ah } = artBox;
-  ctx.fillStyle = o.tint;
+  // the art frame is a stroke centred on the window's edge: measured 4 px on a
+  // 492 px-wide card, i.e. half the ring's weight
+  const artW = Math.max(1, (o.artStroke ?? o.ringWidth * 0.5) * W);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.fillRect(ax, ay, aw, ah);
   if (art) {
     // cover-fit into the window
@@ -263,9 +277,9 @@ export function drawCardFace(
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(art, sx, sy, sw, sh, ax, ay, aw, ah);
   }
-  ctx.lineWidth = Math.max(1, W * 0.0035);
+  ctx.lineWidth = artW;
   ctx.strokeStyle = ink;
-  ctx.strokeRect(ax, ay, aw, ah);
+  ctx.strokeRect(ax + artW / 2, ay + artW / 2, aw - artW, ah - artW);
 
   /* ---- furniture below the art window -----------------------------------
    * The art takes 0.036..0.664 of the card height, so everything else has to
@@ -453,10 +467,11 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   }
 
   // the plate is moulded, so it is a shade lighter along the top than the
-  // bottom — the reference reads a touch of that even in flat light
+  // bottom. Measured on the reference: #3d2e3a at the top of the plate and
+  // #3b2a36 at the bottom — a 0.02 luma tilt, not a gradient
   const plateGrad = ctx.createLinearGradient(0, 0, 0, H);
-  plateGrad.addColorStop(0, 'rgba(255,255,255,0.05)');
-  plateGrad.addColorStop(1, 'rgba(0,0,0,0.16)');
+  plateGrad.addColorStop(0, 'rgba(255,255,255,0.03)');
+  plateGrad.addColorStop(1, 'rgba(0,0,0,0.06)');
   ctx.fillStyle = plateGrad;
   ctx.fillRect(0, 0, W, H);
 
@@ -466,10 +481,12 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   // the line hugs the plate, the way the reference's highlight does, and its
   // radius has to be the plate's own (SLAB_SPEC.labelRadius is a fraction of
   // min(w, h), i.e. H*0.055 in this texture)
-  const inset = W * 0.008;
-  ctx.strokeStyle = 'rgba(234,240,248,0.5)';
-  ctx.lineWidth = Math.max(1, W * 0.0036);
-  roundRect(ctx, inset, inset, W - inset * 2, H - inset * 2, Math.max(2, H * 0.055 - inset));
+  // the lip the reference shows inside the plate: a pale line 9 px in from the
+  // plate's edge (measured y 263..267 and 428..433 of a 153 px plate)
+  const inset = W * 0.016;
+  ctx.strokeStyle = 'rgba(238,244,252,0.62)';
+  ctx.lineWidth = Math.max(1, W * 0.003);
+  roundRect(ctx, inset, inset, W - inset * 2, H - inset * 2, Math.max(2, H * 0.16));
   ctx.stroke();
   ctx.globalAlpha = 1;
 
@@ -585,127 +602,109 @@ export function buildLabelTexture(o: LabelText): THREE.CanvasTexture {
  * ------------------------------------------------------------------ */
 
 export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, layout: TrayLayout) {
-  // smoky plate, tuned to the window floor tone sampled off the reference: the
-  // case is translucent, so the floor never goes black under the card — it
-  // stays a mauve-smoke that is lighter at the top where the window is open
+  /*
+   * Measured off the reference (see docs/reference-parity.md). The window floor
+   * is remarkably flat — #483945 at the top under the ridge, #473642 through
+   * the middle, #42333f at the bottom, and the side rails within 0.02 luma of
+   * the middle. The old painter put a 0.42-alpha white wash across the apron
+   * and a bright rail down each side, which is what made the window glow.
+   *
+   * What light there is arrives from above and from the right (the key light in
+   * the reference is off to that side): the rails are a shade lighter than the
+   * plate, and the plate darkens very slightly toward the bottom edge.
+   */
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#57494f');
-  g.addColorStop(0.45, '#463a44');
-  g.addColorStop(1, '#3b3139');
+  g.addColorStop(0, '#4a3c46');
+  g.addColorStop(0.37, '#483a45');
+  g.addColorStop(0.75, '#463843');
+  g.addColorStop(1, '#41323e');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
-  // retaining wells above the card, with their own baked shadow and lip
+  // hanger ledges at the top of the window: small moulded tabs that catch the
+  // light (the reference reads them *brighter* than the floor, not darker)
   for (const slot of layout.slots) {
     const sw = Math.max(2, slot.w * w);
-    const sh = slot.h * h;
+    const sh = Math.max(2, slot.h * h);
     const sx = slot.x * w;
     const sy = slot.y * h;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    const lip = ctx.createLinearGradient(0, sy, 0, sy + sh);
+    lip.addColorStop(0, 'rgba(232,238,248,0.62)');
+    lip.addColorStop(0.55, 'rgba(196,206,222,0.34)');
+    lip.addColorStop(1, 'rgba(150,160,180,0.10)');
+    ctx.fillStyle = lip;
     ctx.fillRect(sx, sy, sw, sh);
-    ctx.fillStyle = 'rgba(196,206,222,0.34)';
-    ctx.fillRect(sx + sw * 0.5, sy + sh * 0.03, Math.max(1, sw * 0.32), sh * 0.94);
-    const sg = ctx.createLinearGradient(0, sy + sh, 0, sy + sh + h * 0.035);
-    sg.addColorStop(0, 'rgba(0,0,0,0.4)');
-    sg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = sg;
-    ctx.fillRect(sx - sw * 2, sy + sh, sw * 5, h * 0.035);
+    // the shaded under-edge that makes the tab read as a moulding
+    const under = ctx.createLinearGradient(0, sy + sh, 0, sy + sh + h * 0.006);
+    under.addColorStop(0, 'rgba(0,0,0,0.34)');
+    under.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = under;
+    ctx.fillRect(sx, sy + sh, sw, h * 0.006);
   }
 
-  // baked AO around the card cutout: a contact shadow that grows with the lip
+  // baked contact shadow around the card cutout — narrow, because the card sits
+  // in a shallow tray and the reference's shadow is a tight line, not a well
   const cw = layout.card.w * w;
   const ch = layout.card.h * h;
   const cx = layout.card.x * w;
   const cy = layout.card.y * h;
-  const pad = Math.max(6, w * 0.028);
+  const pad = Math.max(5, w * 0.022);
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.78)';
-  ctx.shadowBlur = pad * 1.5;
-  ctx.shadowOffsetY = pad * 0.22;
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.shadowColor = 'rgba(0,0,0,0.62)';
+  ctx.shadowBlur = pad * 1.1;
+  ctx.shadowOffsetY = pad * 0.16;
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
   roundRect(ctx, cx, cy, cw, ch, w * 0.05);
   ctx.fill();
   ctx.restore();
 
-  // inner lip: a light line hugging the cutout, then a dark line just inside it
-  ctx.strokeStyle = 'rgba(226,233,244,0.20)';
-  ctx.lineWidth = Math.max(1, w * 0.0045);
-  roundRect(ctx, cx - pad * 0.42, cy - pad * 0.42, cw + pad * 0.84, ch + pad * 0.84, w * 0.055);
+  // the cutout's lip: the die-cut edge is pale, and a hairline of shadow sits
+  // just inside the tray where the card meets it
+  ctx.strokeStyle = 'rgba(214,222,238,0.16)';
+  ctx.lineWidth = Math.max(1, w * 0.0035);
+  roundRect(ctx, cx - pad * 0.5, cy - pad * 0.5, cw + pad, ch + pad, w * 0.055);
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = Math.max(1, w * 0.006);
-  roundRect(ctx, cx + pad * 0.1, cy + pad * 0.1, cw - pad * 0.2, ch - pad * 0.2, w * 0.045);
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+  ctx.lineWidth = Math.max(1, w * 0.005);
+  roundRect(ctx, cx + pad * 0.12, cy + pad * 0.12, cw - pad * 0.24, ch - pad * 0.24, w * 0.045);
   ctx.stroke();
 
-  // ambient occlusion under the label ridge: a thin band, because most of the
-  // apron above the card is lit by the open window, not shadowed
-  const top = ctx.createLinearGradient(0, 0, 0, h * 0.055);
-  top.addColorStop(0, 'rgba(0,0,0,0.6)');
-  top.addColorStop(0.5, 'rgba(0,0,0,0.22)');
+  // the ridge's shadow on the top of the window: the reference shows the floor
+  // about 3 luma darker for the first 40 px under the ridge
+  const top = ctx.createLinearGradient(0, 0, 0, h * 0.045);
+  top.addColorStop(0, 'rgba(0,0,0,0.30)');
+  top.addColorStop(0.45, 'rgba(0,0,0,0.10)');
   top.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = top;
-  ctx.fillRect(0, 0, w, h * 0.055);
+  ctx.fillRect(0, 0, w, h * 0.045);
 
-  // frosted wash over the apron between the ridge and the card: light comes
-  // through the open window and the moulded lip picks it up. Measured off the
-  // reference (apron centre ~#887b85 vs a black tray at ~#5c4e5b) — centre
-  // weighted, because the rails beside it stay dark.
-  const apron = ctx.createRadialGradient(w * 0.5, 0, 0, w * 0.5, 0, w * 0.82);
-  apron.addColorStop(0, 'rgba(220,228,244,0.42)');
-  apron.addColorStop(0.5, 'rgba(210,218,236,0.26)');
-  apron.addColorStop(1, 'rgba(200,208,226,0)');
-  ctx.save();
-  ctx.fillStyle = apron;
-  ctx.fillRect(0, 0, w, h * 0.16);
-  ctx.restore();
+  // side rails: a shade lighter than the plate on the key-light side (right),
+  // and a hair darker on the left — measured 0.04 luma either way, no more
+  const lightL = ctx.createLinearGradient(0, 0, w * 0.06, 0);
+  lightL.addColorStop(0, 'rgba(0,0,0,0.14)');
+  lightL.addColorStop(0.55, 'rgba(198,208,226,0.05)');
+  lightL.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = lightL;
+  ctx.fillRect(0, 0, w * 0.06, h);
+  const lightR = ctx.createLinearGradient(w, 0, w * 0.94, 0);
+  lightR.addColorStop(0, 'rgba(198,208,226,0.16)');
+  lightR.addColorStop(0.5, 'rgba(198,208,226,0.05)');
+  lightR.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = lightR;
+  ctx.fillRect(w * 0.94, 0, w * 0.06, h);
 
-  // ...and one along the bottom wall the card leans on. Kept light: the
-  // reference reads this ledge at ~#43374 1, well above the side troughs, so the
-  // card's contact shadow is a thin line rather than a wide well.
-  const bottom = ctx.createLinearGradient(0, h, 0, h * 0.94);
-  bottom.addColorStop(0, 'rgba(0,0,0,0.07)');
+  // and the bottom ledge the card leans on: 0.06 luma darker than the middle,
+  // with a pale lip where the moulding turns
+  const bottom = ctx.createLinearGradient(0, h, 0, h * 0.95);
+  bottom.addColorStop(0, 'rgba(0,0,0,0.20)');
   bottom.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = bottom;
-  ctx.fillRect(0, h * 0.94, w, h * 0.06);
-  // the bottom wall still catches some light through the acrylic
-  const bottomLight = ctx.createLinearGradient(0, h, 0, h * 0.96);
-  bottomLight.addColorStop(0, 'rgba(196,206,224,0.16)');
-  bottomLight.addColorStop(1, 'rgba(196,206,224,0)');
-  ctx.fillStyle = bottomLight;
-  ctx.fillRect(0, h * 0.96, w, h * 0.04);
-
-  // side walls: a thin lit rail, then the tray falls away into shadow — the
-  // reference reads the rails *darker* than the plate, not brighter
-  const sideL = ctx.createLinearGradient(0, 0, w * 0.075, 0);
-  sideL.addColorStop(0, 'rgba(198,208,226,0.16)');
-  sideL.addColorStop(0.3, 'rgba(0,0,0,0.12)');
-  sideL.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = sideL;
-  ctx.fillRect(0, 0, w * 0.075, h);
-  // light piped down the acrylic wall, just inside each rail — the streaks the
-  // reference shows running the height of the window
-  const streakL = ctx.createLinearGradient(w * 0.04, 0, w * 0.115, 0);
-  streakL.addColorStop(0, 'rgba(210,220,238,0)');
-  streakL.addColorStop(0.45, 'rgba(214,224,242,0.2)');
-  streakL.addColorStop(1, 'rgba(210,220,238,0)');
-  ctx.fillStyle = streakL;
-  ctx.fillRect(w * 0.04, 0, w * 0.075, h);
-  // the right rail runs brighter than the left all the way to the moulding —
-  // the reference's key light is off to that side
-  const streakR = ctx.createLinearGradient(w * 0.885, 0, w, 0);
-  streakR.addColorStop(0, 'rgba(210,220,238,0)');
-  streakR.addColorStop(0.45, 'rgba(218,228,244,0.22)');
-  streakR.addColorStop(0.85, 'rgba(222,232,248,0.2)');
-  streakR.addColorStop(1, 'rgba(222,232,248,0.22)');
-  ctx.fillStyle = streakR;
-  ctx.fillRect(w * 0.885, 0, w * 0.115, h);
-
-  const sideR = ctx.createLinearGradient(w, 0, w * 0.925, 0);
-  sideR.addColorStop(0, 'rgba(212,222,238,0.26)');
-  sideR.addColorStop(0.3, 'rgba(0,0,0,0.04)');
-  sideR.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = sideR;
-  ctx.fillRect(w * 0.925, 0, w * 0.075, h);
+  ctx.fillRect(0, h * 0.95, w, h * 0.05);
+  const bottomLip = ctx.createLinearGradient(0, h, 0, h * 0.97);
+  bottomLip.addColorStop(0, 'rgba(196,206,224,0.14)');
+  bottomLip.addColorStop(1, 'rgba(196,206,224,0)');
+  ctx.fillStyle = bottomLip;
+  ctx.fillRect(0, h * 0.97, w, h * 0.03);
 }
 
 export function buildTrayTexture(w = 512, h = 768, layout: TrayLayout = trayLayout()): THREE.CanvasTexture {

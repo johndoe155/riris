@@ -111,11 +111,12 @@ export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): C
     // the frame and art window, measured off the reference photo
     ringInset: SLAB_SPEC.ringInset,
     ringWidth: SLAB_SPEC.ringWidth,
-    ringRadius: SLAB_SPEC.ringInset * 1.2,
+    ringRadius: SLAB_SPEC.cardRadius / SLAB_SPEC.cardW,
     artInset: SLAB_SPEC.artInset,
     artWidth: 1 - SLAB_SPEC.artInset * 2,
     artTop: SLAB_SPEC.artTop,
     artHeight: 1 - SLAB_SPEC.artTop - SLAB_SPEC.artBottom,
+    artStroke: SLAB_SPEC.artStroke,
   };
 }
 

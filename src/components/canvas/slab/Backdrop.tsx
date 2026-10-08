@@ -8,42 +8,45 @@ import * as THREE from 'three';
  * than lit geometry: they cost nothing and never pick up the strip lights that
  * are meant for the plastic.
  *
+ * The gradient is *diagonal*, which is what the reference actually shows
+ * (measured in `scripts/analysis/_bg.mjs`): #574151 in the top-left corner
+ * rising to #b9a8b4 in the top-right and falling to #34202d along the bottom,
+ * so the light is off to the right of frame and slightly above. An earlier
+ * version painted a vertical ramp with a pool of light behind the slab, which
+ * put the brightest part of the wall in the centre and made the case read flat.
+ *
  * The shadow sits ON the backdrop plane, not floating just behind the slab, so
- * it behaves like a shadow cast on a wall while the camera orbits.
+ * it behaves like a shadow cast on a wall while the camera orbits, and it is
+ * tight against the case's bottom edge — the reference's contact shadow is
+ * ~20 px deep on a 1116 px case, not a pool 400 px wide.
  */
 
 let gradientCache: THREE.CanvasTexture | null = null;
+let gradientKey = '';
 
-function gradientTexture(top: string, glow: string, bottom: string) {
-  if (gradientCache) return gradientCache;
+function gradientTexture(top: string, glow: string, bottom: string, angle: number) {
+  const key = `${top}|${glow}|${bottom}|${angle}`;
+  if (gradientCache && gradientKey === key) return gradientCache;
   const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
-  const g = ctx.createLinearGradient(0, 0, 0, size);
-  g.addColorStop(0, top);
-  g.addColorStop(0.55, glow);
-  g.addColorStop(1, bottom);
+  // direction: 0 = pure horizontal (light on the right), positive tilts the
+  // light end up toward the top-right, in radians
+  const dx = Math.cos(angle) * size * 0.5;
+  const dy = Math.sin(angle) * size * 0.5;
+  const g = ctx.createLinearGradient(size / 2 - dx, size / 2 + dy, size / 2 + dx, size / 2 - dy);
+  g.addColorStop(0, bottom);
+  g.addColorStop(0.5, glow);
+  g.addColorStop(1, top);
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  // a wide, soft pool of light behind the slab
-  const pool = ctx.createRadialGradient(128, 118, 10, 128, 118, 190);
-  pool.addColorStop(0, 'rgba(255,246,238,0.16)');
-  pool.addColorStop(0.5, 'rgba(255,246,238,0.05)');
-  pool.addColorStop(1, 'rgba(255,246,238,0)');
-  ctx.fillStyle = pool;
-  ctx.fillRect(0, 0, size, size);
-  // and a vignette so the corners fall away
-  const vig = ctx.createRadialGradient(128, 128, 60, 128, 128, 190);
-  vig.addColorStop(0, 'rgba(0,0,0,0)');
-  vig.addColorStop(1, 'rgba(0,0,0,0.55)');
-  ctx.fillStyle = vig;
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
   gradientCache = tex;
+  gradientKey = key;
   return tex;
 }
 
@@ -57,9 +60,9 @@ function shadowTexture() {
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
   const g = ctx.createRadialGradient(size / 2, size / 2, 4, size / 2, size / 2, size / 2);
-  g.addColorStop(0, 'rgba(0,0,0,0.55)');
-  g.addColorStop(0.45, 'rgba(0,0,0,0.3)');
-  g.addColorStop(0.75, 'rgba(0,0,0,0.08)');
+  g.addColorStop(0, 'rgba(0,0,0,0.5)');
+  g.addColorStop(0.4, 'rgba(0,0,0,0.26)');
+  g.addColorStop(0.72, 'rgba(0,0,0,0.07)');
   g.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
@@ -73,11 +76,15 @@ function shadowTexture() {
 const noRaycast = () => null;
 
 export interface BackdropProps {
-  /** visible height in world units; the slab is ~1.66 tall */
+  /** visible height in world units; the slab is ~1.677 tall */
   height?: number;
+  /** the lit end of the gradient (toward the top-right by default) */
   top?: string;
   glow?: string;
+  /** the dark end of the gradient */
   bottom?: string;
+  /** tilt of the gradient in radians; 0 = light straight to the right */
+  angle?: number;
   shadow?: number;
   /** shadow centre and size, relative to the slab */
   shadowOffset?: [number, number];
@@ -89,11 +96,12 @@ export function Backdrop({
   top = '#191418',
   glow = '#4a3a45',
   bottom = '#0d0a0d',
+  angle = 0.28,
   shadow = 0.85,
-  shadowOffset = [0.08, -1.42],
-  shadowScale = [1.7, 1.05],
+  shadowOffset = [0.02, -0.95],
+  shadowScale = [1.25, 0.34],
 }: BackdropProps) {
-  const gradient = useMemo(() => gradientTexture(top, glow, bottom), [top, glow, bottom]);
+  const gradient = useMemo(() => gradientTexture(top, glow, bottom, angle), [top, glow, bottom, angle]);
   const soft = useMemo(() => shadowTexture(), []);
   const wallZ = -6;
 
@@ -117,3 +125,17 @@ export function Backdrop({
     </>
   );
 }
+
+/**
+ * The measured backdrop of `reference-image.jpg`, ready to hand to `<Backdrop>`
+ * when a view is meant to reproduce the photo's frame rather than a studio.
+ */
+export const REF_BACKDROP = {
+  top: '#b9a8b4',
+  glow: '#6d5566',
+  bottom: '#34202d',
+  angle: 0.28,
+  shadow: 0.7,
+  shadowOffset: [0.0, -0.98] as [number, number],
+  shadowScale: [1.35, 0.32] as [number, number],
+};

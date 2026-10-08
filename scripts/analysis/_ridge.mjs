@@ -1,0 +1,16 @@
+import sharp from 'sharp';
+const { data, info } = await sharp('/home/user/riris/reference-image.jpg').removeAlpha().raw().toBuffer({ resolveWithObject: true });
+const { width: W, channels: C } = info;
+const L = (x, y) => { const i = (y * W + x) * C; return 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]; };
+const hex = (x, y) => { const i = (y * W + x) * C; return '#' + [data[i], data[i+1], data[i+2]].map((v) => v.toString(16).padStart(2, '0')).join(''); };
+console.log('ridge row y=424 luma across x (every 8px):');
+let line = '';
+for (let x = 412; x <= 1077; x += 8) line += `${x}:${Math.round(L(x, 424))} `;
+console.log(line);
+console.log('\nridge row y=424 hex samples:', [420, 430, 440, 460, 480, 500, 600, 740, 900, 990, 1010, 1030, 1050, 1065, 1075].map((x) => `${x}:${hex(x, 424)}`).join(' '));
+console.log('\nfront face rows 380..435 at x=740 (luma):', Array.from({ length: 56 }, (_, i) => `${380 + i}:${Math.round(L(740, 380 + i))}`).join(' '));
+console.log('\nfront face rows 380..435 at x=480 (luma):', Array.from({ length: 56 }, (_, i) => `${380 + i}:${Math.round(L(480, 380 + i))}`).join(' '));
+console.log('\ntop strip rows 186..230 at x=740:', Array.from({ length: 45 }, (_, i) => `${186 + i}:${Math.round(L(740, 186 + i))}`).join(' '));
+console.log('\ntop strip rows 186..230 at x=1000:', Array.from({ length: 45 }, (_, i) => `${186 + i}:${Math.round(L(1000, 186 + i))}`).join(' '));
+console.log('\nbottom rows 1230..1310 at x=740:', Array.from({ length: 81 }, (_, i) => `${1230 + i}:${Math.round(L(740, 1230 + i))}`).join(' '));
+console.log('\nbottom rows 1230..1310 at x=460:', Array.from({ length: 81 }, (_, i) => `${1230 + i}:${Math.round(L(460, 1230 + i))}`).join(' '));

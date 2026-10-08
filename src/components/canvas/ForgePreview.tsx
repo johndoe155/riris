@@ -13,16 +13,23 @@ import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
 /**
  * Long strip lights are what real plastic shows: a soft body reflection with
  * one hard streak down the edge.
+ *
+ * Tuned to the reference, which is a neutral studio with the key off to the
+ * upper right: the case's face measures #91808c with a #baa9b5 top strip, i.e.
+ * a mauve-neutral acrylic under light that carries no hue of its own. The
+ * orange ring and cyan circle an earlier version added were the single biggest
+ * source of the case's colour cast — nothing in the photo supports them — so
+ * the rig is now one soft key, a cool fill opposite it and a dim bounce from
+ * below, all near-neutral with the faintest mauve.
  */
 function StudioEnvironment() {
   return (
-    <Environment resolution={256} frames={1} environmentIntensity={0.9}>
-      <Lightformer form="rect" intensity={2.6} color="#ffffff" position={[0, 5.5, -4]} rotation={[Math.PI * 0.1, 0, 0]} scale={[14, 1.6, 1]} />
-      <Lightformer form="rect" intensity={1.8} color="#e8f1ff" position={[-6, 0.5, -3]} rotation={[0, Math.PI * 0.35, 0]} scale={[12, 2.2, 1]} />
-      <Lightformer form="rect" intensity={1.5} color="#fff0e6" position={[6, -0.5, -3]} rotation={[0, -Math.PI * 0.35, 0]} scale={[12, 2.2, 1]} />
-      <Lightformer form="ring" intensity={4} color="#FF4D00" position={[-4.5, 2.5, 2]} scale={3} target={[0, 0, 0]} />
-      <Lightformer form="circle" intensity={3} color="#00E5FF" position={[4.5, -2, 1.5]} scale={2.4} target={[0, 0, 0]} />
-      <Lightformer form="rect" intensity={0.7} color="#8fa2b8" position={[0, -6, 2]} rotation={[-Math.PI * 0.4, 0, 0]} scale={[16, 3, 1]} />
+    <Environment resolution={256} frames={1} environmentIntensity={0.82}>
+      <Lightformer form="rect" intensity={2.2} color="#fff6fa" position={[5.5, 5, -3]} rotation={[Math.PI * 0.12, 0, -Math.PI * 0.16]} scale={[13, 2.4, 1]} />
+      <Lightformer form="rect" intensity={0.95} color="#e6dce8" position={[-6, 1.5, -3]} rotation={[0, Math.PI * 0.32, 0]} scale={[12, 2.6, 1]} />
+      <Lightformer form="rect" intensity={0.5} color="#6d5b66" position={[0, -6, 2]} rotation={[-Math.PI * 0.4, 0, 0]} scale={[16, 3, 1]} />
+      {/* a narrow vertical strip: the hairline the moulding's bevel catches */}
+      <Lightformer form="rect" intensity={1.1} color="#ffffff" position={[3.2, 0, 3]} rotation={[0, -Math.PI * 0.18, 0]} scale={[0.7, 7, 1]} />
     </Environment>
   );
 }
@@ -101,15 +108,20 @@ export function ForgePreviewCanvas() {
 
   return (
     <div className="w-full h-full min-h-[500px] relative bg-[#050505] overflow-hidden">
+      {/*
+        A long lens. The reference is effectively orthographic — its cone is
+        under two degrees wide — and at fov 32 the near edge of the case
+        projected ~40 px wider than the far one on a 665 px case. fov 16 keeps
+        a little parallax for the orbit while holding the measured proportions.
+      */}
       <Canvas
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
-        camera={{ position: [0, 0, 4.2], fov: 32 }}
+        camera={{ position: [0, 0, 7.4], fov: 16 }}
       >
-        <PerspectiveCamera makeDefault position={[0, 0, 4.2]} fov={32} />
-        <ambientLight intensity={0.35} />
-        <directionalLight position={[4, 5, 6]} intensity={0.9} />
-        <pointLight position={[0, 2.2, 2.4]} intensity={0.5} color="#00E5FF" />
+        <PerspectiveCamera makeDefault position={[0, 0, 7.4]} fov={16} />
+        <ambientLight intensity={0.3} />
+        <directionalLight position={[4, 5, 6]} intensity={0.55} />
 
         <StudioEnvironment />
         <MovingHighlights />

@@ -42,11 +42,20 @@ const HoloShaderMaterial = shaderMaterial(
     uIntensity: 1,
     /** 0 = draw the art, 1 = foil overlay */
     uMode: 0,
-    /** x0, y0, x1, y1 of the foil mask, in card UV (v measured from the bottom) */
-    uMask: new THREE.Vector4(0.071, 0.336, 0.929, 0.964),
-    uMaskFeather: 0.06,
-    /** how strongly the foil shows outside the mask (0 = card plane only) */
-    uOutside: 0.12,
+    /**
+     * x0, y0, x1, y1 of the foil mask, in card UV (v measured from the bottom).
+     * These are the measured art window of `reference-image.jpg`: card
+     * x 0.0569..0.9431, y 0.0464..0.6325 from the top.
+     */
+    uMask: new THREE.Vector4(0.0569, 0.3675, 0.9431, 0.9536),
+    /**
+     * The reference's art frame is a hard 4 px ink line, so the foil has to
+     * stop at it: the old 0.06 feather smeared the rainbow ~30 px past the
+     * window and onto the card's furniture, which the photo does not show.
+     */
+    uMaskFeather: 0.012,
+    /** how strongly the foil shows outside the mask (the photo shows none) */
+    uOutside: 0.015,
   },
   // vertex
   /* glsl */ `
@@ -95,15 +104,24 @@ const HoloShaderMaterial = shaderMaterial(
       return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
     }
 
+    /**
+     * Diffraction ramp. A real foil's orders are never fully saturated — they
+     * sit on top of the specular white and wash out toward the highlights — so
+     * the pure-hue stops are pulled toward their own luma by uFoilSat.
+     */
     vec3 holoGradient(float t) {
-      vec3 c1 = vec3(1.0, 0.3, 0.0); // orange
-      vec3 c2 = vec3(0.0, 0.9, 1.0); // cyan
-      vec3 c3 = vec3(1.0, 0.9, 0.0); // yellow
-      vec3 c4 = vec3(1.0, 0.0, 0.9); // magenta
+      vec3 c1 = vec3(1.0, 0.42, 0.12); // orange
+      vec3 c2 = vec3(0.22, 0.88, 1.0); // cyan
+      vec3 c3 = vec3(1.0, 0.92, 0.36); // yellow
+      vec3 c4 = vec3(1.0, 0.24, 0.82); // magenta
       float t2 = fract(t);
-      if (t2 < 0.33) return mix(c1, c2, t2 / 0.33);
-      if (t2 < 0.66) return mix(c2, c3, (t2 - 0.33) / 0.33);
-      return mix(c3, c4, (t2 - 0.66) / 0.34);
+      vec3 c = (t2 < 0.33) ? mix(c1, c2, t2 / 0.33)
+             : (t2 < 0.66) ? mix(c2, c3, (t2 - 0.33) / 0.33)
+             :               mix(c3, c4, (t2 - 0.66) / 0.34);
+      // the foil's own orders arrive with roughly equal energy, so the ramp is
+      // desaturated toward its luma before it multiplies the base
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      return mix(c, vec3(l), 0.22);
     }
 
     // Cover-fit: crop the source rather than squashing it into the card face.
@@ -130,16 +148,25 @@ const HoloShaderMaterial = shaderMaterial(
       float fresnel = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 3.0);
       vec3 lightDir = normalize(vec3(0.35, 0.6, 0.72));
       vec3 halfVec = normalize(lightDir + v);
-      float spec = pow(clamp(dot(n, halfVec), 0.0, 1.0), 28.0);
+      float spec = pow(clamp(dot(n, halfVec), 0.0, 1.0), 34.0);
       float viewShift = (1.0 - abs(dot(n, v))) * 0.6 + spec * 0.5;
 
       vec2 pointer = uPointer;
       float dist = distance(vUv, pointer);
       float pointerGlow = 1.0 - smoothstep(0.0, 0.75, dist);
 
-      float bands = sin(atan(vUv.y - pointer.y, vUv.x - pointer.x) * 6.0
-                     + uTime * 0.5 + dist * 10.0 + viewShift * 6.0) * 0.5 + 0.5;
-      vec3 foil = holoGradient(bands + viewShift + pointer.x * 0.4 + uTime * 0.05);
+      // The foil's orders run as a diffraction grating: a family of near-parallel
+      // lines whose spacing sets the colour banding. Kept on a fixed axis plus a
+      // view-angle term (rather than the old polar spiral around the pointer) —
+      // a grating is anisotropic, and the radial version read as a lens flare.
+      float grating = (vUv.x * 0.72 + vUv.y * 0.28) * 34.0
+                    + viewShift * 5.5
+                    + dist * 3.2
+                    + uTime * 0.06;
+      float bands = sin(grating) * 0.5 + 0.5;
+      // a second, coarser order so the ramp is not a single clean sine
+      bands = mix(bands, sin(grating * 0.37 + 1.7) * 0.5 + 0.5, 0.35);
+      vec3 foil = holoGradient(bands + viewShift * 0.5 + pointer.x * 0.25);
 
       /* ---- per-finish colour + strength ---- */
       float w0 = max(0.0, 1.0 - abs(uFinish - 0.0));
@@ -148,8 +175,11 @@ const HoloShaderMaterial = shaderMaterial(
       float w3 = max(0.0, 1.0 - abs(uFinish - 3.0));
       float wSum = max(w0 + w1 + w2 + w3, 0.0001);
 
-      float foilMask = clamp(fresnel * 0.8 + pointerGlow * 0.55 + 0.12, 0.0, 1.0);
-      foilMask *= 0.55 + noise(vUv * 8.0 + uTime * 0.08) * 0.45;
+      // the foil is only lit where the view angle has moved it off the
+      // specular axis, plus where the pointer sits: much tighter than before,
+      // so the card's frame and inks stay flat ink at rest
+      float foilMask = clamp(fresnel * 0.72 + pointerGlow * 0.45 + 0.06, 0.0, 1.0);
+      foilMask *= 0.62 + noise(vUv * 8.0 + uTime * 0.08) * 0.38;
 
       float n1 = noise(vUv * 12.0 + 3.1);
       float n2 = noise(vUv * 27.0 + 11.0);
@@ -159,11 +189,12 @@ const HoloShaderMaterial = shaderMaterial(
       vec3 goldB = vec3(0.62, 0.42, 0.09);
       vec3 gold = mix(goldB, goldA, sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0) * 0.5 + 0.5);
 
+      // base finish: the card's own ink, lifted only slightly by the view angle
       vec3 baseTint = vec3(1.0);
-      float baseAmt = 0.04 + fresnel * 0.05;
+      float baseAmt = 0.02 + fresnel * 0.04;
 
       vec3 holoTint = foil;
-      float holoAmt = clamp(foilMask * 0.85 + spec * 0.5 + fresnel * 0.25, 0.0, 0.95);
+      float holoAmt = clamp(foilMask * 0.7 + spec * 0.35 + fresnel * 0.2, 0.0, 0.7);
 
       vec3 iceTint = ice * (0.6 + crack * 0.4) + vec3(crack * 0.35);
       float iceAmt = clamp(0.24 + fresnel * 0.3 + crack * 0.45 + spec * 0.3, 0.0, 0.8);
@@ -176,7 +207,7 @@ const HoloShaderMaterial = shaderMaterial(
       float effectAmt = (baseAmt * w0 + holoAmt * w1 + iceAmt * w2 + goldAmt * w3) / wSum;
 
       if (uMode > 0.5) {
-        /* ---- foil overlay: masked to the card plane ---- */
+        /* ---- foil overlay: masked to the art window ---- */
         float m = artMask(vUv);
         float alpha = effectAmt * mix(uOutside, 1.0, m) * uIntensity;
         vec3 col = effectColor / max(effectAmt, 0.0001);
@@ -392,9 +423,9 @@ export function HoloCardMaterial({
   cardAspect = 0.709,
   timeOffset = 0,
   overlay = false,
-  mask = [0.071, 0.036, 0.929, 0.664],
-  maskFeather = 0.06,
-  outside = 0.12,
+  mask = [0.0569, 0.3675, 0.9431, 0.9536],
+  maskFeather = 0.012,
+  outside = 0.015,
 }: HoloCardMaterialProps) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const gl = useThree((state) => state.gl);

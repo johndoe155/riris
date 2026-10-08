@@ -43,7 +43,10 @@ for (const q of ['hero', 'cheap']) {
       console.log(`${k.padEnd(12)} = ${v}`);
     }
   }
+  // the cache is only meaningful across two calls to the getter (the first call
+  // is what fills it — comparing it with the freshly built `set` above always
+  // reported a miss, which made the line useless as a test)
   const cached = getSlabGeometry(q);
-  console.log(`cache returns same object: ${cached === set}`);
+  console.log(`cache returns same object: ${getSlabGeometry(q) === cached}`);
   if (bad) process.exit(1);
 }
