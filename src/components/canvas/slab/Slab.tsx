@@ -6,7 +6,7 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import type { SlabCard } from '@/data/slabCards';
 import { HoloCardMaterial, useCardPointer } from '@/components/canvas/HoloMaterial';
 import { getSlabGeometry } from './geometry';
-import { SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
+import { REF_COLOUR, SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
 import { getWearMaps } from './textures';
 import {
   ensureBackTexture,
@@ -44,20 +44,26 @@ function getMaterials(): SlabMaterials {
   const wear = getWearMaps();
   materials = {
     // real transmission — the Forge canvas is contained, so the pass is bounded
+    /* Measured: the left rail reads #433841 against a #412e3d backdrop right
+     * beside it (1.14x) and the right rail #9e919b against #7d6b79 (1.33x).
+     * The shell therefore transmits the backdrop almost unchanged and adds
+     * only a little specular — a blue-tinted 0.5-unit-thick block, which is
+     * what the old numbers described, is a long way from that. A real slab
+     * is ~5 mm of acrylic on an 85 mm body, so thickness is 0.06, not 0.5. */
     glass: new THREE.MeshPhysicalMaterial({
       transmission: 1,
-      thickness: 0.5,
-      roughness: 0.075,
+      thickness: 0.06,
+      roughness: 0.1,
       metalness: 0,
-      ior: 1.46,
+      ior: 1.49,
       clearcoat: 1,
-      clearcoatRoughness: 0.06,
-      attenuationColor: new THREE.Color('#cfe3ff'),
-      attenuationDistance: 2.2,
-      envMapIntensity: 1.65,
+      clearcoatRoughness: 0.08,
+      attenuationColor: new THREE.Color('#f2eef4'),
+      attenuationDistance: 6,
+      envMapIntensity: 1.15,
       roughnessMap: wear.roughness,
       bumpMap: wear.bump,
-      bumpScale: 0.01,
+      bumpScale: 0.006,
       side: THREE.DoubleSide,
     }),
     // pit fake: low opacity + env map, no transmission pass
@@ -68,9 +74,9 @@ function getMaterials(): SlabMaterials {
       clearcoat: 1,
       clearcoatRoughness: 0.08,
       transparent: true,
-      opacity: 0.2,
-      envMapIntensity: 1.9,
-      ior: 1.46,
+      opacity: 0.16,
+      envMapIntensity: 1.3,
+      ior: 1.49,
       roughnessMap: wear.roughness,
       side: THREE.DoubleSide,
     }),
@@ -84,10 +90,11 @@ function getMaterials(): SlabMaterials {
       clearcoat: 1,
       clearcoatRoughness: 0.12,
       transparent: true,
-      opacity: 0.68,
-      envMapIntensity: 1.75,
+      opacity: 0.5,
+      envMapIntensity: 1.2,
     }),
-    label: new THREE.MeshStandardMaterial({ color: '#15151a', roughness: 0.6, metalness: 0.05 }),
+    // the plate reads #453a43 in the photo — the old #15151a was 2.7x too dark
+    label: new THREE.MeshStandardMaterial({ color: REF_COLOUR.labelPlate, roughness: 0.62, metalness: 0.05 }),
     // the ridge under the label is the brightest moulded edge on the part: let
     // it carry a proper specular so the environment paints a highlight on it
     ridge: new THREE.MeshPhysicalMaterial({
@@ -96,9 +103,10 @@ function getMaterials(): SlabMaterials {
       metalness: 0.16,
       clearcoat: 1,
       clearcoatRoughness: 0.05,
-      envMapIntensity: 1.8,
+      envMapIntensity: 1.25,
     }),
-    tray: new THREE.MeshStandardMaterial({ color: '#232329', roughness: 0.84, metalness: 0.05 }),
+    // sampled in four places round the card: #433640 / #483c46 / #463a44 / #453942
+    tray: new THREE.MeshStandardMaterial({ color: REF_COLOUR.tray, roughness: 0.86, metalness: 0.05 }),
     cardBody: new THREE.MeshPhysicalMaterial({
       color: '#fbfbfb',
       roughness: 0.44,

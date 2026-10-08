@@ -206,15 +206,52 @@ export interface CardFaceText {
   bodyRadius: number;
   /** squircle power, from SLAB_SPEC */
   cornerPower: number;
-  /* ---- face layout, straight from SLAB_SPEC ---- */
+  /* ---- face layout, straight from SLAB_SPEC ----
+   * `ringInset`/`ringWidth` and `keylineWidth` are fractions of the card
+   * *width* but are applied as the same number of pixels on both axes: the
+   * reference's border is 8 px on the sides and 8-9 px top and bottom, i.e.
+   * isotropic. Scaling them by H as well, which the old code did, made the
+   * top and bottom bands 1.4x too thick. */
   ringInset: number;
   ringWidth: number;
   ringRadius: number;
+  /** the thin white line that rims the art window, in card widths */
+  keylineWidth: number;
   artInset: number;
   artWidth: number;
   artTop: number;
   artHeight: number;
+  /** measured ink/paper, sampled off the reference photo */
+  paperColour: string;
+  inkColour: string;
 }
+
+/**
+ * Measured furniture of the band below the art window, as fractions of that
+ * band. Read off the reference: the band runs y 963..1198 (235 px) and the
+ * light rows sit at 986-1000 (title), 1016-1037 / 1052-1073 / 1090-1111
+ * (a 2-column x 3-row grid), a full-width white rule at 1122-1124, two footer
+ * lines at 1130-1138 and 1150-1157, another rule at 1166, and the owner line
+ * at 1176-1185.
+ */
+const BAND = {
+  title: 0.098,
+  titleSize: 0.089,
+  gridTop: 0.2,
+  gridPitch: 0.164,
+  gridRows: 3,
+  labelSize: 0.049,
+  valueSize: 0.055,
+  ruleTop: 0.677,
+  ruleWeight: 0.013,
+  footA: 0.711,
+  footB: 0.796,
+  footSize: 0.055,
+  rule2: 0.864,
+  owner: 0.906,
+  ownerSize: 0.062,
+  colGap: 0.115,
+};
 
 export function drawCardFace(
   ctx: CanvasRenderingContext2D,
@@ -226,8 +263,9 @@ export function drawCardFace(
   const { width: W, height: H } = o;
   const bodyRadius = (o.bodyRadius ?? 0.0568) * W;
   const power = o.cornerPower ?? 4.6;
-  const ink = o.dark ? '#F7F5F2' : '#141414';
-  const paper = o.dark ? '#101014' : '#F4F2EE';
+  const ink = o.inkColour ?? (o.dark ? '#F7F5F2' : '#141414');
+  const paper = o.paperColour ?? (o.dark ? '#101014' : '#F4F2EE');
+  const sans = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
   ctx.clearRect(0, 0, W, H);
   ctx.save();
@@ -237,18 +275,18 @@ export function drawCardFace(
   ctx.fillStyle = paper;
   ctx.fillRect(0, 0, W, H);
 
-  // ---- ring frame
-  const rx = ring.inset * W;
-  const ry = ring.inset * H;
-  const rw = W - rx * 2;
-  const rh = H - ry * 2;
+  /* ---- white border. Measured at 8 px on the sides, 8-9 px top and bottom,
+   * starting ~1 px inside the card's silhouette, so it is a stroke centred
+   * ringInset*W from the edge and it is the SAME pixel width on both axes. */
+  const ringPx = Math.max(1.5, ring.width * W);
+  const ringOff = ring.inset * W;
   const rRad = Math.max(2, ring.radius * W);
-  ctx.lineWidth = Math.max(1.5, ring.width * W);
+  ctx.lineWidth = ringPx;
   ctx.strokeStyle = ink;
-  roundRect(ctx, rx, ry, rw, rh, rRad);
+  roundRect(ctx, ringOff, ringOff, W - ringOff * 2, H - ringOff * 2, rRad);
   ctx.stroke();
 
-  // ---- art window with a thin border
+  // ---- art window
   const { x: ax, y: ay, w: aw, h: ah } = artBox;
   ctx.fillStyle = o.tint;
   ctx.fillRect(ax, ay, aw, ah);
@@ -263,68 +301,88 @@ export function drawCardFace(
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(art, sx, sy, sw, sh, ax, ay, aw, ah);
   }
-  ctx.lineWidth = Math.max(1, W * 0.0035);
+
+  /* ---- the keyline: a second, thinner white line that rims the art window
+   * on the outside. The photo shows it clearly (8 px, x 528..535 / 957..964)
+   * and the old painter did not draw it at all, which is why the art looked
+   * like it was floating straight on the panel. Stroking a rect inflated by
+   * half the line width puts the stroke's inner edge exactly on the art. */
+  const key = Math.max(1, (o.keylineWidth ?? 0.0163) * W);
+  ctx.lineWidth = key;
   ctx.strokeStyle = ink;
-  ctx.strokeRect(ax, ay, aw, ah);
+  roundRect(ctx, ax - key / 2, ay - key / 2, aw + key, ah + key, key * 0.6);
+  ctx.stroke();
 
   /* ---- furniture below the art window -----------------------------------
-   * The art takes 0.036..0.664 of the card height, so everything else has to
-   * live in the bottom third. The positions below are walked down from the art
-   * in fractions of that band, which is why nothing can overlap. */
+   * The art takes artTop..1-artBottom of the card height (measured
+   * 0.0488..0.6528), so everything else lives in the band under it. The band
+   * stops at the top of the bottom border, not at the card's edge. */
   const bandTop = ay + ah;
-  const band = H - bandTop;
+  const band = (H - ringOff - ringPx / 2) - bandTop;
 
-  // ---- title under the art
-  const titleSize = Math.max(11, Math.min(W * 0.048, band * 0.11));
-  ctx.fillStyle = ink;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  ctx.font = `700 ${titleSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.title, ax, bandTop + band * 0.05);
 
-  // ---- attribute grid (2 columns x 3 rows), hairline rules like the photo
-  const gridTop = bandTop + band * 0.2;
-  const rowH = (band * 0.44) / 3;
-  const colW = (aw - W * 0.03) / 2;
-  const attrSize = Math.max(7, W * 0.021);
-  const valSize = Math.max(7, W * 0.0195);
+  // ---- title
+  const titleSize = Math.max(9, band * BAND.titleSize);
+  ctx.fillStyle = ink;
+  ctx.font = `700 ${titleSize}px ${sans}`;
+  ctx.fillText(o.title, ax, bandTop + band * BAND.title);
+
+  // ---- attribute grid: 2 columns x 3 rows, hairline rule down each column
+  const colGap = aw * BAND.colGap;
+  const colW = (aw - colGap) / 2;
+  const labelSize = Math.max(6, band * BAND.labelSize);
+  const valueSize = Math.max(6, band * BAND.valueSize);
+  const ruleW = Math.max(1, W * 0.0022);
   const traits = o.traits ?? [];
-  for (let i = 0; i < 6; i++) {
-    const cx = ax + (i % 2) * (colW + W * 0.03);
-    const cy = gridTop + Math.floor(i / 2) * rowH;
+  for (let i = 0; i < BAND.gridRows * 2; i++) {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const cx = ax + col * (colW + colGap);
+    const cy = bandTop + band * (BAND.gridTop + row * BAND.gridPitch);
     const [label, value] = traits[i] ?? ['—', '—'];
-    // rule
+    // the vertical hairline: one continuous rule per column, as in the photo
     ctx.fillStyle = ink;
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(cx, cy, Math.max(1, W * 0.002), valSize * 3.1);
+    ctx.globalAlpha = 0.55;
+    ctx.fillRect(cx, cy, ruleW, valueSize * 2.6);
     ctx.globalAlpha = 1;
-    ctx.font = `700 ${attrSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-    ctx.fillText(label.toUpperCase(), cx + W * 0.012, cy);
-    ctx.font = `400 ${valSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-    ctx.globalAlpha = 0.78;
-    ctx.fillText(value, cx + W * 0.012, cy + attrSize * 1.5);
+    ctx.font = `700 ${labelSize}px ${sans}`;
+    ctx.globalAlpha = 0.62;
+    ctx.fillText(label.toUpperCase(), cx + W * 0.014, cy);
+    ctx.font = `400 ${valueSize}px ${sans}`;
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(value, cx + W * 0.014, cy + labelSize * 1.45);
     ctx.globalAlpha = 1;
   }
 
-  // ---- bottom rows: contract / token id / standard / chain + owner bar
-  const footTop = gridTop + rowH * 3 + band * 0.04;
-  const footSize = Math.max(7, W * 0.0195);
-  ctx.font = `400 ${footSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.globalAlpha = 0.72;
-  ctx.fillText(`COLLECTION: ${o.collection}`, ax, footTop);
-  ctx.fillText(`TOKEN ID: ${String(o.serial).split('/')[0]}`, ax, footTop + footSize * 1.5);
-  ctx.fillText(`STANDARD: ERC-721`, ax + colW + W * 0.03, footTop);
-  ctx.fillText(`CHAIN: Ethereum`, ax + colW + W * 0.03, footTop + footSize * 1.5);
+  // ---- a full-width white rule between the grid and the footer
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = ink;
+  ctx.fillRect(ax, bandTop + band * BAND.ruleTop, aw, Math.max(1, band * BAND.ruleWeight));
   ctx.globalAlpha = 1;
 
-  // owner strip along the bottom edge
-  const barY = H - band * 0.13;
-  ctx.font = `700 ${Math.max(8, W * 0.022)}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(`OWNED BY: ${o.handle}`, ax, barY);
+  // ---- two footer lines
+  const footSize = Math.max(6, band * BAND.footSize);
+  ctx.font = `400 ${footSize}px ${sans}`;
+  ctx.globalAlpha = 0.72;
+  ctx.fillText(`COLLECTION: ${o.collection}`, ax, bandTop + band * BAND.footA);
+  ctx.fillText(`TOKEN ID: ${String(o.serial).split('/')[0]}`, ax + colW + colGap, bandTop + band * BAND.footA);
+  ctx.fillText(`STANDARD: ERC-721`, ax, bandTop + band * BAND.footB);
+  ctx.fillText(`CHAIN: Ethereum`, ax + colW + colGap, bandTop + band * BAND.footB);
+  ctx.globalAlpha = 1;
+
+  // ---- second rule, then the owner strip
+  ctx.globalAlpha = 0.8;
+  ctx.fillRect(ax, bandTop + band * BAND.rule2, aw, Math.max(1, band * BAND.ruleWeight * 0.8));
+  ctx.globalAlpha = 1;
+  ctx.font = `700 ${Math.max(7, band * BAND.ownerSize)}px ${sans}`;
+  ctx.fillText(`OWNED BY: ${o.handle}`, ax, bandTop + band * BAND.owner);
   ctx.textAlign = 'right';
-  ctx.fillText(o.serial, ax + aw, barY);
+  ctx.fillText(o.serial, ax + aw, bandTop + band * BAND.owner);
   ctx.textAlign = 'left';
 
+  ctx.restore();
 }
 
 /** Canvas facing the card's front: face text + art. */
@@ -460,25 +518,30 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   ctx.fillStyle = plateGrad;
   ctx.fillRect(0, 0, W, H);
 
-  // thin inner border, mirroring the moulded ridge: a pale line, not a
-  // coloured one — the reference's frame is white/neutral and the colour in
-  // the header comes from the mark at the right
-  // the line hugs the plate, the way the reference's highlight does, and its
-  // radius has to be the plate's own (SLAB_SPEC.labelRadius is a fraction of
-  // min(w, h), i.e. H*0.055 in this texture)
-  const inset = W * 0.008;
-  ctx.strokeStyle = 'rgba(234,240,248,0.5)';
-  ctx.lineWidth = Math.max(1, W * 0.0036);
+  /* Thin inner border, mirroring the moulded rim. Measured: the plate is
+   * 578 px wide and the bright rim runs 4 px in from its edge (x 450..453 sits
+   * just outside the plate body at 455), so inset ~0.007 W and ~0.0035 W
+   * thick. It is a pale line, not a coloured one: in the reference the only
+   * colour on the plate is inside the mark. */
+  const inset = W * 0.007;
+  ctx.strokeStyle = 'rgba(234,240,248,0.42)';
+  ctx.lineWidth = Math.max(1, W * 0.0035);
   roundRect(ctx, inset, inset, W - inset * 2, H - inset * 2, Math.max(2, H * 0.055 - inset));
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  const pad = W * 0.065;
+  /* Measured label anatomy (plate 578 x 150 px at x 455..1033, y 228..378):
+   *   title line 1   x 495..751   y 265..295   (cap 31 px)
+   *   title line 2   x 487..767   y 307..337   (cap 31 px, pitch 42 px)
+   *   mark block     x 898..986   y 265..345   (~88 x 80, orange + white)
+   *   nothing else — the strip between the title and the mark is bare plate. */
+  const pad = W * 0.062; // title inset: 36 px / 578
+  const markPad = W * 0.087; // mark inset: 50 px / 578
   const centreY = H / 2;
 
-  /* ---- right: the QR block, with the grade and serial stacked to its left */
-  const q = H * 0.56;
-  const qx = W - pad - q;
+  /* ---- right: the QR block, orange finders on a dark tile ---- */
+  const q = H * 0.55;
+  const qx = W - markPad - q;
   const qy = centreY - q / 2;
   // the mark: a QR-style tile whose three finder squares carry the card's own
   // colour, which is where the label's accent lives (the reference puts its
@@ -515,41 +578,18 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   finderAt(n - 3, 0);
   finderAt(0, n - 3);
 
-  /* ---- zones: title | grade + serial | mark, so nothing can collide ---- */
-  // the reference's widest title line runs to 0.55 of the plate; our titles are
-  // longer words, so the zone ends just short of the divider and the fit loop
-  // scales the type down when it has to
-  const titleZone = W * 0.52;
-  const markRight = W * 0.79;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = o.ink;
-  ctx.globalAlpha = 0.92;
-  ctx.font = `800 ${H * 0.26}px "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.grade, markRight, centreY - H * 0.1);
-  ctx.globalAlpha = 0.55;
-  ctx.font = `600 ${H * 0.14}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.serial, markRight, centreY + H * 0.2);
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'left';
-
-  // hairline divider between the title and the marks — neutral, like the inner
-  // border, so the plate stays dark and only the mark carries colour
-  ctx.globalAlpha = 0.16;
-  ctx.fillStyle = o.ink;
-  ctx.fillRect(W * 0.53, H * 0.22, Math.max(1, W * 0.0014), H * 0.56);
-  ctx.globalAlpha = 1;
-
-  /* ---- left: a two-line heavy title, shrunk and then trimmed to fit ---- */
+  /* ---- left: a two-line heavy title, shrunk and then trimmed to fit ----
+   * Measured: the widest line runs to 0.540 of the plate (x 767 of 578) and
+   * the block is centred, leaving 37 px of bare plate above and 41 px below. */
   const heavy = (px: number) =>
     `800 ${px}px "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
   const lines = o.title
     .split('\n')
     .slice(0, 2)
     .map((l) => l.toUpperCase());
-  const avail = titleZone - pad;
-  let size = H * 0.31;
-  for (; size > H * 0.12; size -= 2) {
+  const avail = W * 0.545 - pad;
+  let size = H * 0.3;
+  for (; size > H * 0.135; size -= 1) {
     ctx.font = heavy(size);
     if (Math.max(...lines.map((l) => ctx.measureText(l).width)) <= avail) break;
   }
@@ -561,15 +601,30 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
     return `${cut}…`;
   });
 
-  // the reference stacks its two lines tight: cap 0.224 of the plate, 1.26 caps
-  // of leading, so the block spans half the plate and sits centred
-  const lead = size * 0.92;
+  // the reference stacks its two lines on a 42 px pitch with a 31 px cap, i.e.
+  // a leading of ~0.98 em, and centres the block on the plate
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const lead = size * 0.98;
   const blockTop = centreY - ((fitted.length - 1) * lead) / 2;
   ctx.fillStyle = o.ink;
   fitted.forEach((line, i) => {
-    ctx.globalAlpha = i === 0 ? 1 : 0.9;
+    ctx.globalAlpha = i === 0 ? 1 : 0.92;
     ctx.fillText(line, pad, blockTop + i * lead);
   });
+  ctx.globalAlpha = 1;
+
+  /* ---- grade + serial. The reference leaves the band under the title bare,
+   * but a slab card has to carry them somewhere and the mark block is the only
+   * other furniture, so they go here at a size the photo would read as plate
+   * tone rather than type. Drop this block to match a blank plate exactly. */
+  const foot = Math.max(5, H * 0.085);
+  ctx.font = `600 ${foot}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 0.46;
+  ctx.fillText(`GRADE ${o.grade}`, pad, centreY + lead * 0.5 + foot * 1.5);
+  ctx.globalAlpha = 0.3;
+  ctx.fillText(o.serial, pad + ctx.measureText(`GRADE ${o.grade}  `).width, centreY + lead * 0.5 + foot * 1.5);
   ctx.globalAlpha = 1;
   ctx.textBaseline = 'top';
 }
@@ -585,127 +640,121 @@ export function buildLabelTexture(o: LabelText): THREE.CanvasTexture {
  * ------------------------------------------------------------------ */
 
 export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, layout: TrayLayout) {
-  // smoky plate, tuned to the window floor tone sampled off the reference: the
-  // case is translucent, so the floor never goes black under the card — it
-  // stays a mauve-smoke that is lighter at the top where the window is open
+  /* The photo's window floor is almost perfectly flat. Sampled in four places
+   * round the card it reads #433640 / #483c46 / #463a44 / #453942 - a spread of
+   * 1.4 L* over 1000 px, sd 0.7-1.4 inside each patch. The old gradient ran
+   * #57494f -> #3b3139, a 28-point swing that never appears in the reference,
+   * so the base is now flat and everything else is a few L* on top. */
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#57494f');
-  g.addColorStop(0.45, '#463a44');
-  g.addColorStop(1, '#3b3139');
+  g.addColorStop(0, '#453a42');
+  g.addColorStop(0.45, '#443943');
+  g.addColorStop(1, '#413643');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
-  // retaining wells above the card, with their own baked shadow and lip
+  // the key light is off the upper right: the whole floor lifts a couple of
+  // points toward that corner, and only a couple
+  const key = ctx.createLinearGradient(0, 0, w, h * 0.35);
+  key.addColorStop(0, 'rgba(0,0,0,0.05)');
+  key.addColorStop(0.55, 'rgba(0,0,0,0)');
+  key.addColorStop(1, 'rgba(214,224,242,0.05)');
+  ctx.fillStyle = key;
+  ctx.fillRect(0, 0, w, h);
+
+  /* retaining wells. The reference's apron is only 23 px tall (0.035 of the
+   * slab) and shows no pockets at all, so SLAB_SPEC carries `slots: 0` and
+   * this loop is a no-op — it stays here so a well can be switched back on. */
   for (const slot of layout.slots) {
     const sw = Math.max(2, slot.w * w);
     const sh = slot.h * h;
     const sx = slot.x * w;
     const sy = slot.y * h;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.fillRect(sx, sy, sw, sh);
-    ctx.fillStyle = 'rgba(196,206,222,0.34)';
-    ctx.fillRect(sx + sw * 0.5, sy + sh * 0.03, Math.max(1, sw * 0.32), sh * 0.94);
-    const sg = ctx.createLinearGradient(0, sy + sh, 0, sy + sh + h * 0.035);
-    sg.addColorStop(0, 'rgba(0,0,0,0.4)');
+    const sg = ctx.createLinearGradient(0, sy + sh, 0, sy + sh + h * 0.02);
+    sg.addColorStop(0, 'rgba(0,0,0,0.14)');
     sg.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = sg;
-    ctx.fillRect(sx - sw * 2, sy + sh, sw * 5, h * 0.035);
+    ctx.fillRect(sx - sw * 2, sy + sh, sw * 5, h * 0.02);
   }
 
-  // baked AO around the card cutout: a contact shadow that grows with the lip
+  /* Contact shadow around the card cutout. There is essentially none in the
+   * photo: the floor immediately left of the card reads #433640 and
+   * immediately right of it #483c46, against #453a43 in the open apron — a
+   * 1.4 L* difference that is entirely explained by the key light. The card
+   * sits flush in its recess, so this is a hairline, not the wide well the
+   * old texture painted. */
   const cw = layout.card.w * w;
   const ch = layout.card.h * h;
   const cx = layout.card.x * w;
   const cy = layout.card.y * h;
-  const pad = Math.max(6, w * 0.028);
+  const pad = Math.max(3, w * 0.012);
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.78)';
-  ctx.shadowBlur = pad * 1.5;
-  ctx.shadowOffsetY = pad * 0.22;
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  roundRect(ctx, cx, cy, cw, ch, w * 0.05);
+  ctx.shadowColor = 'rgba(0,0,0,0.22)';
+  ctx.shadowBlur = pad * 0.7;
+  ctx.shadowOffsetY = pad * 0.12;
+  ctx.fillStyle = 'rgba(0,0,0,0.10)';
+  roundRect(ctx, cx - pad * 0.15, cy - pad * 0.15, cw + pad * 0.3, ch + pad * 0.3, w * 0.05);
   ctx.fill();
   ctx.restore();
 
-  // inner lip: a light line hugging the cutout, then a dark line just inside it
-  ctx.strokeStyle = 'rgba(226,233,244,0.20)';
-  ctx.lineWidth = Math.max(1, w * 0.0045);
-  roundRect(ctx, cx - pad * 0.42, cy - pad * 0.42, cw + pad * 0.84, ch + pad * 0.84, w * 0.055);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = Math.max(1, w * 0.006);
-  roundRect(ctx, cx + pad * 0.1, cy + pad * 0.1, cw - pad * 0.2, ch - pad * 0.2, w * 0.045);
+  // the lip: a single faint light line hugging the cutout, nothing more
+  ctx.strokeStyle = 'rgba(226,233,244,0.055)';
+  ctx.lineWidth = Math.max(1, w * 0.0035);
+  roundRect(ctx, cx - pad * 0.5, cy - pad * 0.5, cw + pad, ch + pad, w * 0.055);
   ctx.stroke();
 
-  // ambient occlusion under the label ridge: a thin band, because most of the
-  // apron above the card is lit by the open window, not shadowed
-  const top = ctx.createLinearGradient(0, 0, 0, h * 0.055);
-  top.addColorStop(0, 'rgba(0,0,0,0.6)');
-  top.addColorStop(0.5, 'rgba(0,0,0,0.22)');
+  /* Under the ridge the floor darkens for about 5% of the window height, then
+   * the apron returns to the flat floor tone: the apron samples at #453942,
+   * the same as the side strips. */
+  const top = ctx.createLinearGradient(0, 0, 0, h * 0.05);
+  top.addColorStop(0, 'rgba(0,0,0,0.16)');
+  top.addColorStop(0.6, 'rgba(0,0,0,0.05)');
   top.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = top;
-  ctx.fillRect(0, 0, w, h * 0.055);
+  ctx.fillRect(0, 0, w, h * 0.05);
 
-  // frosted wash over the apron between the ridge and the card: light comes
-  // through the open window and the moulded lip picks it up. Measured off the
-  // reference (apron centre ~#887b85 vs a black tray at ~#5c4e5b) — centre
-  // weighted, because the rails beside it stay dark.
-  const apron = ctx.createRadialGradient(w * 0.5, 0, 0, w * 0.5, 0, w * 0.82);
-  apron.addColorStop(0, 'rgba(220,228,244,0.42)');
-  apron.addColorStop(0.5, 'rgba(210,218,236,0.26)');
-  apron.addColorStop(1, 'rgba(200,208,226,0)');
-  ctx.save();
-  ctx.fillStyle = apron;
-  ctx.fillRect(0, 0, w, h * 0.16);
-  ctx.restore();
-
-  // ...and one along the bottom wall the card leans on. Kept light: the
-  // reference reads this ledge at ~#43374 1, well above the side troughs, so the
-  // card's contact shadow is a thin line rather than a wide well.
-  const bottom = ctx.createLinearGradient(0, h, 0, h * 0.94);
-  bottom.addColorStop(0, 'rgba(0,0,0,0.07)');
+  // the bottom ledge: a couple of points down, then back up as it catches light
+  const bottom = ctx.createLinearGradient(0, h, 0, h * 0.95);
+  bottom.addColorStop(0, 'rgba(0,0,0,0.05)');
   bottom.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = bottom;
-  ctx.fillRect(0, h * 0.94, w, h * 0.06);
-  // the bottom wall still catches some light through the acrylic
-  const bottomLight = ctx.createLinearGradient(0, h, 0, h * 0.96);
-  bottomLight.addColorStop(0, 'rgba(196,206,224,0.16)');
+  ctx.fillRect(0, h * 0.95, w, h * 0.05);
+  const bottomLight = ctx.createLinearGradient(0, h, 0, h * 0.97);
+  bottomLight.addColorStop(0, 'rgba(196,206,224,0.05)');
   bottomLight.addColorStop(1, 'rgba(196,206,224,0)');
   ctx.fillStyle = bottomLight;
-  ctx.fillRect(0, h * 0.96, w, h * 0.04);
+  ctx.fillRect(0, h * 0.97, w, h * 0.03);
 
-  // side walls: a thin lit rail, then the tray falls away into shadow — the
-  // reference reads the rails *darker* than the plate, not brighter
-  const sideL = ctx.createLinearGradient(0, 0, w * 0.075, 0);
-  sideL.addColorStop(0, 'rgba(198,208,226,0.16)');
-  sideL.addColorStop(0.3, 'rgba(0,0,0,0.12)');
+  /* Side walls. The left rail reads #433841 and the right #9e919b, but that
+   * asymmetry lives on the SHELL, not the tray: inside the window the two
+   * side strips are both ~#453a43. So the tray keeps a hair of light piped
+   * down each acrylic wall and no more. */
+  const sideL = ctx.createLinearGradient(0, 0, w * 0.06, 0);
+  sideL.addColorStop(0, 'rgba(198,208,226,0.05)');
+  sideL.addColorStop(0.35, 'rgba(0,0,0,0.03)');
   sideL.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sideL;
-  ctx.fillRect(0, 0, w * 0.075, h);
-  // light piped down the acrylic wall, just inside each rail — the streaks the
-  // reference shows running the height of the window
-  const streakL = ctx.createLinearGradient(w * 0.04, 0, w * 0.115, 0);
+  ctx.fillRect(0, 0, w * 0.06, h);
+  const streakL = ctx.createLinearGradient(w * 0.03, 0, w * 0.09, 0);
   streakL.addColorStop(0, 'rgba(210,220,238,0)');
-  streakL.addColorStop(0.45, 'rgba(214,224,242,0.2)');
+  streakL.addColorStop(0.5, 'rgba(214,224,242,0.05)');
   streakL.addColorStop(1, 'rgba(210,220,238,0)');
   ctx.fillStyle = streakL;
-  ctx.fillRect(w * 0.04, 0, w * 0.075, h);
-  // the right rail runs brighter than the left all the way to the moulding —
-  // the reference's key light is off to that side
-  const streakR = ctx.createLinearGradient(w * 0.885, 0, w, 0);
-  streakR.addColorStop(0, 'rgba(210,220,238,0)');
-  streakR.addColorStop(0.45, 'rgba(218,228,244,0.22)');
-  streakR.addColorStop(0.85, 'rgba(222,232,248,0.2)');
-  streakR.addColorStop(1, 'rgba(222,232,248,0.22)');
-  ctx.fillStyle = streakR;
-  ctx.fillRect(w * 0.885, 0, w * 0.115, h);
+  ctx.fillRect(w * 0.03, 0, w * 0.06, h);
 
-  const sideR = ctx.createLinearGradient(w, 0, w * 0.925, 0);
-  sideR.addColorStop(0, 'rgba(212,222,238,0.26)');
-  sideR.addColorStop(0.3, 'rgba(0,0,0,0.04)');
+  const streakR = ctx.createLinearGradient(w * 0.91, 0, w, 0);
+  streakR.addColorStop(0, 'rgba(210,220,238,0)');
+  streakR.addColorStop(0.5, 'rgba(218,228,244,0.055)');
+  streakR.addColorStop(1, 'rgba(222,232,248,0.06)');
+  ctx.fillStyle = streakR;
+  ctx.fillRect(w * 0.91, 0, w * 0.09, h);
+  const sideR = ctx.createLinearGradient(w, 0, w * 0.94, 0);
+  sideR.addColorStop(0, 'rgba(212,222,238,0.07)');
+  sideR.addColorStop(0.35, 'rgba(0,0,0,0.01)');
   sideR.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sideR;
-  ctx.fillRect(w * 0.925, 0, w * 0.075, h);
+  ctx.fillRect(w * 0.94, 0, w * 0.06, h);
 }
 
 export function buildTrayTexture(w = 512, h = 768, layout: TrayLayout = trayLayout()): THREE.CanvasTexture {

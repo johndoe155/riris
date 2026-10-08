@@ -16,13 +16,24 @@ import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
  */
 function StudioEnvironment() {
   return (
-    <Environment resolution={256} frames={1} environmentIntensity={0.9}>
-      <Lightformer form="rect" intensity={2.6} color="#ffffff" position={[0, 5.5, -4]} rotation={[Math.PI * 0.1, 0, 0]} scale={[14, 1.6, 1]} />
-      <Lightformer form="rect" intensity={1.8} color="#e8f1ff" position={[-6, 0.5, -3]} rotation={[0, Math.PI * 0.35, 0]} scale={[12, 2.2, 1]} />
-      <Lightformer form="rect" intensity={1.5} color="#fff0e6" position={[6, -0.5, -3]} rotation={[0, -Math.PI * 0.35, 0]} scale={[12, 2.2, 1]} />
-      <Lightformer form="ring" intensity={4} color="#FF4D00" position={[-4.5, 2.5, 2]} scale={3} target={[0, 0, 0]} />
-      <Lightformer form="circle" intensity={3} color="#00E5FF" position={[4.5, -2, 1.5]} scale={2.4} target={[0, 0, 0]} />
-      <Lightformer form="rect" intensity={0.7} color="#8fa2b8" position={[0, -6, 2]} rotation={[-Math.PI * 0.4, 0, 0]} scale={[16, 3, 1]} />
+    /* Rebuilt against the photo. The old rig had a #FF4D00 ring at intensity 4
+     * and a #00E5FF circle at 3 flanking the slab; nothing in the reference is
+     * that saturated or that hot — sampled over the whole frame, only 7.2 % of
+     * pixels clear L 0.75 and the brightest specular on the shell is a neutral
+     * #9e919b. What the photo actually shows is one soft key from the upper
+     * right (the right rail reads #9e919b against a #7d6b79 backdrop, the left
+     * rail #433841 against #412e3d — a 2.6x side-to-side ratio) and a dim
+     * warm fill from the lower left (#32212e). */
+    <Environment resolution={256} frames={1} environmentIntensity={0.55}>
+      {/* key, upper right, slightly in front */}
+      <Lightformer form="rect" intensity={2.2} color="#fffaf4" position={[6.5, 3, 2]} rotation={[0, -Math.PI * 0.42, 0]} scale={[13, 3.4, 1]} />
+      {/* a soft box front-right, so the shell keeps a body reflection */}
+      <Lightformer form="rect" intensity={1.1} color="#f4eef4" position={[3.5, 0.5, 5]} rotation={[0, -Math.PI * 0.3, 0]} scale={[9, 5, 1]} />
+      {/* the dark side: a dim strip and nothing else */}
+      <Lightformer form="rect" intensity={0.35} color="#6b5a68" position={[-6.5, 0.5, -2]} rotation={[0, Math.PI * 0.4, 0]} scale={[10, 2, 1]} />
+      {/* top and bottom fills, both near-neutral */}
+      <Lightformer form="rect" intensity={0.9} color="#efe8ef" position={[0, 6, -3]} rotation={[Math.PI * 0.35, 0, 0]} scale={[14, 2, 1]} />
+      <Lightformer form="rect" intensity={0.3} color="#4a3a45" position={[0, -6, 2]} rotation={[-Math.PI * 0.35, 0, 0]} scale={[16, 3, 1]} />
     </Environment>
   );
 }
@@ -107,9 +118,18 @@ export function ForgePreviewCanvas() {
         camera={{ position: [0, 0, 4.2], fov: 32 }}
       >
         <PerspectiveCamera makeDefault position={[0, 0, 4.2]} fov={32} />
-        <ambientLight intensity={0.35} />
-        <directionalLight position={[4, 5, 6]} intensity={0.9} />
-        <pointLight position={[0, 2.2, 2.4]} intensity={0.5} color="#00E5FF" />
+        {/* Ambient down from 0.35: the window interior in the reference sits at
+            L 45-50 with a spread of 5, so the shadowed side of the slab is
+            genuinely dark and a flat ambient term washes it out. */}
+        <ambientLight intensity={0.12} />
+        {/* Key from the upper right — the direction the photo's own key comes
+            from (see StudioEnvironment). 1.05, not 0.9, because the fill it
+            has to balance against was removed with the cyan point light. */}
+        <directionalLight position={[3.4, 2.6, 3.8]} intensity={1.05} color="#fff6ec" />
+        {/* The old cyan point light had no counterpart in the photo. This is a
+            dim neutral bounce off the lower-left of the backdrop instead, at
+            the colour the backdrop actually measures there (#4a3a45). */}
+        <pointLight position={[-1.8, -1.6, 1.6]} intensity={0.28} color="#c8b4c0" />
 
         <StudioEnvironment />
         <MovingHighlights />
@@ -159,14 +179,19 @@ export function ForgePreviewCanvas() {
 
 function FinishBloom() {
   const finishType = useVaultStore((s) => s.finishType);
+  /* Threshold 0.9 caught essentially nothing on the reference card — only
+   * 7.2 % of its pixels exceed 0.75 and the histogram tops out at 0.93, so
+   * there is no blown highlight to bloom. 0.78 sits just above the art's
+   * 75th percentile (0.49) and its 93rd (0.75), and the intensities come down
+   * by roughly a third to match. */
   const intensity =
-    finishType === 'gold' ? 0.85 :
-    finishType === 'holo' ? 0.7 :
-    finishType === 'cracked-ice' ? 0.4 :
-    0.12;
+    finishType === 'gold' ? 0.3 :
+    finishType === 'holo' ? 0.26 :
+    finishType === 'cracked-ice' ? 0.18 :
+    0.05;
   return (
     <EffectComposer multisampling={0}>
-      <Bloom mipmapBlur intensity={intensity} luminanceThreshold={0.9} luminanceSmoothing={0.18} radius={0.7} />
+      <Bloom mipmapBlur intensity={intensity} luminanceThreshold={0.78} luminanceSmoothing={0.2} radius={0.42} />
     </EffectComposer>
   );
 }

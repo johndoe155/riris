@@ -2,17 +2,29 @@
  * Every measurement of the graded-card slab, in one place, so tuning is a
  * one-line change and both scenes follow.
  *
- * The numbers come from the reference photo (slab box 664x1103 px, ratio
- * 0.602:1) and the card-face template recovered from cards.zip:
+ * ---------------------------------------------------------------------------
+ * The numbers below are MEASURED OFF `reference-image.jpg`, not guessed.
+ * `npm run verify:reference` re-derives them from the photo and fails when the
+ * spec drifts; see `scripts/verify/ref-measure.mjs` and
+ * `docs/reference-parity.md` for the method and the full table.
  *
- *   slab        0.602 : 1
- *   label       x 0.059..0.941, y 0.0335..0.170 of the slab   (dark plate)
- *   window      x 0.080..0.920, y 0.190..0.955 of the slab
- *   card        x 0.131..0.870, y 0.289..0.918 of the slab -> 0.710 aspect
- *   card ring   hugs the card edge, ~0.0143 of the card width thick
- *   art window  0.071..0.929 of the card width, 0.036..0.664 of its height
+ * Reference photo 1488 x 1484, sRGB. Measured pixel boxes (edges found at the
+ * half-height crossing of the luminance step against a per-row/per-column
+ * local background, so the numbers are not threshold-biased):
  *
- * The z stack is the real thing, front to back (all world units, slab 1 wide):
+ *   slab      x  412 .. 1077   y  187 .. 1302   -> 665 x 1115  (0.59641 : 1)
+ *   label     x  455 .. 1033   y  228 ..  378   -> 578 x  150
+ *   window    x  480 .. 1010   y  485 .. 1227   -> 530 x  742
+ *   card      x  500 ..  991   y  508 .. 1205   -> 491 x  697  (0.70452 : 1)
+ *   art       x  536 ..  955   y  542 ..  963   -> 419 x  421  (1.00 : 1 !)
+ *
+ * Every spec field below is (pixel measure / slab width 665) except the ones
+ * that are explicitly ratios of the card or of the label. The slab is 1 unit
+ * wide, so `h` is simply 1115 / 665.
+ *
+ * The z stack is the real thing, front to back (all world units, slab 1 wide).
+ * A face-on photo cannot measure depth, so these stay as modelled — they only
+ * show when the slab is turned.
  *
  *   zFront        +0.045  flat front face of the shell
  *   zPlateBack    +0.017  back of the front plate (window is this deep)
@@ -73,31 +85,43 @@ export interface SlabSpec {
   /** card centre offset from the slab centre (negative = below centre) */
   cardY: number;
   cardRadius: number;
-  /** gap between card edge and its cutout in the tray */
+  /** gap between card edge and its cutout in the tray (x) */
   cardGap: number;
+  /** the same gap measured vertically: the tray is a little looser this way */
+  cardGapY: number;
 
   /* ---- card face layout (fractions of the card) ---- */
+  /** centre-line of the white border stroke */
   ringInset: number;
+  /** thickness of the white border stroke */
   ringWidth: number;
+  /** the second, thinner white line that rims the art window */
+  keylineInset: number;
+  keylineWidth: number;
   artInset: number;
   artTop: number;
+  /** distance from the card's bottom edge up to the bottom of the art */
   artBottom: number;
 
   /* ---- furniture ---- */
-  /** retaining wells in the apron above the card (they must not overlap it) */
+  /** retaining wells in the apron above the card (0 = the reference has none) */
   slotTop: number;
   slotH: number;
   slotW: number;
   slots: number;
 }
 
+/**
+ * All lengths in world units with the slab 1 unit wide.
+ * Reference slab box: 665 x 1115 px.
+ */
 export const SLAB_SPEC: SlabSpec = {
   w: 1,
-  h: 1.6611,
+  h: 1.676692, // 1115 / 665
 
-  radius: 0.115,
-  cornerPower: 4.6,
-  bevel: 0.02,
+  radius: 0.037594, // 25 px — the old 0.115 made the corners 3.1x too round
+  cornerPower: 4.6, // squircle easing; kept from the previous spec
+  bevel: 0.015037, // 10 px — the dark rim on the top edge
 
   zFront: 0.045,
   zPlateBack: 0.017,
@@ -107,37 +131,46 @@ export const SLAB_SPEC: SlabSpec = {
   zBackPlateFront: -0.028,
   zBack: -0.045,
 
-  labelW: 0.881,
-  labelH: 0.2275,
-  labelTop: 0.055,
-  labelRadius: 0.055,
+  labelW: 0.869173, // 578 px
+  labelH: 0.225564, // 150 px
+  labelTop: 0.061654, // 41 px from the slab's top edge
+  labelRadius: 0.006, // the photo reads the plate's corners as square
   labelD: 0.026,
-  labelBorder: 0.0115,
-  ridgeH: 0.02,
-  ridgeGap: 0.016,
+  labelBorder: 0.006015, // 4 px bright rim, measured at the plate's left edge
+  ridgeH: 0.007519, // 5 px bright band under the plate
+  ridgeGap: 0.003008, // 2 px
 
-  windowW: 0.84,
-  windowH: 1.27,
-  windowTop: 0.3156,
-  windowRadius: 0.075,
-  windowBand: 0.026,
+  windowW: 0.796992, // 530 px
+  windowH: 1.115789, // 742 px
+  windowTop: 0.44812, // 298 px from the slab's top edge
+  windowRadius: 0.01, // small: the tray's top-left corner is square at 1 px
+  windowBand: 0.01203, // 8 px — the lit lip 10 px above the tray is the band
 
-  cardW: 0.7395,
-  cardH: 1.0432,
-  cardY: -0.1718,
-  cardRadius: 0.042,
-  cardGap: 0.014,
+  cardW: 0.738346, // 491 px
+  cardH: 1.048120, // 697 px
+  cardY: -0.168421, // card centre sits 112 px below the slab centre
+  cardRadius: 0.033083, // 22 px
+  cardGap: 0.028571, // 19 px
+  cardGapY: 0.033835, // 22.5 px
 
-  ringInset: 0.008,
-  ringWidth: 0.0143,
-  artInset: 0.071,
-  artTop: 0.036,
-  artBottom: 0.336,
+  /* ---- card face, as fractions of the card itself (491 x 697 px) ----
+   *   white border  x 500..507 / 984..991, y 508..516 / 1198..1205  (8-9 px)
+   *   dark frame    18 px
+   *   white keyline  8 px
+   *   art interior  419 x 421  -> square, which is the biggest single error
+   *                  the old spec made (it drew 0.963 : 1)                */
+  ringInset: 0.008654, // stroke centre line
+  ringWidth: 0.015274, // 8.5 px total, so the band covers 0.001 .. 0.0163
+  keylineInset: 0.064153, // stroke centre line (8 px band at 0.056 .. 0.072)
+  keylineWidth: 0.016291,
+  artInset: 0.073321, // 36 px
+  artTop: 0.048780, // 34 px
+  artBottom: 0.347202, // 242 px — art bottom is 455 px below the card top
 
   slotTop: 0.02,
   slotH: 0.1,
   slotW: 0.014,
-  slots: 4,
+  slots: 0, // the reference's apron is 23 px tall and shows no wells
 };
 
 export interface SlabLayers {
@@ -168,7 +201,7 @@ export interface SlabLayers {
 
 /** Derived z planes and y anchors. The small gaps are what catch the light. */
 export function slabLayers(spec: SlabSpec = SLAB_SPEC): SlabLayers {
-  const { h, zFront, zPlateBack, zCardBack, cardD, zTrayFront, labelD, windowW, windowH, slots, cardGap, cardW, cardH, cardRadius } = spec;
+  const { h, zFront, zPlateBack, zCardBack, cardD, zTrayFront, labelD, windowW, windowH, slots, cardGap, cardGapY, cardW, cardH, cardRadius } = spec;
 
   const labelY = h / 2 - spec.labelTop - spec.labelH / 2;
   const ridgeY = labelY - spec.labelH / 2 - spec.ridgeGap - spec.ridgeH / 2;
@@ -199,7 +232,7 @@ export function slabLayers(spec: SlabSpec = SLAB_SPEC): SlabLayers {
     windowY,
     slotX,
     trayW: cardW + cardGap * 2,
-    trayH: cardH + cardGap * 2,
+    trayH: cardH + cardGapY * 2,
     trayRadius: cardRadius + cardGap * 0.5,
   };
 }
@@ -245,3 +278,37 @@ export function trayLayout(spec: SlabSpec = SLAB_SPEC, layers: SlabLayers = slab
     })),
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Reference measurement constants, kept next to the spec so the
+ * verify script and the geometry can never disagree.
+ * ------------------------------------------------------------------ */
+
+/** Pixel boxes measured off `reference-image.jpg` (1488 x 1484). */
+export const REF_MEASURE = {
+  image: { w: 1488, h: 1484 },
+  slab: { x0: 412, x1: 1077, y0: 187, y1: 1302 },
+  label: { x0: 455, x1: 1033, y0: 228, y1: 378 },
+  window: { x0: 480, x1: 1010, y0: 485, y1: 1227 },
+  card: { x0: 500, x1: 991, y0: 508, y1: 1205 },
+  art: { x0: 536, x1: 955, y0: 542, y1: 963 },
+  /** corner radii, px */
+  radius: { slab: 25, card: 22 },
+} as const;
+
+/** Material colours sampled from the photo (sRGB hex, straight off the JPEG). */
+export const REF_COLOUR = {
+  /** backdrop corners: a diagonal mauve gradient, dark bottom-left */
+  bgTopLeft: '#564351',
+  bgTopRight: '#b3a6b1',
+  bgBottomLeft: '#32212e',
+  bgBottomRight: '#5c4858',
+  /** the tray floor and the card's dark frame are the same ink */
+  tray: '#453a43',
+  labelPlate: '#453a43',
+  cardFrame: '#433640',
+  cardBorder: '#fdfdfd',
+  /** shell rails: the key light is off the upper right, so they differ a lot */
+  railLit: '#9e919b',
+  railShadow: '#433841',
+} as const;

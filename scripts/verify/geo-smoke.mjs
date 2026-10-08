@@ -43,7 +43,8 @@ for (const q of ['hero', 'cheap']) {
       console.log(`${k.padEnd(12)} = ${v}`);
     }
   }
-  const cached = getSlabGeometry(q);
-  console.log(`cache returns same object: ${cached === set}`);
+  /* getSlabGeometry memoises; buildSlabGeometry does not. Compare two
+   * getSlabGeometry calls, which is what actually exercises the cache. */
+  console.log(`cache returns same object: ${getSlabGeometry(q) === getSlabGeometry(q)}`);
   if (bad) process.exit(1);
 }

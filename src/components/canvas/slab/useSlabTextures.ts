@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import type { SlabCard } from '@/data/slabCards';
-import { SLAB_SPEC, trayLayout } from './SlabSpec';
+import { REF_COLOUR, SLAB_SPEC, trayLayout } from './SlabSpec';
 import {
   drawCardBack,
   drawCardFace,
@@ -94,6 +94,13 @@ export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): C
     ['SERIAL', card.serial],
     ['OWNER', card.handle],
   ];
+  /* ---- measured face inks ------------------------------------------------
+   * Sampled off the reference photo: the card's border reads #fdfdfd (it is a
+   * clean white, with no foil tint on it at all) and the panel inside the
+   * border reads #433640, the same ink as the tray floor. Both are fed in
+   * straight from REF_COLOUR so a re-measure moves the drawing with the
+   * geometry. */
+  const dark = card.frame === 'dark';
   return {
     title: card.title,
     collection: card.collection,
@@ -101,7 +108,7 @@ export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): C
     handle: card.handle,
     grade: card.grade,
     traits,
-    dark: card.frame === 'dark',
+    dark,
     tint: card.color2,
     width,
     height: Math.round(width * FACE_ASPECT),
@@ -112,10 +119,13 @@ export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): C
     ringInset: SLAB_SPEC.ringInset,
     ringWidth: SLAB_SPEC.ringWidth,
     ringRadius: SLAB_SPEC.ringInset * 1.2,
+    keylineWidth: SLAB_SPEC.keylineWidth,
     artInset: SLAB_SPEC.artInset,
     artWidth: 1 - SLAB_SPEC.artInset * 2,
     artTop: SLAB_SPEC.artTop,
     artHeight: 1 - SLAB_SPEC.artTop - SLAB_SPEC.artBottom,
+    paperColour: dark ? REF_COLOUR.cardFrame : '#f2f0ec',
+    inkColour: dark ? REF_COLOUR.cardBorder : '#141414',
   };
 }
 
@@ -235,7 +245,7 @@ export function getLabelTexture(
     // the reference plate reads neutral dark (~#383037) with only a hint of the
     // card's own colour — a saturated moulding photographs far hotter than the
     // real part; the colour belongs in the accent border, not the plate
-    plate: blank ? '#FFFFFF' : mixHex('#3f343c', card.color2, 0.06),
+    plate: blank ? '#FFFFFF' : mixHex(REF_COLOUR.labelPlate, card.color2, 0.05),
     ink: blank ? '#141414' : '#F7F5F2',
     qr: !blank,
     blank,

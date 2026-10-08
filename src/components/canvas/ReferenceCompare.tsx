@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber';
 import { Environment, Lightformer, useTexture, Line, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { Slab } from '@/components/canvas/slab/Slab';
-import { SLAB_SPEC } from '@/components/canvas/slab/SlabSpec';
+import { REF_MEASURE, SLAB_SPEC } from '@/components/canvas/slab/SlabSpec';
 import { slabCards, type SlabCard } from '@/data/slabCards';
 import { Backdrop } from '@/components/canvas/slab/Backdrop';
 
@@ -12,12 +12,23 @@ import { Backdrop } from '@/components/canvas/slab/Backdrop';
    y 191..1294 (measured). Scaling the plane so that box equals the slab's own
    world height lines the photo up with the 3D model exactly, which is what
    makes the slider a real proportion check rather than a vibe check. */
-const REF_PX = { w: 1488, h: 1484, x0: 413, x1: 1077, y0: 191, y1: 1294 };
+const REF_PX = { w: 1488, h: 1484, x0: 412, x1: 1077, y0: 187, y1: 1302 };
 const SLAB_H = SLAB_SPEC.h;
 const IMG_H = SLAB_H / ((REF_PX.y1 - REF_PX.y0) / REF_PX.h);
 const IMG_W = IMG_H * (REF_PX.w / REF_PX.h);
 const BOX_CX = ((REF_PX.x0 + REF_PX.x1) / 2 / REF_PX.w - 0.5) * IMG_W;
 const BOX_CY = (0.5 - (REF_PX.y0 + REF_PX.y1) / 2 / REF_PX.h) * IMG_H;
+
+/** measured features as fractions of the slab box, from REF_MEASURE (px) */
+const frac = (box: { x0: number; x1: number; y0: number; y1: number }) => ({
+  x0: (box.x0 - REF_MEASURE.slab.x0) / (REF_MEASURE.slab.x1 - REF_MEASURE.slab.x0),
+  x1: (box.x1 - REF_MEASURE.slab.x0) / (REF_MEASURE.slab.x1 - REF_MEASURE.slab.x0),
+  y0: (box.y0 - REF_MEASURE.slab.y0) / (REF_MEASURE.slab.y1 - REF_MEASURE.slab.y0),
+  y1: (box.y1 - REF_MEASURE.slab.y0) / (REF_MEASURE.slab.y1 - REF_MEASURE.slab.y0),
+});
+const CARD_FX = frac(REF_MEASURE.card);
+const LABEL_FX = frac(REF_MEASURE.label);
+const WINDOW_FX = frac(REF_MEASURE.window);
 
 /** measured features, in the slab's own normalized box (origin centre) */
 const norm = (fx: number) => fx * SLAB_H - SLAB_H / 2; // from-image-top fraction → world y
@@ -37,31 +48,31 @@ const GUIDES: { label: string; points: [number, number][] }[] = [
   {
     label: 'card ring',
     points: [
-      [nx(0.131), norm(0.289)],
-      [nx(0.87), norm(0.289)],
-      [nx(0.87), norm(0.918)],
-      [nx(0.131), norm(0.918)],
-      [nx(0.131), norm(0.289)],
+      [nx(CARD_FX.x0), norm(CARD_FX.y0)],
+      [nx(CARD_FX.x1), norm(CARD_FX.y0)],
+      [nx(CARD_FX.x1), norm(CARD_FX.y1)],
+      [nx(CARD_FX.x0), norm(CARD_FX.y1)],
+      [nx(CARD_FX.x0), norm(CARD_FX.y0)],
     ],
   },
   {
     label: 'label plate',
     points: [
-      [nx(0.0587), norm(0.0335)],
-      [nx(0.941), norm(0.0335)],
-      [nx(0.941), norm(0.17)],
-      [nx(0.0587), norm(0.17)],
-      [nx(0.0587), norm(0.0335)],
+      [nx(LABEL_FX.x0), norm(LABEL_FX.y0)],
+      [nx(LABEL_FX.x1), norm(LABEL_FX.y0)],
+      [nx(LABEL_FX.x1), norm(LABEL_FX.y1)],
+      [nx(LABEL_FX.x0), norm(LABEL_FX.y1)],
+      [nx(LABEL_FX.x0), norm(LABEL_FX.y0)],
     ],
   },
   {
     label: 'window',
     points: [
-      [nx(0.08), norm(0.19)],
-      [nx(0.92), norm(0.19)],
-      [nx(0.92), norm(0.955)],
-      [nx(0.08), norm(0.955)],
-      [nx(0.08), norm(0.19)],
+      [nx(WINDOW_FX.x0), norm(WINDOW_FX.y0)],
+      [nx(WINDOW_FX.x1), norm(WINDOW_FX.y0)],
+      [nx(WINDOW_FX.x1), norm(WINDOW_FX.y1)],
+      [nx(WINDOW_FX.x0), norm(WINDOW_FX.y1)],
+      [nx(WINDOW_FX.x0), norm(WINDOW_FX.y0)],
     ],
   },
 ];
@@ -122,7 +133,7 @@ function StraightScene({ card, showPhoto, showGuides }: { card: SlabCard; showPh
         <Lightformer form="rect" intensity={1.4} color="#fff0e6" position={[6, -0.5, -3]} scale={[12, 2.2, 1]} />
       </Environment>
       {/* the reference photo's own background tone, so the slider blends */}
-      <Backdrop height={SLAB_H * 3.4} top="#2b2028" glow="#54404c" bottom="#1a1319" shadow={0.8} />
+      <Backdrop height={SLAB_H * 3.4} top="#b3a6b1" glow="#5a4856" bottom="#32212e" shadow={0.8} />
       <Slab card={card} quality="hero" intensity={1} />
       <PhotoOverlay opacity={showPhoto} />
       <Guides show={showGuides} />
@@ -177,14 +188,14 @@ export default function ReferenceCompare() {
           </select>
         </div>
         <ul className="space-y-1 text-[10px] leading-relaxed text-[#F5F3EF]/45">
-          <li>cyan — slab outline (0.6:1)</li>
+          <li>cyan — slab outline (0.596:1)</li>
           <li>pink — card / white ring box</li>
           <li>orange — header label plate</li>
           <li>green — window recess</li>
           <li>straight-on fov 12° — no perspective skew</li>
         </ul>
         <p className="text-[10px] leading-relaxed text-[#F5F3EF]/35">
-          Reference: 664 × 1103 px slab in a 1488 × 1484 photo, plate 0.881 w, card 0.7395 w, ring line 0.0143 card-w.
+          Reference: 665 × 1115 px slab in a 1488 × 1484 photo, label 0.869 w, card 0.738 w, border 0.0153 card-w, art 419 × 421 px.
         </p>
       </div>
     </div>

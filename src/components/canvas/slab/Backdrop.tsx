@@ -13,37 +13,41 @@ import * as THREE from 'three';
  */
 
 let gradientCache: THREE.CanvasTexture | null = null;
+let gradientKey = '';
 
 function gradientTexture(top: string, glow: string, bottom: string) {
-  if (gradientCache) return gradientCache;
+  const key = `${top}|${glow}|${bottom}`;
+  if (gradientCache && gradientKey === key) return gradientCache;
   const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
-  const g = ctx.createLinearGradient(0, 0, 0, size);
-  g.addColorStop(0, top);
-  g.addColorStop(0.55, glow);
-  g.addColorStop(1, bottom);
+  /* The reference backdrop is a DIAGONAL ramp, not a vertical one. Sampled in
+   * 150 px corner patches it reads #32212e bottom-left, #b3a6b1 top-right and
+   * #564351 / #5c4858 on the other two corners, i.e. the mid tone. A vertical
+   * gradient lays the brightest band straight across the slab's shoulders,
+   * which is the most visible thing the old backdrop got wrong. */
+  const g = ctx.createLinearGradient(0, size, size, 0);
+  g.addColorStop(0, bottom); // bottom-left, darkest
+  g.addColorStop(0.5, glow); // middle of the diagonal
+  g.addColorStop(1, top); // top-right, brightest
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
-  // a wide, soft pool of light behind the slab
-  const pool = ctx.createRadialGradient(128, 118, 10, 128, 118, 190);
-  pool.addColorStop(0, 'rgba(255,246,238,0.16)');
-  pool.addColorStop(0.5, 'rgba(255,246,238,0.05)');
-  pool.addColorStop(1, 'rgba(255,246,238,0)');
-  ctx.fillStyle = pool;
-  ctx.fillRect(0, 0, size, size);
-  // and a vignette so the corners fall away
-  const vig = ctx.createRadialGradient(128, 128, 60, 128, 128, 190);
+  /* The off-diagonal corners sit about 25 L* under the centre (#564351 and
+   * #5c4858 against a #745e5e middle) so there IS a vignette, just a gentle
+   * one. The old 0.55 alpha black pushed them 55 L* down. */
+  const vig = ctx.createRadialGradient(128, 128, 74, 128, 128, 196);
   vig.addColorStop(0, 'rgba(0,0,0,0)');
-  vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+  vig.addColorStop(1, 'rgba(10,4,9,0.26)');
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
+  if (gradientCache) gradientCache.dispose();
   gradientCache = tex;
+  gradientKey = key;
   return tex;
 }
 
@@ -86,9 +90,11 @@ export interface BackdropProps {
 
 export function Backdrop({
   height = 8,
-  top = '#191418',
-  glow = '#4a3a45',
-  bottom = '#0d0a0d',
+  // measured off reference-image.jpg: top-right corner, diagonal middle,
+  // bottom-left corner
+  top = '#b3a6b1',
+  glow = '#5a4856',
+  bottom = '#32212e',
   shadow = 0.85,
   shadowOffset = [0.08, -1.42],
   shadowScale = [1.7, 1.05],

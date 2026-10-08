@@ -9,8 +9,9 @@
     "lint": "eslint",
     "verify:geometry": "node scripts/verify/geo-smoke.mjs",
     "verify:textures": "node scripts/verify/canvas-smoke.mjs",
-    "verify:shaders": "node scripts/verify/glsl-check.mjs",
-    "verify": "npm run verify:geometry && npm run verify:textures"
+    "verify:shaders": "node scripts/verify/glsl-check.mjs src/components/canvas/HoloMaterial.tsx",
+    "verify": "npm run verify:geometry && npm run verify:textures && npm run verify:shaders && npm run verify:reference",
+    "verify:reference": "node scripts/verify/ref-measure.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",
