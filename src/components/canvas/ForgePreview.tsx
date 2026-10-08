@@ -7,7 +7,7 @@ import { OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@rea
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useVaultStore } from '@/store/useVaultStore';
 import { Slab } from '@/components/canvas/slab/Slab';
-import { Backdrop } from '@/components/canvas/slab/Backdrop';
+import { Backdrop, HERO_BACKDROP, HERO_WALL_HEIGHT } from '@/components/canvas/slab/Backdrop';
 import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
 
 /**
@@ -24,9 +24,9 @@ import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
  */
 function StudioEnvironment() {
   return (
-    <Environment resolution={256} frames={1} environmentIntensity={0.82}>
+    <Environment resolution={256} frames={1} environmentIntensity={2.4}>
       <Lightformer form="rect" intensity={2.2} color="#fff6fa" position={[5.5, 5, -3]} rotation={[Math.PI * 0.12, 0, -Math.PI * 0.16]} scale={[13, 2.4, 1]} />
-      <Lightformer form="rect" intensity={0.95} color="#e6dce8" position={[-6, 1.5, -3]} rotation={[0, Math.PI * 0.32, 0]} scale={[12, 2.6, 1]} />
+      <Lightformer form="rect" intensity={0.4} color="#e6dce8" position={[-6, 1.5, -3]} rotation={[0, Math.PI * 0.32, 0]} scale={[12, 2.6, 1]} />
       <Lightformer form="rect" intensity={0.5} color="#6d5b66" position={[0, -6, 2]} rotation={[-Math.PI * 0.4, 0, 0]} scale={[16, 3, 1]} />
       {/* a narrow vertical strip: the hairline the moulding's bevel catches */}
       <Lightformer form="rect" intensity={1.1} color="#ffffff" position={[3.2, 0, 3]} rotation={[0, -Math.PI * 0.18, 0]} scale={[0.7, 7, 1]} />
@@ -120,12 +120,13 @@ export function ForgePreviewCanvas() {
         camera={{ position: [0, 0, 7.4], fov: 16 }}
       >
         <PerspectiveCamera makeDefault position={[0, 0, 7.4]} fov={16} />
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[4, 5, 6]} intensity={0.55} />
+        {/* scaled ~2.7x from the first rig so front-facing surfaces return their measured tones (scripts/analysis/_tones.mjs) */}
+        <ambientLight intensity={1.5} />
+        <directionalLight position={[4, 5, 6]} intensity={2.1} />
 
         <StudioEnvironment />
         <MovingHighlights />
-        <Backdrop height={9} />
+        <Backdrop height={HERO_WALL_HEIGHT} aspect={1} {...HERO_BACKDROP} />
 
         <group
           onPointerOver={() => setHovered(true)}

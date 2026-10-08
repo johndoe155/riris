@@ -21,11 +21,12 @@
  *   corner profile   superellipse, exponent ~5.2       cornerPower 5.2
  *   outer chamfer    10 px (a dark band inside the edge) stepInset 0.015
  *   label plate      x 452..1036, y 227..379           x +-0.4391, top 0.0600, h 0.2284
- *   ridge            y 418..427, full face width       top 0.3472, h 0.0134
- *   hanger ledge     x 700..760, y 470..485            w 0.088, h 0.0225
+ *   ridge rail       y 418..427, x 435..1055 (inner frame) top 0.3472, h 0.0134
+ *   ridge tabs       x 459..512, 719..771, 982..1036   w 0.080, the only bright parts of the rail
+ *   window lip       x 515..976, y 474..484 (bright)   one bar, w 0.6933, h 0.0150
  *   window opening   x 465..1030, y 470..1295          w 0.8496, top 0.4253, h 1.2396
  *   card             x 500..991,  y 508..1240          w 0.7384, top 0.4823, h 1.1000
- *   card ring        hugs the card's edge, 8 px         ringInset 0, stroke 0.0163 card-w
+ *   card ring        paper 0..8 px, ink band 10..25 px  ringInset 0.0203, stroke 0.0305 card-w
  *   art window       ink x 532..536 / 957..961,        inset 0.0630 card-w,
  *                        y 535..541 / 964..970          top 0.0365, bottom 0.3680 card-h
  *
@@ -83,14 +84,25 @@ export interface SlabSpec {
   /** light inner border drawn on the plate */
   labelBorder: number;
 
-  /* ---- ridge: the full-width moulding line between label and window ---- */
-  /** how far in from the slab's edge the ridge starts */
+  /* ---- ridge: the moulded rail between the label and the window ---- */
+  /**
+   * How far in from the slab's edge the rail ends. The reference's rail is the
+   * top of an inner frame: its line runs x 435..1055 (inset 0.034), not out to
+   * the rim. The old inset (0.015) ran the rail's bright edge to both sides of
+   * the slab, which is the stray line across the whole case.
+   */
   ridgeInset: number;
   ridgeH: number;
   /** ridge centre, measured down from the slab's top edge */
   ridgeTop: number;
   /** how far the ridge stands proud of the face */
   ridgeLift: number;
+  /**
+   * Centres (world x) of the three bright tabs on the rail, and their width.
+   * Only the tabs catch the light; between them the rail reads as the face.
+   */
+  ridgeTabs: number[];
+  ridgeTabW: number;
 
   /* ---- window ---- */
   windowW: number;
@@ -123,11 +135,9 @@ export interface SlabSpec {
 
   /* ---- furniture ---- */
   /**
-   * The retaining ledges in the apron above the card. Measured off the
-   * reference as one small bright notch at the window's top edge, 60 px wide
-   * and 15 px tall (they catch the light rather than reading as dark pockets),
-   * so they are modelled small and near the opening — nothing like the deep
-   * wells the previous spec drew across the whole apron.
+   * The window's top lip: one bright bar along the top of the opening, x 515..976
+   * and y 474..484 in the photo. It was modelled as four 60 px ledges, which left
+   * dark gaps where the photo's lip is continuous, so it is now one bar.
    */
   slotTop: number;
   slotH: number;
@@ -162,10 +172,14 @@ export const SLAB_SPEC: SlabSpec = {
   labelD: 0.026,
   labelBorder: 0.0115,
 
-  ridgeInset: 0.015,
+  ridgeInset: 0.034,
   ridgeH: 0.0137,
   ridgeTop: 0.3472,
   ridgeLift: 0.004,
+  // tab centres 459..512, 719..771, 982..1036 px of the 665 px case, as
+  // (px centre - 744.5) / 665; the three tabs are 52..54 px wide
+  ridgeTabs: [-0.3895, 0.0008, 0.3963],
+  ridgeTabW: 0.08,
 
   windowW: 0.8496,
   windowH: 1.2396,
@@ -180,8 +194,10 @@ export const SLAB_SPEC: SlabSpec = {
   cardRadius: 0.042,
   cardGap: 0.012,
 
-  ringInset: 0.0,
-  ringWidth: 0.0163,
+  // the reference card at mid-height: paper 500..508 (outer 8 px), ink 510..526,
+  // paper 528..534, art from 536. 10 px of 492 = 0.0203; the ink band is 15-16 px = 0.0305
+  ringInset: 0.0203,
+  ringWidth: 0.0305,
   /**
    * The art frame's *outer* edge, as a fraction of the card width. Measured
    * from the frame's ink: x 532..536 (left) and 957..961 (right) of a card
@@ -193,12 +209,12 @@ export const SLAB_SPEC: SlabSpec = {
   artTop: 0.0365,
   artBottom: 0.368,
 
-  slotTop: 0.0015,
-  // 15 px of the 1116 px case, in world y (15/1116 * 1.677)
-  slotH: 0.0225,
-  // 60 px of the 665 px case, in world x
-  slotW: 0.088,
-  slots: 4,
+  // 4 px below the window's top edge (474 px), 10 px tall, in world units
+  slotTop: 0.006,
+  slotH: 0.015,
+  // x 515..976 px of the 665 px case: 461 / 665, in world x
+  slotW: 0.6933,
+  slots: 1,
 };
 
 export interface SlabLayers {
@@ -220,6 +236,8 @@ export interface SlabLayers {
   labelY: number;
   ridge: number;
   ridgeY: number;
+  /** world x of each bright tab on the rail */
+  ridgeTabX: number[];
   /** window anchor (centre y) and slot x positions */
   windowY: number;
   slotX: number[];
@@ -242,7 +260,8 @@ export function slabLayers(spec: SlabSpec = SLAB_SPEC): SlabLayers {
   const windowY = h / 2 - spec.windowTop - windowH / 2;
 
   /*
-   * The ledges are spread across the middle of the window, each clear of its
+   * With one lip bar (`slots` 1) this is just its centre. For more than one, the
+   * ledges spread across the middle of the window, each clear of its
    * neighbours and of the window's walls. (The old rule — `windowW - slotW * 8`
    * — assumed a 14 px-wide ledge; at the measured 60 px it collapsed the span to
    * less than one ledge and stacked all four on top of each other.)
@@ -269,6 +288,7 @@ export function slabLayers(spec: SlabSpec = SLAB_SPEC): SlabLayers {
     labelY,
     ridge: zFront + spec.ridgeLift,
     ridgeY,
+    ridgeTabX: spec.ridgeTabs.slice(),
     windowY,
     slotX,
     trayW: cardW + cardGap * 2,
@@ -351,4 +371,6 @@ export const REF_TONE = {
   cardBodyInk: '#3a2b35',
   /** the card's frame ink */
   cardPaper: '#fbf9fb',
+  /** the window's top lip: mean luma 122 across x 540..950, rows 476..482 */
+  lip: '#857683',
 } as const;

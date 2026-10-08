@@ -38,12 +38,13 @@ the top edge, so multiply an image-x fraction by 1 and an image-y fraction by
 | corner profile | inset 10 px by 1.8 % of the corner | superellipse, exponent ≈ 5.2 | `cornerPower` 5.2 |
 | rim chamfer | 10 px dark band inside the silhouette | — | `stepInset` 0.015 |
 | label plate | x 452..1036, y 227..379 | x 0.0600..0.9383, y 0.0358..0.1720 | `labelW` 0.8781, `labelTop` 0.0600, `labelH` 0.2284 |
-| ridge | y 418..427, full face width | y 0.2070..0.2151 | `ridgeTop` 0.3472, `ridgeH` 0.0134 |
+| ridge rail | y 418..427, x 435..1055 (inner frame) | y 0.2070..0.2151, x 0.0346..0.9654 | `ridgeTop` 0.3472, `ridgeH` 0.0137, `ridgeInset` 0.034 |
+| ridge tabs | x 459..512, 719..771, 982..1036; the only bright parts of the rail | — | `ridgeTabs` −0.3895, 0.0008, 0.3963; `ridgeTabW` 0.080 |
 | window opening | x 465..1030, y 470..1295 | x 0.0797..0.9293, y 0.2543..0.9933 | `windowW` 0.8496, `windowTop` 0.4253, `windowH` 1.2396 |
 | card | x 500..991, y 508..1240 | x 0.1323..0.8707, y 0.2876..0.9435 | `cardW` 0.7384, `cardH` 1.1000, `cardY` −0.1939 |
-| card ring | hugs the card edge, 8 px | 0.0000..0.0163 of the card width | `ringInset` 0, `ringWidth` 0.0163 |
+| card ring | paper 500..508, ink 510..526, paper 528..534 | ink band 0.0203..0.0508 of the card width | `ringInset` 0.0203, `ringWidth` 0.0305 |
 | art frame ink | x 532..536 / 957..961, y 535..541 / 964..970 | 0.0630 in, 0.0365/0.3680 down | `artInset` 0.063, `artStroke` 0.0081, `artTop` 0.0365, `artBottom` 0.368 |
-| hanger ledge | 60 × 15 px at the window's top edge | — | `slotW` 0.088, `slotH` 0.0225, `slotTop` 0.0015 |
+| window lip | one bright bar along the opening's top edge, x 515..976, y 474..484 | — | `slotW` 0.6933, `slotH` 0.0150, `slotTop` 0.0060, `slots` 1 |
 
 ### The measured tones
 
@@ -57,7 +58,7 @@ the top edge, so multiply an image-x fraction by 1 and an image-y fraction by
 | window floor | `#483945` → `#42333f` | flat; rails within 0.02 luma of the middle |
 | label plate | `#3b2a36` | warm dark mauve, not black |
 | card body | `#473642` | dark mauve card with white ink |
-| backdrop | `#b9a8b4` (top-right) → `#34202d` (bottom-left) | a *diagonal* ramp |
+| backdrop | `#b5a3b0` (top) · `#5b4153` (middle) · `#35202f` (bottom), ramp at 50° | least-squares fit over 38,833 background px, rms 8.4 (the previous stops and 16° gave 14.1) |
 
 ---
 
@@ -233,33 +234,77 @@ through the corner.
 **Ring on the silhouette.** Stroke an inset path by half the stroke width:
 
 ```
-ringW     = 0.0163 × W                     // 8 px on a 492 px card
-ringInset = ring.inset × W + ringW / 2     // = 4 px, i.e. the stroke's centre
+ringW     = 0.0305 × W                     // 15 px on a 492 px card (Phase 4)
+ringInset = ring.inset × W + ringW / 2     // 0.0203 × W + half the stroke, i.e. 10..25 px in
 radius    = bodyRadius − ringInset         // concentric with the card's own corner
 ```
 
-so the stroke's outer edge lands exactly on the card's silhouette instead of
-floating 4 px inside it.
+so the stroke's centre is concentric with the card's corner. *Superseded in
+Phase 4:* the photo's outer 8 px are paper, so the ink band runs 10–25 px in.
+
+## Phase 4 — Hero render (live preview)
+
+Three bugs were reported on the live preview: (1) the whole preview looked dimmed and the backdrop muddy; (2) a stray horizontal line across the slab at the ridge; (3) the translucent frame began in the label and cut through "BORED APE" rather than hugging the card window. Each was reproduced in a headless render of the hero canvas before it was changed.
+
+### Root causes and fixes
+
+| Report | Cause (measured) | Fix |
+| --- | --- | --- |
+| 3. outline through the label | `extrudedLayer` re-centres every layer on its own bounds. The band was built with the window's y offset (−0.207) inside its outline, so the re-centre discarded the offset and lifted the band 0.207 units: its top sat at photo y 324 instead of 461. The tray ring had the same fault. The analysis rasteriser repeated it, so the layer map agreed with the wrong render. | Layers are built about their own origin. `SlabGeometry.place` gives the world position of each offset layer (`band`, `tray`, `ridge`, `ridgeTabs`), and both `Slab.tsx` and `_render.mjs` use it. The band's outer top and bottom now sit at 274.0 and 1116.9 px, against 273.7 and 1117.3 expected. |
+| 2. stray line | The rail spanned the full face (inset 0.015), and its bright material ran out to the rim. The photo's rail is the top of an inner frame, x 435..1055 (inset 0.034). Only three tabs are bright, at x 459..512, 719..771 and 982..1036; the rail body reads as the face. | `ridgeInset` 0.034. The rail takes the face tone, and three bright tabs are placed from `ridgeTabs` (centres −0.3895, 0.0008, 0.3963; width 0.080). |
+| 1. dimmed and muddy | (a) The hero's backdrop used the component's dark defaults on a 9-unit plane, so the visible middle was nearly flat mid-mauve. The gradient angle was 16°; the photo's is 50°. (b) The face plate was 92 % transmissive, so the dark tray and label showed through the apron (#322c31 where the photo has #91808c). (c) The rig was about 2.7× too weak for the measured tones: the face and tray returned roughly a third to a half of their albedo. (d) The card's outer 8 px were stroked in ink; the photo's are paper. (e) The shell was fully transmissive, so its lit chamfer showed only the dark back plate. | (a) `REF_BACKDROP` refitted to the photo's background (`scripts/analysis/_bgfit.mjs`: 50°, stops #35202f / #5b4153 / #b5a3b0, rms residual 8.4 against 14.1 before), on a 4.07-unit square plane sized to the photo's frame, with the contact shadow at the case's base. (b) The face is opaque mauve (#91808c); the label and window are still cut through. (c) Environment 0.9 → 2.4, key 0.8 → 2.1, ambient 0.55 → 1.5, and the left fill halved, since the photo's left side is in shadow. (d) Card ring inset 0.0203 and width 0.0305: paper outside, ink band 10–25 px in. (e) Shell transmission 1.0 → 0.2, tinted with the measured rim tone. |
+
+Also changed: the window-top lip was four ledges with dark gaps between them. The photo's lip is one bright bar (x 515–976), so it is now one bar in the measured lip tone (`REF_TONE.lip`, #857683; `slots` 1, `slotW` 0.6933). The contact shadow is now 1.0 strength at `y −1.56`.
+
+### Residual, measured on the hero render
+
+`scripts/analysis/_tones.mjs` compares a DPR 1 hero grab (363 × 500 px) with the photo at matched case-relative positions. Luma ratio is hero ÷ photo:
+
+| Surface | Photo | Hero | Ratio |
+| --- | --- | --- | --- |
+| backdrop, top-right | `#bbaab6` | `#b5a3b0` | 0.96 |
+| backdrop, bottom-left | `#372131` | `#35202f` | 0.97 |
+| backdrop, middle-right | `#826b7b` | `#816b7b` | 1.00 |
+| backdrop, top-left | `#654e60` | `#745c6d` | 1.17 |
+| contact shadow under the case | `#351f2f` | `#352230` | 1.07 |
+| rim, lit (right) | `#947f8e` | `#7f6b7a` | 0.85 |
+| rim, dark (left) | `#41323f` | `#766672` | 1.96 |
+| face, top strip | `#a18f9b` | `#8b7b87` | 0.86 |
+| face, left edge | `#4e404b` | `#8c7c88` | 1.89 |
+| face, right | `#ae9eaa` | `#8b7b86` | 0.79 |
+| rail body | `#7f6e7a` | `#847480` | 1.05 |
+| label plate | `#3d2e3a` | `#403a42` | 1.20 |
+| tray floor | `#44333f` | `#4f434d` | 1.27 |
+| card ink band | `#463541` | `#3d3c3b` | 1.04 |
+| card paper, outer ring | `#fbfbfc` | `#d1cfcc` | 0.83 |
+| card paper, top margin | `#fefdfd` | `#e6e4e1` | 0.90 |
+
+At DPR 2 each of the three rail tabs reads 164 at mid-height against the photo's 172 (0.95). The window lip is one bar now: it reads 114 along the photo's span against the photo's mean of 122 (0.93), where four separate ledges left 56-level gaps.
+
+**Known gaps, not closed in this pass:**
+
+- **Face gradient.** The photo's face runs from `#4e404b` at the left edge to `#ae9eaa` at the right. The hero face is uniform (about 127). The card paper in the photo is uniform as well, so a point light near the subject would grade the card too, and the photo doesn't. The gradient is therefore not a simple light falloff, and it is left as is.
+- **Left chamfer** is about 2× the photo (106 against 54). The ambient term lights both chamfers equally, so reducing it would dim the face.
+- **Tray floor and label plate** run 20–27 % bright. Their roughness adds a specular floor that the photo doesn't show.
+- **Backdrop top-left** is 17 % bright. This is where the fit's residual is largest.
+- **Translucent band.** Its sides read as a light outline. The photo's window walls are dark, and only the top edge is bright.
 
 ## Verification
 
 ```bash
 npm run verify          # geometry + textures + shaders + parity
 npm run verify:parity   # the table below, on its own
+node scripts/analysis/_bgfit.mjs      # the backdrop fit
+node scripts/analysis/_tones.mjs <hero-grab.png>   # the tone table above
 ```
 
-`scripts/verify/parity-check.mjs` re-derives 20 features from `SLAB_SPEC` and
-compares them with the frozen measurements, failing past 3.5 px on the 665 ×
-1116 px case. Current state:
+`scripts/verify/parity-check.mjs` checks 29 features against the frozen measurements, failing past 3.5 px on the 665 × 1116 px case (7 px for the window and band left/right pair, which the photo locates to about 3 px). The band and the rail's tabs are checked from the **built** meshes with their `place` offset applied, so a position error like the one above fails here. Current state:
 
 ```
-worst delta 3.01px of a 665x1116px case (tolerance 3.5px)
+worst delta 3.34px of a 665x1116px case (tolerance 3.5px)
 OK - every measured feature of the slab matches reference-image.jpg
 ```
 
-The 3 px residual is the window's horizontal edges: its left edge is a 15 px
-ramp in the photo where the acrylic wall darkens, so the pair can only be
-located to about 3 px. Everything with a hard edge is within 1 px.
 
 ## What is *not* claimed
 

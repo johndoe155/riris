@@ -9,9 +9,9 @@ import * as THREE from 'three';
  * are meant for the plastic.
  *
  * The gradient is *diagonal*, which is what the reference actually shows
- * (measured in `scripts/analysis/_bg.mjs`): #574151 in the top-left corner
- * rising to #b9a8b4 in the top-right and falling to #34202d along the bottom,
- * so the light is off to the right of frame and slightly above. An earlier
+ * (fitted to the photo's background in `scripts/analysis/_bgfit.mjs`): a linear
+ * ramp at 50 degrees, from #35202f along the bottom-left to #b5a3b0 at the
+ * top-right, so the light is off to the right of frame and above. An earlier
  * version painted a vertical ramp with a pool of light behind the slab, which
  * put the brightest part of the wall in the centre and made the case read flat.
  *
@@ -78,6 +78,8 @@ const noRaycast = () => null;
 export interface BackdropProps {
   /** visible height in world units; the slab is ~1.677 tall */
   height?: number;
+  /** plane width / height. The wall is 1.35 wide by default; the hero passes 1 */
+  aspect?: number;
   /** the lit end of the gradient (toward the top-right by default) */
   top?: string;
   glow?: string;
@@ -93,6 +95,7 @@ export interface BackdropProps {
 
 export function Backdrop({
   height = 8,
+  aspect = 1.35,
   top = '#191418',
   glow = '#4a3a45',
   bottom = '#0d0a0d',
@@ -108,7 +111,7 @@ export function Backdrop({
   return (
     <>
       <mesh position={[0, 0, wallZ]} renderOrder={-20} raycast={noRaycast}>
-        <planeGeometry args={[height * 1.35, height]} />
+        <planeGeometry args={[height * aspect, height]} />
         <meshBasicMaterial map={gradient} toneMapped={false} depthWrite={false} />
       </mesh>
       {shadow > 0.01 && (
@@ -131,11 +134,33 @@ export function Backdrop({
  * when a view is meant to reproduce the photo's frame rather than a studio.
  */
 export const REF_BACKDROP = {
-  top: '#b9a8b4',
-  glow: '#6d5566',
-  bottom: '#34202d',
-  angle: 0.28,
+  // least-squares fit of the photo's background pixels (scripts/analysis/_bgfit.mjs):
+  // rms residual 8.4 per channel, against 14.1 for the previous stops and angle
+  top: '#b5a3b0',
+  glow: '#5b4153',
+  bottom: '#35202f',
+  // 50 degrees from +x. The old 0.28 rad (16 degrees) made the bottom-right far
+  // too bright.
+  angle: 0.873,
   shadow: 0.7,
   shadowOffset: [0.0, -0.98] as [number, number],
   shadowScale: [1.35, 0.32] as [number, number],
+};
+
+/**
+ * The reference's backdrop placed for the hero camera. The photo's frame is
+ * 2.24 x 2.23 case units; the wall is 1.82 times farther from the camera than the
+ * case front, so the frame is 4.07 wall units square. Every colour then sits at
+ * the same place relative to the case as it does in the photo. The default
+ * wall (9 units tall, 1.35 wide) left the visible part almost flat mid-mauve.
+ *
+ * The contact shadow moves to the case's bottom edge at wall depth (y -1.56).
+ */
+export const HERO_WALL_HEIGHT = 4.07;
+export const HERO_BACKDROP = {
+  ...REF_BACKDROP,
+  // the photo's contact shadow is ~30 px deep and near black (35) under the case
+  shadow: 1.0,
+  shadowOffset: [0.0, -1.56] as [number, number],
+  shadowScale: [2.1, 0.28] as [number, number],
 };

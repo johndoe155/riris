@@ -189,6 +189,15 @@ export function buildWindowPlate(
  * Layer set
  * ------------------------------------------------------------------ */
 
+export type Vec3 = [number, number, number];
+
+export interface SlabPlacement {
+  band: Vec3;
+  tray: Vec3;
+  ridge: Vec3;
+  ridgeTabs: Vec3[];
+}
+
 export interface SlabGeometry {
   /** outer case: full silhouette, window cut through, chamfered rim */
   shell: THREE.BufferGeometry;
@@ -206,9 +215,11 @@ export interface SlabGeometry {
   band: THREE.BufferGeometry;
   /** the dark label plate */
   labelPlate: THREE.BufferGeometry;
-  /** the full-width moulding line between the label and the window */
-  ridge: THREE.BufferGeometry;
-  /** the card body */
+    /** the moulded rail between the label and the window (inner-frame width) */
+    ridge: THREE.BufferGeometry;
+    /** one bright tab on the rail; placed three times via `place.ridgeTabs` */
+    ridgeTab: THREE.BufferGeometry;
+    /** the card body */
   card: THREE.BufferGeometry;
   /** flat card-shaped plane for the printed face, foil and back */
   cardFace: THREE.BufferGeometry;
@@ -217,20 +228,23 @@ export interface SlabGeometry {
   /** retaining wells in the window */
   slots: THREE.BufferGeometry[];
   planes: SlabLayers;
-  /** mesh z positions, so the component never recomputes planes by hand */
-  at: {
-    shell: number;
-    face: number;
-    backPlate: number;
-    tray: number;
-    band: number;
-    labelPlate: number;
-    ridge: number;
-    card: number;
-    slot: number;
-  };
-  triangles: number;
-}
+    /** mesh z positions, so the component never recomputes planes by hand */
+    at: {
+      shell: number;
+      face: number;
+      backPlate: number;
+      tray: number;
+      band: number;
+      labelPlate: number;
+      ridge: number;
+      ridgeTab: number;
+      card: number;
+      slot: number;
+    };
+    /** world position of each layer that is not centred on the origin */
+    place: SlabPlacement;
+    triangles: number;
+  }
 
 const QUALITY: Record<SlabQuality, { corner: number; bevel: number; curve: number }> = {
   hero: { corner: 12, bevel: 5, curve: 22 },
@@ -295,8 +309,10 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   });
 
   // --- tray: a plate with a card cutout, the card sits in the cutout
-  const trayShape = plain({ ...windowRect, w: windowW * 0.99, h: windowH * 0.99, r: windowRadius * 0.96 }, 0.004);
-  addHole(trayShape, fit({ w: L.trayW, h: L.trayH, r: L.trayRadius, x: 0, y: spec.cardY }, 0.004, -1), P, q.corner);
+    // Built about its own origin and placed at the window's centre (`place.tray`),
+    // like every other layer: extrudedLayer re-centres each geometry on its bounds.
+    const trayShape = plain({ w: windowW * 0.99, h: windowH * 0.99, r: windowRadius * 0.96 }, 0.004);
+    addHole(trayShape, fit({ w: L.trayW, h: L.trayH, r: L.trayRadius, x: 0, y: spec.cardY - L.windowY }, 0.004, -1), P, q.corner);
   const tray = extrudedLayer(trayShape, {
     depth: Math.max(zTrayFront - zCardBack, 0.006),
     bevel: 0.004,
@@ -304,9 +320,13 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     curveSegments: q.curve,
   });
 
-  // --- frosted band: the moulded lip hugging the window's opening
-  const bandShape = plain({ w: windowW + windowBand * 2, h: windowH + windowBand * 2, r: windowRadius + windowBand, y: L.windowY }, 0.004);
-  addHole(bandShape, fit(windowRect, 0.004, -1), P, q.corner);
+    // --- frosted band: the moulded lip hugging the window's opening. Built about
+    // its own origin, then moved to the window's centre by `place.band`. The old
+    // version kept the window's y offset inside the outline, and extrudedLayer's
+    // re-centre threw that offset away, so the band rode 0.21 units up into the
+    // label plate and cut through the printed name.
+    const bandShape = plain({ w: windowW + windowBand * 2, h: windowH + windowBand * 2, r: windowRadius + windowBand }, 0.004);
+    addHole(bandShape, fit({ w: windowW, h: windowH, r: windowRadius }, 0.004, -1), P, q.corner);
   const band = extrudedLayer(bandShape, {
     depth: 0.008,
     bevel: 0.004,
@@ -328,16 +348,24 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
    * front plane. `drawLabel` draws it with its own hairline shadow.
    */
 
-  // --- ridge: one full-width moulding line, centred in the gap between the
-  // label's underside and the window's top edge (measured: 40 px of face above
-  // it, 41 px below it)
-  const ridgeW = w - ridgeInset * 2;
-  const ridge = extrudedLayer(plain({ w: ridgeW, h: spec.ridgeH, r: spec.ridgeH / 2 }, 0.003), {
-    depth: 0.01,
-    bevel: 0.003,
-    bevelSegments: q.bevel,
-    curveSegments: q.curve,
-  });
+    // --- ridge: the moulded rail between the label's underside and the window's
+    // top edge (measured: 40 px of face above it, 41 px below it). It ends at the
+    // inner frame, x 435..1055, and not at the rim (`ridgeInset`).
+    const ridgeW = w - ridgeInset * 2;
+    const ridge = extrudedLayer(plain({ w: ridgeW, h: spec.ridgeH, r: spec.ridgeH / 2 }, 0.003), {
+      depth: 0.01,
+      bevel: 0.003,
+      bevelSegments: q.bevel,
+      curveSegments: q.curve,
+    });
+    // the three bright tabs on the rail: one geometry, placed at `place.ridgeTabs`
+    // and set proud of the rail (`at.ridgeTab`)
+    const ridgeTab = extrudedLayer(plain({ w: spec.ridgeTabW, h: spec.ridgeH, r: spec.ridgeH / 2 }, 0.002), {
+      depth: 0.006,
+      bevel: 0.002,
+      bevelSegments: q.bevel,
+      curveSegments: q.curve,
+    });
 
   // --- the card
   const card = extrudedLayer(plain({ w: cardW, h: cardH, r: cardRadius }, 0.005), {
@@ -355,7 +383,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   );
 
   /*
-   * --- hanger ledges in the apron above the card ---
+   * --- the window's top lip: one bright bar along the opening's top edge ---
    * The apron is the strip of tray between the window's top edge and the card's
    * top edge — 38 px of the case, measured. The ledges sit at the window's top
    * edge and must stay clear of the card: an earlier version clamped them with
@@ -375,24 +403,11 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   });
 
   const tri = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
-  const triangles =
-    tri(trayPlate) + tri(shell) + tri(face) + tri(backPlate) + tri(tray) + tri(band) + tri(labelPlate) + tri(ridge) +
-    tri(card) + tri(cardFace) + slots.reduce((a, s) => a + tri(s), 0);
+    const triangles =
+      tri(trayPlate) + tri(shell) + tri(face) + tri(backPlate) + tri(tray) + tri(band) + tri(labelPlate) + tri(ridge) +
+      tri(ridgeTab) * L.ridgeTabX.length + tri(card) + tri(cardFace) + slots.reduce((a, s) => a + tri(s), 0);
 
-  return {
-    shell,
-    face,
-    backPlate,
-    tray,
-    band,
-    labelPlate,
-    ridge,
-    card,
-    cardFace,
-    trayPlate,
-    slots,
-    planes: L,
-    at: {
+    const at = {
       shell: (L.shellFront + zBack) / 2,
       face: (zFront + L.shellFront - 0.004) / 2,
       backPlate: (zBackPlateFront + zBack) / 2,
@@ -400,11 +415,40 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
       band: zFront + 0.0005,
       labelPlate: zFront - spec.labelD / 2 - 0.002,
       ridge: L.ridge,
+      ridgeTab: L.ridge + 0.003,
       card: zCardBack + cardD / 2,
       slot: zTrayFront + 0.006,
-    },
-    triangles,
-  };
+    };
+
+    return {
+      shell,
+      face,
+      backPlate,
+      tray,
+      band,
+      labelPlate,
+      ridge,
+      ridgeTab,
+      card,
+      cardFace,
+      trayPlate,
+      slots,
+      planes: L,
+      at,
+      /*
+       * Where each layer's centre goes in the slab. Every layer is centred on its
+       * own bounds (`extrudedLayer`), so an offset inside an outline is lost, and
+       * any layer that is not centred on the origin must be placed here. Renderers
+       * read these; they must not assume (0, 0).
+       */
+      place: {
+        band: [0, L.windowY, at.band],
+        tray: [0, L.windowY, at.tray],
+        ridge: [0, L.ridgeY, at.ridge],
+        ridgeTabs: L.ridgeTabX.map((x): Vec3 => [x, L.ridgeY, at.ridgeTab]),
+      },
+      triangles,
+    };
 }
 
 /* ------------------------------------------------------------------ *

@@ -145,11 +145,12 @@ for (let y = 0; y < PXH; y++) for (let x = 0; x < PXW; x++) {
 draw(geo.shell, 'shell', 0, 0, geo.at.shell);
 draw(geo.face, 'face', 0, 0, geo.at.face);
 draw(geo.backPlate, 'backplate', 0, 0, geo.at.backPlate);
-draw(geo.tray, 'tray', 0, 0, geo.at.tray);
+draw(geo.tray, 'tray', ...geo.place.tray);
 draw(geo.trayPlate, 'trayplate', 0, 0, L.trayFront + 0.0012);
-draw(geo.band, 'band', 0, 0, geo.at.band);
+draw(geo.band, 'band', ...geo.place.band);
 draw(geo.labelPlate, 'label', 0, L.labelY, geo.at.labelPlate);
-draw(geo.ridge, 'ridge', 0, L.ridgeY, geo.at.ridge);
+draw(geo.ridge, 'ridge', ...geo.place.ridge);
+for (const p of geo.place.ridgeTabs) draw(geo.ridgeTab, 'ridge', ...p);
 for (const g of geo.slots) draw(g, 'slot', 0, 0, geo.at.slot);
 draw(geo.card, 'card', 0, SLAB_SPEC.cardY, geo.at.card);
 draw(geo.cardFace, 'card', 0, SLAB_SPEC.cardY, L.cardFace + 0.0012);

@@ -621,8 +621,8 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
-  // hanger ledges at the top of the window: small moulded tabs that catch the
-  // light (the reference reads them *brighter* than the floor, not darker)
+  // the window's top lip: a moulded bar that catches the light (the reference
+  // reads it *brighter* than the floor, not darker)
   for (const slot of layout.slots) {
     const sw = Math.max(2, slot.w * w);
     const sh = Math.max(2, slot.h * h);

@@ -32,7 +32,8 @@ interface SlabMaterials {
   face: THREE.MeshPhysicalMaterial;
   band: THREE.MeshPhysicalMaterial;
   label: THREE.MeshStandardMaterial;
-  ridge: THREE.MeshPhysicalMaterial;
+  ridge: THREE.MeshStandardMaterial;
+  ridgeTab: THREE.MeshStandardMaterial;
   tray: THREE.MeshStandardMaterial;
   cardBody: THREE.MeshPhysicalMaterial;
   slot: THREE.MeshStandardMaterial;
@@ -50,14 +51,17 @@ function getMaterials(): SlabMaterials {
     // the blue-white this used to carry, and the attenuation is short enough
     // that the case reads as tinted acrylic instead of clear glass.
     glass: new THREE.MeshPhysicalMaterial({
-      transmission: 1,
+      // mostly opaque, so the chamfer can take the key light: the reference's rim
+      // is dark on the left (#42333f) and lit on the right (#8a7685), and a fully
+      // transmissive shell shows only the dark back plate on both sides
+      transmission: 0.2,
       thickness: 0.42,
       roughness: 0.16,
       metalness: 0,
       ior: 1.46,
       clearcoat: 0.85,
       clearcoatRoughness: 0.12,
-      color: new THREE.Color('#e8dfe8'),
+      color: new THREE.Color(REF_TONE.rimLit),
       attenuationColor: new THREE.Color('#b7a2b4'),
       attenuationDistance: 1.35,
       envMapIntensity: 0.95,
@@ -67,30 +71,23 @@ function getMaterials(): SlabMaterials {
       side: THREE.DoubleSide,
     }),
     /**
-     * The front face plate. Physically the same acrylic as the shell, but its
-     * job in the render is to hold the reference's two measured edges: the
-     * chamfer step (10 px of *dark*, #42333f on the left and #8a7685 on the
-     * lit right, against a face of #91808c) and the bright hairline where the
-     * plate's own bevel turns. Reusing `glass` for it left the case looking
-     * like one flat slab; a separate, slightly cooler and less transmissive
-     * pass is what separates the face from the rim.
+     * The front face plate: opaque mauve, #91808c in the reference. It was a
+     * 92%-transmissive pass, so the dark tray and label behind it showed through
+     * and the whole apron read as the interior (#322c31) instead of the face
+     * (#91808c). The reference's apron is solid face tone, so the plate is solid
+     * here too, with a light clearcoat for its sheen. The label and window are
+     * still holes in it, so their own plates show through as before.
      */
     face: new THREE.MeshPhysicalMaterial({
-      transmission: 0.92,
-      thickness: 0.24,
-      roughness: 0.1,
+      color: new THREE.Color(REF_TONE.faceMid),
+      roughness: 0.42,
       metalness: 0,
-      ior: 1.46,
-      clearcoat: 1,
-      clearcoatRoughness: 0.05,
-      color: new THREE.Color('#efe6ee'),
-      attenuationColor: new THREE.Color('#c3aec0'),
-      attenuationDistance: 1.1,
-      envMapIntensity: 1.15,
+      clearcoat: 0.5,
+      clearcoatRoughness: 0.2,
+      envMapIntensity: 1,
       roughnessMap: wear.roughness,
       bumpMap: wear.bump,
-      bumpScale: 0.008,
-      side: THREE.DoubleSide,
+      bumpScale: 0.006,
     }),
     // pit fake: low opacity + env map, no transmission pass
     glassCheap: new THREE.MeshPhysicalMaterial({
@@ -121,18 +118,12 @@ function getMaterials(): SlabMaterials {
     }),
     // measured off the reference's plate: #3b2a36, not the near-black it was
     label: new THREE.MeshStandardMaterial({ color: REF_TONE.plate, roughness: 0.62, metalness: 0.05 }),
-    // the ridge under the label is the brightest moulded edge on the part: let
-    // it carry a proper specular so the environment paints a highlight on it
-    // the ridge reads #afa6af against a #91808c face: a lit edge, but only
-    // ~20% above the face it sits on, so the highlight stays tight
-    ridge: new THREE.MeshPhysicalMaterial({
-      color: '#dfd8e2',
-      roughness: 0.18,
-      metalness: 0.14,
-      clearcoat: 1,
-      clearcoatRoughness: 0.08,
-      envMapIntensity: 1.25,
-    }),
+    // the rail between label and window. In the reference its body is the face
+    // tone; only its three tabs catch the light (below), so the body is not lit
+    // any brighter than the face it sits on.
+    ridge: new THREE.MeshStandardMaterial({ color: REF_TONE.faceMid, roughness: 0.42, metalness: 0 }),
+    // the bright tabs on the rail: #afa6af, the reference's measured highlight
+    ridgeTab: new THREE.MeshStandardMaterial({ color: REF_TONE.ridge, roughness: 0.3, metalness: 0 }),
     // the tray underneath the window texture: the measured floor tone
     tray: new THREE.MeshStandardMaterial({ color: REF_TONE.tray, roughness: 0.86, metalness: 0.04 }),
     cardBody: new THREE.MeshPhysicalMaterial({
@@ -143,7 +134,9 @@ function getMaterials(): SlabMaterials {
       clearcoatRoughness: 0.3,
       envMapIntensity: 0.7,
     }),
-    slot: new THREE.MeshStandardMaterial({ color: '#6d6272', roughness: 0.55, metalness: 0.1 }),
+    // the window's top lip. The reference's lip is bright (luma ~122 across
+    // x 515..976), not a dark pocket, so the ledges take its measured tone.
+    slot: new THREE.MeshStandardMaterial({ color: REF_TONE.lip, roughness: 0.35, metalness: 0 }),
     wear,
   };
   return materials;
@@ -294,7 +287,7 @@ export function Slab({
         {/* back plate closes the case */}
         <mesh geometry={geo.backPlate} material={mat.tray} position={[0, 0, geo.at.backPlate]} />
         {/* tray ring — a plate with the card's cutout */}
-        <mesh geometry={geo.tray} material={mat.tray} position={[0, 0, geo.at.tray]} />
+        <mesh geometry={geo.tray} material={mat.tray} position={geo.place.tray} />
         {/* window floor: the tray texture's plane, with the card cutout in it
             (the geometry behind it is the deep structure, this is the surface
             you actually see in the apron around the card) */}
@@ -302,17 +295,20 @@ export function Slab({
           <meshStandardMaterial map={trayTex} roughness={0.86} metalness={0.04} />
         </mesh>
         {/* frosted band around the window */}
-        <mesh geometry={geo.band} material={mat.band} position={[0, 0, geo.at.band]} />
+        <mesh geometry={geo.band} material={mat.band} position={geo.place.band} />
         {/* label plate + its printed face */}
         <mesh geometry={geo.labelPlate} material={mat.label} position={[0, L.labelY, geo.at.labelPlate]} />
         <mesh position={[0, L.labelY, L.labelFace]}>
           <planeGeometry args={[SLAB_SPEC.labelW, SLAB_SPEC.labelH]} />
           <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />
         </mesh>
-        {/* ridge: one full-width moulding line between the label and the
-            window (measured y 418..427 of the case) */}
-        <mesh geometry={geo.ridge} material={mat.ridge} position={[0, L.ridgeY, geo.at.ridge]} />
-        {/* retaining wells */}
+        {/* the rail between the label and the window (measured y 418..427, inner
+            frame x 435..1055), then its three bright tabs */}
+        <mesh geometry={geo.ridge} material={mat.ridge} position={geo.place.ridge} />
+        {geo.place.ridgeTabs.map((p, i) => (
+          <mesh key={i} geometry={geo.ridgeTab} material={mat.ridgeTab} position={p} />
+        ))}
+        {/* the window's top lip: one bar */}
         {geo.slots.map((g, i) => (
           <mesh key={i} geometry={g} material={mat.slot} position={[0, 0, geo.at.slot]} />
         ))}

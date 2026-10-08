@@ -11,7 +11,9 @@
  *
  * so a spec drift shows up as a delta with a sign and a magnitude in photo
  * pixels. Fails on any feature that moves more than TOL px on the 665 x 1116 px
- * case.
+ * case. The band and the rail's tabs are checked from the BUILT geometry with
+ * its `place` offset applied, because layers are centred on their own bounds and
+ * a spec-only check cannot see a position error.
  *
  *   npm run verify:parity
  */
@@ -21,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const jiti = createJiti(import.meta.url, { moduleCache: false });
 const { SLAB_SPEC } = await jiti.import(root + 'src/components/canvas/slab/SlabSpec.ts');
+const { buildSlabGeometry } = await jiti.import(root + 'src/components/canvas/slab/geometry.ts');
 
 /** the case box in reference-image.jpg, px — background-deviation tracked */
 const CASE = { w: 665, h: 1116, x0: 412, y0: 187, x1: 1077, y1: 1303 };
@@ -37,6 +40,15 @@ const cardTop = S.cardY + S.cardH / 2; // world y of the card's top edge, slab-c
 /** world y measured down from the slab's top → the same convention */
 const fromTop = (yc) => S.h / 2 - yc;
 
+/* placed bounding box of a built layer: the bounds plus the position `place` gives it */
+const geo = buildSlabGeometry('hero');
+const placedBox = (g, at) => {
+  g.computeBoundingBox();
+  const b = g.boundingBox;
+  return { minX: b.min.x + at[0], maxX: b.max.x + at[0], minY: b.min.y + at[1], maxY: b.max.y + at[1] };
+};
+const band = placedBox(geo.band, geo.place.band);
+
 const MODEL = {
   'case aspect (w/h)': [S.w / S.h, 665 / 1116],
   'case corner radius (of min(w,h))': [S.radius, 76.5 / 665],
@@ -48,11 +60,24 @@ const MODEL = {
 
   'ridge top': [fy(S.ridgeTop), 418 - CASE.y0],
   'ridge bottom': [fy(S.ridgeTop + S.ridgeH), 427 - CASE.y0],
+  // the rail is the top of an inner frame, x 435..1055, not the full face
+  'ridge left': [fxc(-(S.w / 2 - S.ridgeInset)), 435 - CASE.x0, 'px'],
+  'ridge right': [fxc(S.w / 2 - S.ridgeInset), 1055 - CASE.x0, 'px'],
+  // its three bright tabs, centres measured off the reference strip
+  'ridge tab 1': [fxc(S.ridgeTabs[0]), 485.5 - CASE.x0, 'px'],
+  'ridge tab 2': [fxc(S.ridgeTabs[1]), 745 - CASE.x0, 'px'],
+  'ridge tab 3': [fxc(S.ridgeTabs[2]), 1009 - CASE.x0, 'px'],
 
   'window left': [fxc(-S.windowW / 2), 465 - CASE.x0, 'px'],
   'window right': [fxc(S.windowW / 2), 1030 - CASE.x0, 'px'],
   'window top': [fy(S.windowTop), 470 - CASE.y0],
   'window bottom': [fy(S.windowTop + S.windowH), 1295 - CASE.y0],
+  // the band is the window's frosted lip: its outer edge is windowBand outside the opening.
+  // Measured from the built mesh, so a misplaced band fails here
+  'band top (outer)': [fy(fromTop(band.maxY)), 470 - S.windowBand * 665 - CASE.y0],
+  'band bottom (outer)': [fy(fromTop(band.minY)), 1295 + S.windowBand * 665 - CASE.y0],
+  'band left (outer)': [fxc(band.minX), 465 - S.windowBand * 665 - CASE.x0, 'px'],
+  'band right (outer)': [fxc(band.maxX), 1030 + S.windowBand * 665 - CASE.x0, 'px'],
 
   'card left': [fxc(-S.cardW / 2), 500 - CASE.x0, 'px'],
   'card right': [fxc(S.cardW / 2), 991 - CASE.x0, 'px'],
@@ -75,7 +100,7 @@ let failures = 0;
 const rows = [];
 
 for (const [name, [model, ref, unit]] of Object.entries(MODEL)) {
-  const axis = /left|right/.test(name) ? 'x' : 'y';
+  const axis = /left|right|tab/.test(name) ? 'x' : 'y';
   const scale = /aspect|radius/.test(name) ? 1 : axis === 'x' ? CASE.w : CASE.h;
   let delta;
   if (/aspect/.test(name)) delta = (model - ref) * CASE.h; // expressed in px of width
@@ -90,7 +115,7 @@ for (const [name, [model, ref, unit]] of Object.entries(MODEL)) {
      * else (the card, the label, the ridge, all the y features) has a hard edge
      * and is held to TOL.
      */
-    const limit = /window left|window right/.test(name) ? TOL * 2 : TOL;
+    const limit = /window (left|right)|band (left|right)/.test(name) ? TOL * 2 : TOL;
     if (abs > limit) failures++;
   } else if (abs > 4) failures++;
   worst = Math.max(worst, abs);
