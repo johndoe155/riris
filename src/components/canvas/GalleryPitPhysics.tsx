@@ -87,7 +87,7 @@ function Card({
   const grabbed = hovered || dragging;
 
   /** visual spin (hover flourish), mirrored onto the collider each frame */
-  const visual = useRef({ spin: 0, scale: 1, appliedSpin: NaN, appliedScale: NaN });
+  const visual = useRef({ spin: index * 0.7, scale: 1, appliedSpin: NaN, appliedScale: NaN });
   const colliderDirty = useRef(true);
   useEffect(() => {
     colliderDirty.current = true;
@@ -127,7 +127,8 @@ function Card({
     d.lastClient.set(event.clientX, event.clientY);
     d.lastTime = performance.now();
 
-    body.enableCcd(true);
+    body.enableCcd(true); // the spring can move a slab fast enough to tunnel
+    body.lockRotations(true, true); // hold it face-on while it is in hand
     body.wakeUp();
     try {
       gl.domElement.setPointerCapture(event.pointerId);
@@ -179,6 +180,7 @@ function Card({
       const body = rigidRef.current;
       if (body) {
         body.enableCcd(false);
+        body.lockRotations(false, true);
         if (d.dragging && !cancelled) {
           const mass = body.mass() || MASS;
           const current = body.linvel();

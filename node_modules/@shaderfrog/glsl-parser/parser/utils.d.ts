@@ -1,0 +1,12 @@
+import { Program } from '../ast/ast-types.js';
+import { FunctionOverloadIndex, FunctionScopeIndex, Scope, ScopeEntry, ScopeIndex, TypeScopeEntry, TypeScopeIndex } from './scope.js';
+export declare const renameBinding: (binding: ScopeEntry, newName: string) => ScopeEntry;
+export declare const renameBindings: (bindings: ScopeIndex, mangle: (name: string) => string) => ScopeIndex;
+export declare const renameType: (type: TypeScopeEntry, newName: string) => TypeScopeEntry;
+export declare const renameTypes: (types: TypeScopeIndex, mangle: (name: string) => string) => TypeScopeIndex;
+export declare const renameFunction: (overloadIndex: FunctionOverloadIndex, newName: string) => FunctionOverloadIndex;
+export declare const renameFunctions: (functions: FunctionScopeIndex, mangle: (name: string) => string) => FunctionScopeIndex;
+export declare const xor: (a: any, b: any) => boolean;
+export declare const debugEntry: (bindings: ScopeIndex) => string[];
+export declare const debugFunctionEntry: (bindings: FunctionScopeIndex) => string[];
+export declare const debugScopes: (astOrScopes: Program | Scope[]) => void;
