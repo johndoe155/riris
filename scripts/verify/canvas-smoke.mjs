@@ -107,6 +107,13 @@ const b = use.getCardFaceTexture(card, null, 'cheap');
 rows.push(['cache identity (cheap face)', a === b ? 'same object' : 'DIFFERENT', '', '']);
 
 // async art path: placeholder first, art swapped in when the loader resolves
+push('back fallback', use.getBackTexture());
+let backsNotified = 0;
+const offBack = use.onBackTextureReady(() => { backsNotified++; });
+const brandedBack = await use.ensureBackTexture('rainbow');
+offBack();
+push('back branded', brandedBack);
+
 let notified = 0;
 const off = use.onCardTextureReady(() => { notified++; });
 // mimic the real mount order: placeholder first (synchronous first paint),
@@ -124,11 +131,14 @@ console.log('placeholder (fresh) ', placeholder.image.width + 'x' + placeholder.
 console.log('face with art       ', withArt.image.width + 'x' + withArt.image.height, withArt !== placeholder ? '(rebuilt)' : '(NOT rebuilt)');
 console.log('listeners fired     ', notified);
 console.log('remount gets art    ', remount === withArt ? 'yes' : 'NO');
+console.log('branded back        ', brandedBack !== use.getBackTexture() ? 'photo drawn' : 'still the fallback', `(${brandedBack.image.width}x${brandedBack.image.height}, listeners ${backsNotified})`);
 console.log('methods called      ', [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 10).map(([k, v]) => `${k}x${v}`).join(', '));
 
 if (withArt === placeholder) problems.push('ensureCardTexture did not replace the placeholder with the art version');
 if (remount !== withArt) problems.push('a later placeholder request did not pick up the finished texture');
 if (notified === 0) problems.push('onCardTextureReady listeners never fired');
+if (brandedBack === use.getBackTexture()) problems.push('ensureBackTexture did not build the branded back');
+if (backsNotified === 0) problems.push('onBackTextureReady listeners never fired');
 if (problems.length) {
   console.log(`\n${problems.length} PROBLEM(S):`);
   for (const p of problems.slice(0, 15)) console.log(' -', p);

@@ -340,18 +340,60 @@ export function buildCardFace(o: CardFaceText, art: HTMLImageElement | null): TH
 }
 
 /** Card back: real branded backs where available, else a drawn spine. */
+/** Draw an image filling a box, cropping the long side (the cover fit). */
+export function drawCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) {
+  const ir = img.width / img.height;
+  const br = w / h;
+  let sw = img.width;
+  let sh = img.height;
+  let sx = 0;
+  let sy = 0;
+  if (ir > br) {
+    sw = img.height * br;
+    sx = (img.width - sw) / 2;
+  } else {
+    sh = img.width / br;
+    sy = (img.height - sh) / 2;
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+/**
+ * Card back. With a photo (a real branded back from the set) it is cover-fit
+ * inside the card's silhouette; without one it draws a night-sky fallback so
+ * the plane is never blank while the image loads.
+ */
 export function drawCardBack(
   ctx: CanvasRenderingContext2D,
-  style: 'generic',
+  style: 'generic' | 'photo',
   w: number,
   h: number,
   bodyRadius = w * 0.0568,
-  power = 4.6
+  power = 4.6,
+  photo: HTMLImageElement | null = null
 ) {
   ctx.clearRect(0, 0, w, h);
   ctx.save();
   clipSquircle(ctx, w, h, bodyRadius, power);
-  if (style === 'generic') {
+  if (style === 'photo' && photo) {
+    drawCover(ctx, photo, 0, 0, w, h);
+    // a little vignette so the photo sits in the card rather than on it
+    const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.72);
+    v.addColorStop(0, 'rgba(0,0,0,0)');
+    v.addColorStop(1, 'rgba(0,0,0,0.22)');
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, w, h);
+  }
+  if (style === 'generic' || !photo) {
     ctx.fillStyle = '#141418';
     ctx.fillRect(0, 0, w, h);
     ctx.strokeStyle = '#F5F3EF';

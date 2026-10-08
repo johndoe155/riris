@@ -9,12 +9,15 @@ import { getSlabGeometry } from './geometry';
 import { SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
 import { getWearMaps } from './textures';
 import {
+  ensureBackTexture,
   ensureCardTexture,
   getBackTexture,
   getCardFaceTexture,
   getLabelTexture,
   getTrayTexture,
+  latestBackTexture,
   latestCardTexture,
+  onBackTextureReady,
   onCardTextureReady,
 } from './useSlabTextures';
 
@@ -181,7 +184,24 @@ export function Slab({
   }, [card, tier]);
 
   const labelTex = useMemo(() => getLabelTexture(card, false, tier), [card, tier]);
-  const backTex = useMemo(() => getBackTexture(), []);
+
+  // the card's own branded back: drawn fallback first, photo when it lands
+  const [backTex, setBackTex] = useState<THREE.CanvasTexture>(() => latestBackTexture(card.back) ?? getBackTexture());
+  useEffect(() => {
+    let live = true;
+    ensureBackTexture(card.back).then((tex) => {
+      if (live) setBackTex(tex);
+    });
+    const off = onBackTextureReady((style) => {
+      if (!live || style !== card.back) return;
+      const next = latestBackTexture(card.back);
+      if (next) setBackTex(next);
+    });
+    return () => {
+      live = false;
+      off();
+    };
+  }, [card.back]);
   const trayTex = useMemo(() => getTrayTexture(), []);
 
   useEffect(() => {

@@ -19,6 +19,8 @@ export interface SlabCard {
   year: string;
   /** card frame variant */
   frame: 'dark' | 'light';
+  /** which branded card back shows when the card is flipped */
+  back: BackStyle;
 }
 
 /** One entry per slab: real art panels extracted from cards.zip. */
@@ -37,7 +39,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#123A5A",
     "price": "$20",
     "year": "2023",
-    "frame": "light"
+    "frame": "light",
+    "back": "rainbow"
   },
   {
     "id": "002",
@@ -53,7 +56,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#4E131C",
     "price": "$25",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "003",
@@ -69,7 +73,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1C1C22",
     "price": "$30",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "004",
@@ -85,7 +90,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1A0F2B",
     "price": "$40",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "005",
@@ -101,7 +107,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#5A2F0B",
     "price": "$20",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "006",
@@ -117,7 +124,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#0B3326",
     "price": "$25",
     "year": "2024",
-    "frame": "light"
+    "frame": "light",
+    "back": "crocky"
   },
   {
     "id": "007",
@@ -133,7 +141,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#6E1C3B",
     "price": "$30",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "008",
@@ -149,7 +158,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#2A2A30",
     "price": "$40",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "009",
@@ -165,7 +175,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#123A5A",
     "price": "$20",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "010",
@@ -181,7 +192,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#4E131C",
     "price": "$25",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "011",
@@ -197,7 +209,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1C1C22",
     "price": "$30",
     "year": "2023",
-    "frame": "light"
+    "frame": "light",
+    "back": "veefriends"
   },
   {
     "id": "012",
@@ -213,7 +226,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1A0F2B",
     "price": "$40",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "013",
@@ -229,7 +243,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#5A2F0B",
     "price": "$20",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "014",
@@ -245,7 +260,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#0B3326",
     "price": "$25",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "015",
@@ -261,7 +277,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#6E1C3B",
     "price": "$30",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "016",
@@ -277,7 +294,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#2A2A30",
     "price": "$40",
     "year": "2024",
-    "frame": "light"
+    "frame": "light",
+    "back": "rainbow"
   },
   {
     "id": "017",
@@ -293,7 +311,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#123A5A",
     "price": "$20",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "018",
@@ -309,7 +328,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#4E131C",
     "price": "$25",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "019",
@@ -325,7 +345,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1C1C22",
     "price": "$30",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "020",
@@ -341,7 +362,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1A0F2B",
     "price": "$40",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "021",
@@ -357,7 +379,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#5A2F0B",
     "price": "$20",
     "year": "2023",
-    "frame": "light"
+    "frame": "light",
+    "back": "crocky"
   },
   {
     "id": "022",
@@ -373,7 +396,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#0B3326",
     "price": "$25",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "023",
@@ -389,7 +413,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#6E1C3B",
     "price": "$30",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "024",
@@ -405,7 +430,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#2A2A30",
     "price": "$40",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "025",
@@ -421,7 +447,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#123A5A",
     "price": "$20",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "026",
@@ -437,7 +464,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#4E131C",
     "price": "$25",
     "year": "2024",
-    "frame": "light"
+    "frame": "light",
+    "back": "veefriends"
   },
   {
     "id": "027",
@@ -453,7 +481,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1C1C22",
     "price": "$30",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "028",
@@ -469,7 +498,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1A0F2B",
     "price": "$40",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "029",
@@ -485,7 +515,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#5A2F0B",
     "price": "$20",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "030",
@@ -501,7 +532,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#0B3326",
     "price": "$25",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "031",
@@ -517,7 +549,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#6E1C3B",
     "price": "$30",
     "year": "2023",
-    "frame": "light"
+    "frame": "light",
+    "back": "rainbow"
   },
   {
     "id": "032",
@@ -533,7 +566,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#2A2A30",
     "price": "$40",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "033",
@@ -549,7 +583,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#123A5A",
     "price": "$20",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "034",
@@ -565,7 +600,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#4E131C",
     "price": "$25",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "035",
@@ -581,7 +617,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1C1C22",
     "price": "$30",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "036",
@@ -597,7 +634,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#1A0F2B",
     "price": "$40",
     "year": "2024",
-    "frame": "light"
+    "frame": "light",
+    "back": "crocky"
   },
   {
     "id": "037",
@@ -613,7 +651,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#5A2F0B",
     "price": "$20",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "038",
@@ -629,7 +668,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#0B3326",
     "price": "$25",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "veefriends"
   },
   {
     "id": "039",
@@ -645,7 +685,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#6E1C3B",
     "price": "$30",
     "year": "2023",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   },
   {
     "id": "040",
@@ -661,7 +702,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#2A2A30",
     "price": "$40",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "rainbow"
   },
   {
     "id": "041",
@@ -677,7 +719,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#123A5A",
     "price": "$20",
     "year": "2023",
-    "frame": "light"
+    "frame": "light",
+    "back": "veefriends"
   },
   {
     "id": "042",
@@ -693,7 +736,8 @@ export const slabCards: SlabCard[] = [
     "color2": "#4E131C",
     "price": "$25",
     "year": "2024",
-    "frame": "dark"
+    "frame": "dark",
+    "back": "crocky"
   }
 ];
 

@@ -7,6 +7,7 @@ import { OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@rea
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useVaultStore } from '@/store/useVaultStore';
 import { Slab } from '@/components/canvas/slab/Slab';
+import { Backdrop } from '@/components/canvas/slab/Backdrop';
 import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
 
 /**
@@ -112,6 +113,7 @@ export function ForgePreviewCanvas() {
 
         <StudioEnvironment />
         <MovingHighlights />
+        <Backdrop height={9} />
 
         <group
           onPointerOver={() => setHovered(true)}
@@ -129,7 +131,6 @@ export function ForgePreviewCanvas() {
 
         <FinishBloom />
         <SpringOrbit />
-        <fog attach="fog" args={['#050505', 6, 14]} />
       </Canvas>
 
       <div className="absolute top-4 left-4 font-mono text-[9px] px-2 py-1 bg-black/60 text-white/60 border border-white/10 backdrop-blur">

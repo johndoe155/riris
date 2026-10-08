@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { SlabCard } from '@/data/slabCards';
 import { SLAB_SPEC, trayLayout } from './SlabSpec';
 import { drawCardBack, drawCardFace, drawLabel, drawTray, type CardFaceText, type LabelText } from './textures';
+import type { BackStyle } from '@/data/slabCards';
 
 /**
  * Card textures are built per card, but loaders, images and results are cached
@@ -135,14 +136,24 @@ export function getCardFaceTexture(
   return tex;
 }
 
-/** Fired when a face texture is rebuilt because its art finally loaded. */
-type Listener = (card: SlabCard, tier: keyof typeof FACE_TIERS) => void;
-const listeners = new Set<Listener>();
-
-export function onCardTextureReady(fn: Listener): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+/** A tiny subscription helper: one per texture kind. */
+function channel<T extends unknown[]>() {
+  const set = new Set<(...args: T) => void>();
+  return {
+    add(fn: (...args: T) => void) {
+      set.add(fn);
+      return () => set.delete(fn);
+    },
+    fire(...args: T) {
+      set.forEach((fn) => fn(...args));
+    },
+  };
 }
+
+/** Fired when a face texture is rebuilt because its art finally loaded. */
+const faceChannel = channel<[SlabCard, keyof typeof FACE_TIERS]>();
+export const onCardTextureReady = (fn: (card: SlabCard, tier: keyof typeof FACE_TIERS) => void) =>
+  faceChannel.add(fn);
 
 /** Load a card's art and rebuild its face. Safe to call from several slabs. */
 export async function ensureCardTexture(
@@ -172,7 +183,7 @@ export async function ensureCardTexture(
       }, 5000);
     }
   }
-  listeners.forEach((l) => l(card, tier));
+  faceChannel.fire(card, tier);
   return tex;
 }
 
@@ -210,13 +221,44 @@ export function getLabelTexture(
 }
 
 const backCache = new Map<string, THREE.CanvasTexture>();
+const backChannel = channel<[BackStyle]>();
+export const onBackTextureReady = (fn: (style: BackStyle) => void) => backChannel.add(fn);
 
+const BACK_W = 512;
+const BACK_H = 722;
+const backSilhouette = { radius: (SLAB_SPEC.cardRadius / SLAB_SPEC.cardW) * BACK_W, power: SLAB_SPEC.cornerPower };
+
+/** The drawn fallback, used until (and if) the branded photo arrives. */
 export function getBackTexture(): THREE.CanvasTexture {
   const key = 'generic';
   const hit = backCache.get(key);
   if (hit) return hit;
-  const tex = canvasTexture((ctx) => drawCardBack(ctx, 'generic', 512, 722), 512, 722);
+  const tex = canvasTexture(
+    (ctx) => drawCardBack(ctx, 'generic', BACK_W, BACK_H, backSilhouette.radius, backSilhouette.power),
+    BACK_W,
+    BACK_H
+  );
   backCache.set(key, tex);
+  return tex;
+}
+
+export function latestBackTexture(style: BackStyle): THREE.CanvasTexture | null {
+  return backCache.get(`photo:${style}`) ?? null;
+}
+
+export async function ensureBackTexture(style: BackStyle): Promise<THREE.CanvasTexture> {
+  const key = `photo:${style}`;
+  const done = backCache.get(key);
+  if (done) return done;
+  const photo = await loadImage(`/backs/${style}.jpg`);
+  if (!photo) return getBackTexture();
+  const tex = canvasTexture(
+    (ctx) => drawCardBack(ctx, 'photo', BACK_W, BACK_H, backSilhouette.radius, backSilhouette.power, photo),
+    BACK_W,
+    BACK_H
+  );
+  backCache.set(key, tex);
+  backChannel.fire(style);
   return tex;
 }
 

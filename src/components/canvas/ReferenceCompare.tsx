@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { Slab } from '@/components/canvas/slab/Slab';
 import { SLAB_SPEC } from '@/components/canvas/slab/SlabSpec';
 import { slabCards, type SlabCard } from '@/data/slabCards';
+import { Backdrop } from '@/components/canvas/slab/Backdrop';
 
 /* The reference photo is 1488×1484 with the slab occupying x 413..1077,
    y 191..1294 (measured). Scaling the plane so that box equals the slab's own
@@ -120,6 +121,8 @@ function StraightScene({ card, showPhoto, showGuides }: { card: SlabCard; showPh
         <Lightformer form="rect" intensity={1.7} color="#e8f1ff" position={[-6, 0.5, -3]} scale={[12, 2.2, 1]} />
         <Lightformer form="rect" intensity={1.4} color="#fff0e6" position={[6, -0.5, -3]} scale={[12, 2.2, 1]} />
       </Environment>
+      {/* the reference photo's own background tone, so the slider blends */}
+      <Backdrop height={SLAB_H * 3.4} top="#2b2028" glow="#54404c" bottom="#1a1319" shadow={0.8} />
       <Slab card={card} quality="hero" intensity={1} />
       <PhotoOverlay opacity={showPhoto} />
       <Guides show={showGuides} />
