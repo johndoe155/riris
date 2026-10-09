@@ -1,9 +1,8 @@
 'use client';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, applyProps } from '@react-three/fiber';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
-import { OrbitControls, OrthographicCamera, Environment, Lightformer } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useVaultStore } from '@/store/useVaultStore';
 import { Slab } from '@/components/canvas/slab/Slab';
@@ -121,11 +120,13 @@ export function ForgePreviewCanvas() {
         a little parallax for the orbit while holding the measured proportions.
       */}
       <Canvas
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: true, alpha: false }}
         dpr={[1, 2]}
-        camera={{ position: [0, 0, 5], zoom: 1.8 }}
       >
-        <OrthographicCamera makeDefault position={[0, 0, 5]} zoom={1.8} near={0.1} far={60} />
+        <color attach="background" args={['#352334']} />
+        {/* Long-lens framing keeps the case filling the portrait Forge canvas while
+            retaining the reference's nearly orthographic straight-on proportions. */}
+        <PerspectiveCamera makeDefault position={[0, 0, 3.2]} fov={38} near={0.1} far={60} />
         {/* scaled ~2.7x from the first rig so front-facing surfaces return their measured tones (scripts/analysis/_tones.mjs) */}
         <ambientLight intensity={1.5} />
         <directionalLight position={[4, 5, 6]} intensity={2.1} />
@@ -148,7 +149,6 @@ export function ForgePreviewCanvas() {
           />
         </group>
 
-        <FinishBloom />
         <SpringOrbit />
       </Canvas>
 
@@ -173,19 +173,5 @@ export function ForgePreviewCanvas() {
         <div className="font-mono text-[9px] text-[#FF4D00]">TRUE OPTICAL PREVIEW</div>
       </div>
     </div>
-  );
-}
-
-function FinishBloom() {
-  const finishType = useVaultStore((s) => s.finishType);
-  const intensity =
-    finishType === 'gold' ? 0.85 :
-    finishType === 'holo' ? 0.7 :
-    finishType === 'cracked-ice' ? 0.4 :
-    0.12;
-  return (
-    <EffectComposer multisampling={0}>
-      <Bloom mipmapBlur intensity={intensity} luminanceThreshold={0.9} luminanceSmoothing={0.18} radius={0.7} />
-    </EffectComposer>
   );
 }
