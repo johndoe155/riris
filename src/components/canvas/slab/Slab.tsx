@@ -46,97 +46,94 @@ function getMaterials(): SlabMaterials {
   if (materials) return materials;
   const wear = getWearMaps();
   materials = {
-    // real transmission — the Forge canvas is contained, so the pass is bounded.
-    // The tint is the reference's own mauve cast (#91808c, sat ~18%) rather than
-    // the blue-white this used to carry, and the attenuation is short enough
-    // that the case reads as tinted acrylic instead of clear glass.
+    /* Clear acrylic, not tinted glass. The target's rim is four near-white
+     * hairlines (peak luma 250, 2-3 px) around mid-mauve flats (#9b8096 shadow
+     * side, #b095ad lit side, #d4c8d2 / #b6a9b3 mid steps): that is a polished
+     * transparent shell reflecting a bright studio, so transmission is high,
+     * roughness is low and the tint lives in a long attenuation distance
+     * rather than in `color`. The old 0.2 transmission + #8a7685 colour made
+     * the shell an opaque mauve box with no edge fire at all. */
     glass: new THREE.MeshPhysicalMaterial({
-      // mostly opaque, so the chamfer can take the key light: the reference's rim
-      // is dark on the left (#42333f) and lit on the right (#8a7685), and a fully
-      // transmissive shell shows only the dark back plate on both sides
-      transmission: 0.2,
-      thickness: 0.42,
-      roughness: 0.16,
+      transmission: 0.62,
+      thickness: 0.22,
+      roughness: 0.06,
       metalness: 0,
-      ior: 1.46,
-      clearcoat: 0.85,
-      clearcoatRoughness: 0.12,
-      color: new THREE.Color(REF_TONE.rimLit),
-      attenuationColor: new THREE.Color('#b7a2b4'),
-      attenuationDistance: 1.35,
-      envMapIntensity: 0.95,
-      roughnessMap: wear.roughness,
-      bumpMap: wear.bump,
-      bumpScale: 0.01,
-      side: THREE.DoubleSide,
-    }),
-    /**
-     * The front face plate: opaque mauve, #91808c in the reference. It was a
-     * 92%-transmissive pass, so the dark tray and label behind it showed through
-     * and the whole apron read as the interior (#322c31) instead of the face
-     * (#91808c). The reference's apron is solid face tone, so the plate is solid
-     * here too, with a light clearcoat for its sheen. The label and window are
-     * still holes in it, so their own plates show through as before.
-     */
-    face: new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(REF_TONE.faceMid),
-      roughness: 0.42,
-      metalness: 0,
-      clearcoat: 0.5,
-      clearcoatRoughness: 0.2,
-      envMapIntensity: 1,
+      ior: 1.49,
+      clearcoat: 1,
+      clearcoatRoughness: 0.06,
+      color: new THREE.Color('#ffffff'),
+      attenuationColor: new THREE.Color('#d8c8d6'),
+      attenuationDistance: 2.4,
+      envMapIntensity: 1.3,
       roughnessMap: wear.roughness,
       bumpMap: wear.bump,
       bumpScale: 0.006,
+      side: THREE.DoubleSide,
+    }),
+    /* The face plate is the rim ring between the silhouette and the frosted
+     * band: same acrylic a shade rougher, so its two bevels read as the second
+     * hairline pair (px 509 and 539) on a soft broad flat instead of mirroring. */
+    face: new THREE.MeshPhysicalMaterial({
+      transmission: 0.35,
+      thickness: 0.18,
+      roughness: 0.12,
+      metalness: 0,
+      ior: 1.49,
+      clearcoat: 1,
+      clearcoatRoughness: 0.1,
+      color: new THREE.Color('#efe6ee'),
+      attenuationColor: new THREE.Color('#c9b6c6'),
+      attenuationDistance: 1.6,
+      envMapIntensity: 1.15,
+      roughnessMap: wear.roughness,
+      bumpMap: wear.bump,
+      bumpScale: 0.004,
     }),
     // pit fake: low opacity + env map, no transmission pass
     glassCheap: new THREE.MeshPhysicalMaterial({
-      color: '#e4dbe4',
-      roughness: 0.2,
-      metalness: 0.04,
+      color: '#e9e0e9',
+      roughness: 0.12,
+      metalness: 0.02,
       clearcoat: 1,
-      clearcoatRoughness: 0.1,
+      clearcoatRoughness: 0.08,
       transparent: true,
-      opacity: 0.22,
-      envMapIntensity: 1.15,
-      ior: 1.46,
+      opacity: 0.2,
+      envMapIntensity: 1.3,
+      ior: 1.49,
       roughnessMap: wear.roughness,
       side: THREE.DoubleSide,
     }),
-    // frosted band: the moulded lip that runs around the window. The reference
-    // reads it *brighter* than the tray it sits on, so it stays near-white and
-    // semi-transparent rather than tinted.
+    /* The frosted band is the rim's inner step (px 521..545): measured mid
+     * mauve #b1a0b0 with a hairline on each bevel — not the near-white frost
+     * the old material used, which lit the whole rim like a lamp. */
     band: new THREE.MeshPhysicalMaterial({
-      color: '#eef1f7',
-      roughness: 0.26,
-      metalness: 0.1,
+      color: '#cbbcc9',
+      roughness: 0.18,
+      metalness: 0.05,
       clearcoat: 1,
-      clearcoatRoughness: 0.14,
+      clearcoatRoughness: 0.12,
       transparent: true,
-      opacity: 0.5,
-      envMapIntensity: 1.2,
+      opacity: 0.85,
+      envMapIntensity: 1.1,
     }),
-    // measured off the reference's plate: #3b2a36, not the near-black it was
-    label: new THREE.MeshStandardMaterial({ color: REF_TONE.plate, roughness: 0.62, metalness: 0.05 }),
-    // the rail between label and window. In the reference its body is the face
-    // tone; only its three tabs catch the light (below), so the body is not lit
-    // any brighter than the face it sits on.
-    ridge: new THREE.MeshStandardMaterial({ color: REF_TONE.faceMid, roughness: 0.42, metalness: 0 }),
-    // the bright tabs on the rail: #afa6af, the reference's measured highlight
-    ridgeTab: new THREE.MeshStandardMaterial({ color: REF_TONE.ridge, roughness: 0.3, metalness: 0 }),
-    // the tray underneath the window texture: the measured floor tone
-    tray: new THREE.MeshStandardMaterial({ color: REF_TONE.tray, roughness: 0.86, metalness: 0.04 }),
+    // the blank plate: the measured cool pale, with a soft moulded sheen
+    label: new THREE.MeshStandardMaterial({ color: REF_TONE.plate, roughness: 0.32, metalness: 0, }),
+    // the rail: one continuous bright moulding (no tabs in this reference)
+    ridge: new THREE.MeshStandardMaterial({ color: REF_TONE.ridge, roughness: 0.24, metalness: 0 }),
+    ridgeTab: new THREE.MeshStandardMaterial({ color: REF_TONE.ridge, roughness: 0.24, metalness: 0 }),
+    // the window floor: measured #64505e, flat, matte
+    tray: new THREE.MeshStandardMaterial({ color: REF_TONE.tray, roughness: 0.9, metalness: 0.02 }),
+    // card stock: a light board; only its cut edge sits in shadow
     cardBody: new THREE.MeshPhysicalMaterial({
-      color: REF_TONE.cardBodyInk,
-      roughness: 0.48,
+      color: '#d9dde3',
+      roughness: 0.5,
       metalness: 0.02,
-      clearcoat: 0.4,
+      clearcoat: 0.35,
       clearcoatRoughness: 0.3,
-      envMapIntensity: 0.7,
+      envMapIntensity: 0.6,
     }),
-    // the window's top lip. The reference's lip is bright (luma ~122 across
-    // x 515..976), not a dark pocket, so the ledges take its measured tone.
-    slot: new THREE.MeshStandardMaterial({ color: REF_TONE.lip, roughness: 0.35, metalness: 0 }),
+    // the window's top lip bar: measured #cbd1d8, polished
+    slot: new THREE.MeshStandardMaterial({ color: REF_TONE.lip, roughness: 0.16, metalness: 0 }),
     wear,
   };
   return materials;
@@ -217,7 +214,9 @@ export function Slab({
     };
   }, [card, tier]);
 
-  const labelTex = useMemo(() => getLabelTexture(card, false, tier), [card, tier]);
+  // the reference's plate is blank: a full-bleed cover ships in a blank-label
+  // case, so those cards get the pale blank plate rather than printed furniture
+  const labelTex = useMemo(() => getLabelTexture(card, !!card.fullBleed, tier), [card, tier]);
 
   // the card's own branded back: drawn fallback first, photo when it lands
   const [backTex, setBackTex] = useState<THREE.CanvasTexture>(() => latestBackTexture(card.back) ?? getBackTexture());
@@ -342,12 +341,16 @@ export function Slab({
               intensity={intensity}
               hoverBoost={1.5}
               cardAspect={SLAB_SPEC.cardW / SLAB_SPEC.cardH}
-              // UV space: v runs from the bottom, so the art window is
-              // [artBottom, 1 - artTop] vertically. The art frame is a hard
-              // 0.0163-wide ink line, so the foil stops on it.
-              mask={[SLAB_SPEC.artInset, SLAB_SPEC.artBottom, 1 - SLAB_SPEC.artInset, 1 - SLAB_SPEC.artTop]}
-              maskFeather={0.012}
-              outside={0.015}
+              // UV space: v runs from the bottom. A full-bleed cover foils over
+              // its whole face (feathered at the silhouette); a framed card
+              // stops its foil on the art frame's ink line.
+              mask={
+                card.fullBleed
+                  ? [0.02, 0.02, 0.98, 0.98]
+                  : [SLAB_SPEC.artInset, SLAB_SPEC.artBottom, 1 - SLAB_SPEC.artInset, 1 - SLAB_SPEC.artTop]
+              }
+              maskFeather={card.fullBleed ? 0.035 : 0.012}
+              outside={0}
               timeOffset={timeOffset}
             />
           </mesh>

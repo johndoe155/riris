@@ -23,13 +23,32 @@ import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
  * below, all near-neutral with the faintest mauve.
  */
 function StudioEnvironment() {
+  /*
+   * Rebuilt from `reference-image.jpg`'s own lighting evidence:
+   *   - the case's top edge hairline, the blank plate's sheen and both lip bars
+   *     are bright => one broad overhead softbox;
+   *   - the backdrop's right column is up to +74 luma over its left at the top
+   *     of frame => the key sits high and to the right;
+   *   - the cover reads a flat luma 233 across its whole face => a large, weak
+   *     frontal fill, not a raking light;
+   *   - the rim's bottom steps and the floor smear are pink => a bounce card
+   *     below, in the sweep's own hue.
+   * Nothing coloured: the photo's case carries the wall's mauve by reflection,
+   * not from a tinted source, so every former is near-neutral or pink-grey.
+   */
   return (
-    <Environment resolution={256} frames={1} environmentIntensity={2.4}>
-      <Lightformer form="rect" intensity={2.2} color="#fff6fa" position={[5.5, 5, -3]} rotation={[Math.PI * 0.12, 0, -Math.PI * 0.16]} scale={[13, 2.4, 1]} />
-      <Lightformer form="rect" intensity={0.4} color="#e6dce8" position={[-6, 1.5, -3]} rotation={[0, Math.PI * 0.32, 0]} scale={[12, 2.6, 1]} />
-      <Lightformer form="rect" intensity={0.5} color="#6d5b66" position={[0, -6, 2]} rotation={[-Math.PI * 0.4, 0, 0]} scale={[16, 3, 1]} />
-      {/* a narrow vertical strip: the hairline the moulding's bevel catches */}
-      <Lightformer form="rect" intensity={1.1} color="#ffffff" position={[3.2, 0, 3]} rotation={[0, -Math.PI * 0.18, 0]} scale={[0.7, 7, 1]} />
+    <Environment resolution={256} frames={1} environmentIntensity={2.2}>
+      {/* overhead softbox: the top hairline + plate sheen + lip bars */}
+      <Lightformer form="rect" intensity={2.6} color="#fff5fb" position={[0.4, 6, 1.2]} rotation={[-Math.PI / 2.15, 0, 0]} scale={[10, 5, 1]} />
+      {/* the key, high right: the backdrop's horizontal lift and the rim's lit side */}
+      <Lightformer form="rect" intensity={1.5} color="#f6e9f3" position={[6, 3.4, 2.2]} rotation={[0, -Math.PI / 2.6, -0.2]} scale={[7, 4, 1]} />
+      {/* large weak frontal fill: the cover's flat 233 */}
+      <Lightformer form="rect" intensity={0.75} color="#eef1f7" position={[0, 0.2, 7]} rotation={[0, 0, 0]} scale={[7, 7, 1]} />
+      {/* pink bounce off the sweep's floor */}
+      <Lightformer form="rect" intensity={0.55} color="#c98bb4" position={[0, -5.4, 2.4]} rotation={[Math.PI / 2.3, 0, 0]} scale={[12, 4, 1]} />
+      {/* two narrow vertical strips: the hairlines the rim's bevels catch */}
+      <Lightformer form="rect" intensity={1.2} color="#ffffff" position={[3.4, 0, 3]} rotation={[0, -Math.PI / 2.1, 0]} scale={[0.5, 7, 1]} />
+      <Lightformer form="rect" intensity={0.7} color="#f2e6f0" position={[-3.4, 0, 3]} rotation={[0, Math.PI / 2.1, 0]} scale={[0.5, 7, 1]} />
     </Environment>
   );
 }
@@ -120,9 +139,11 @@ export function ForgePreviewCanvas() {
         camera={{ position: [0, 0, 7.4], fov: 16 }}
       >
         <PerspectiveCamera makeDefault position={[0, 0, 7.4]} fov={16} />
-        {/* scaled ~2.7x from the first rig so front-facing surfaces return their measured tones (scripts/analysis/_tones.mjs) */}
-        <ambientLight intensity={1.5} />
-        <directionalLight position={[4, 5, 6]} intensity={2.1} />
+        {/* the photo's flats: overhead key, high-right key, weak frontal fill */}
+        <ambientLight intensity={1.15} />
+        <directionalLight position={[3.5, 6, 4]} intensity={1.7} />
+        <directionalLight position={[0, 0.5, 7]} intensity={0.55} />
+        <directionalLight position={[0, -4, 3]} intensity={0.3} color="#d9a2c4" />
 
         <StudioEnvironment />
         <MovingHighlights />
@@ -176,10 +197,12 @@ function FinishBloom() {
     finishType === 'gold' ? 0.85 :
     finishType === 'holo' ? 0.7 :
     finishType === 'cracked-ice' ? 0.4 :
-    0.12;
+    0.3;
   return (
     <EffectComposer multisampling={0}>
-      <Bloom mipmapBlur intensity={intensity} luminanceThreshold={0.9} luminanceSmoothing={0.18} radius={0.7} />
+      {/* threshold at the hairlines' luma (230/255 = 0.9): only the case's
+          edge fire blooms, never the cover (233 sRGB but tone-mapped under) */}
+      <Bloom mipmapBlur intensity={intensity} luminanceThreshold={0.88} luminanceSmoothing={0.12} radius={0.62} />
     </EffectComposer>
   );
 }

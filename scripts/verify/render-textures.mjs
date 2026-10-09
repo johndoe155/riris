@@ -47,7 +47,7 @@ const card = slabCards.find((c) => c.back === 'rainbow') ?? slabCards[0];
 const art = await loadImage(path.join(root, 'public', card.art.replace(/^\//, '')));
 const face = use.getCardFaceTexture(card, art, 'hero');
 write('card-face', face);
-write('label', use.getLabelTexture(card, false, 'hero'));
+write('label', use.getLabelTexture(card, !!card.fullBleed, 'hero'));
 write('label-blank', use.getLabelTexture(card, true, 'hero'));
 write('card-back-drawn', use.getBackTexture());
 write('card-back-branded', await use.ensureBackTexture(card.back));

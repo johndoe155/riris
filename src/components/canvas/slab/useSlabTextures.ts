@@ -117,6 +117,7 @@ export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): C
     artTop: SLAB_SPEC.artTop,
     artHeight: 1 - SLAB_SPEC.artTop - SLAB_SPEC.artBottom,
     artStroke: SLAB_SPEC.artStroke,
+    fullBleed: card.fullBleed,
   };
 }
 

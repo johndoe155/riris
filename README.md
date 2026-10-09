@@ -32,38 +32,28 @@ Open http://localhost:3000. Same dependency versions as the main project, so the
 
 ## Reference-parity pass (this branch)
 
-`reference-image.jpg` is the target. The numbers to build against were recovered
-from it first, with the scripts in `scripts/analysis/` (silhouette tracking,
-scan lines, corner arcs, a software rasteriser for the repo's own geometry), and
-the whole audit — measured table, layer-by-layer diagnostic, gap list and the
-exact math for the two changes that are easy to get wrong — is in
-**`docs/reference-parity.md`**. In short:
+`reference-image.jpg` is the target: a 1920x1920 photo of a blank-label slab
+holding a full-bleed zine cover, on a purple studio sweep with a glossy floor.
+The audit — measured table, layer-by-layer diagnostic, gap list and every
+change — is in **`docs/reference-parity.md`**, and every number in it is
+re-derivable with `scripts/analysis/_target_measure.mjs` (plus
+`_target_scan.mjs`, `_target_silhouette.mjs` and `_foil_cpu.mjs`, a CPU port of
+the foil shader evaluated in the photo's pose).
 
-- **Geometry.** The case was 7 px too tall (0.602 vs the measured 0.5959) and the
-  window sat 71 px high, which dragged the tray, card and apron down with it. The
-  ridge was 31 px high and only 0.84 wide where the reference has one full-width
-  moulding line at y 418..427 of 1116. The four "hanger wells" were 9 × 67 px
-  against a measured 60 × 15 px, and clamped *below* the card's top edge, so they
-  floated in front of the artwork. All fixed, and every feature is now within 1 px
-  except the window's own horizontal edges (see below).
-- **The moulding step.** The reference's front is two planes, not one: 10 px of
-  dark rim (`#42333f` on the left, `#8a7685` on the lit right) with a bright
-  hairline where the face plate's bevel turns, against a `#91808c` face. That
-  edge is the case's whole read, and the model did not have it — hence the new
-  `face` layer in `geometry.ts`.
-- **Colour.** The card body was white (`#fbfbfb`) where the reference's is
-  `#473642`; the label plate `#15151a` against `#3b2a36`; the tray carried a
-  gradient and a white "apron wash" the photo has no trace of. `REF_TONE` in
-  `SlabSpec.ts` now holds the measured tones and both the 2-D painters and the
-  3-D materials read from it.
-- **Light.** The environment's `#FF4D00` ring and `#00E5FF` circle (plus a cyan
-  point light) were the cause of the case's colour cast; the rig is now a neutral
-  key off the upper right, a cool fill and a dim bounce. The camera went from
-  `fov 32` to `fov 16`, because the reference is effectively orthographic.
-- **The shader.** The foil's mask is the measured art window with a 0.012 feather
-  and `uOutside` 0.015 (was 0.06 / 0.12, which smeared rainbow over the frame and
-  the card's text), and the polar spiral around the pointer is replaced by a
-  grating term — the anisotropic family of orders a real foil shows.
+Headline: the parity table this branch inherited was measured on
+`public/reference.jpg`, a *different* slab, so the spec, tones, painters, light
+rig and backdrop were all tuned to the wrong photo. Re-measured against the
+real target, the case is 930 x 1536 px at x 494..1424 / y 181..1717 (aspect
+0.6055, corner R 0.0484), the rim carries four bright hairlines instead of one
+step, the window sits a tenth of a case-height higher, the card is a
+full-bleed cover with no ring or frame, the label plate is blank pale
+`#e3e9f0`, the shell is clear acrylic rather than opaque mauve, and the foil
+is exactly zero at rest — the photo's cover is clean print.
+
+`verify:parity` now checks 34 features against `reference-image.jpg` and
+reports worst delta 1.97 px; the residual is the window's soft left edge (a
+14 px ramp where the acrylic wall darkens). Everything with a hard edge is
+inside 2 px.
 
 ### Porting back
 

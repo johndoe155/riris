@@ -21,10 +21,38 @@ export interface SlabCard {
   frame: 'dark' | 'light';
   /** which branded card back shows when the card is flipped */
   back: BackStyle;
+  /**
+   * The art panel IS the whole card face — no printed ring, frame or attribute
+   * furniture. `reference-image.jpg`'s card is one of these: its cover runs
+   * edge-to-edge under the acrylic, so the face painter and the foil mask both
+   * skip the furniture and use the full silhouette.
+   */
+  fullBleed?: boolean;
 }
 
 /** One entry per slab: real art panels extracted from cards.zip. */
 export const slabCards: SlabCard[] = [
+  {
+    // the slab `reference-image.jpg` photographs: a full-bleed zine cover in a
+    // blank-label case. It is the Forge default so the hero view and the photo
+    // are the same object, and `fullBleed` keeps its face furniture-free.
+    "id": "000",
+    "art": "/cards/rainbow-zine.jpg",
+    "title": "THE RAINBOW ZINE",
+    "collection": "Rainbow Zine",
+    "style": "base",
+    "type": "1/1",
+    "grade": "10",
+    "serial": "1/1",
+    "handle": "@rainbowzine",
+    "color": "#E3EAEF",
+    "color2": "#DDE5EE",
+    "price": "$48",
+    "year": "2026",
+    "frame": "light",
+    "back": "rainbow",
+    "fullBleed": true
+  },
   {
     "id": "001",
     "art": "/cards/Gpo4KaoWUAAhtXw.jpg",

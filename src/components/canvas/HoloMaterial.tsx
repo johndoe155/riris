@@ -55,7 +55,15 @@ const HoloShaderMaterial = shaderMaterial(
      */
     uMaskFeather: 0.012,
     /** how strongly the foil shows outside the mask (the photo shows none) */
-    uOutside: 0.015,
+    uOutside: 0,
+    /**
+     * 0 at rest, 1 while the card is held/hovered. `reference-image.jpg` shows
+     * a clean printed cover — luma 233 flat, no orders, no bands — so the foil
+     * has to be *off* until the view actually moves: every rest-state term the
+     * old shader carried (a 0.06 mask floor, a pointer glow of 0.45) painted
+     * rainbow over the middle of the art in the exact pose the photo holds.
+     */
+    uHover: 0,
   },
   // vertex
   /* glsl */ `
@@ -84,6 +92,7 @@ const HoloShaderMaterial = shaderMaterial(
     uniform vec4 uMask;
     uniform float uMaskFeather;
     uniform float uOutside;
+    uniform float uHover;
 
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -175,10 +184,13 @@ const HoloShaderMaterial = shaderMaterial(
       float w3 = max(0.0, 1.0 - abs(uFinish - 3.0));
       float wSum = max(w0 + w1 + w2 + w3, 0.0001);
 
-      // the foil is only lit where the view angle has moved it off the
-      // specular axis, plus where the pointer sits: much tighter than before,
-      // so the card's frame and inks stay flat ink at rest
-      float foilMask = clamp(fresnel * 0.72 + pointerGlow * 0.45 + 0.06, 0.0, 1.0);
+      /* The foil is lit only where the view has moved off the specular axis
+       * (fresnel + half-vector) and where the pointer sits, and the whole term
+       * is gated by uHover: at rest, front-on, the reference's cover carries no
+       * foil at all, so every constant floor is gone and the mask collapses to
+       * exactly zero in the photo's pose. */
+      float motion = clamp(fresnel * 1.15 + spec * 0.6, 0.0, 1.0);
+      float foilMask = clamp(motion * 0.72 + pointerGlow * 0.45, 0.0, 1.0) * uHover;
       foilMask *= 0.62 + noise(vUv * 8.0 + uTime * 0.08) * 0.38;
 
       float n1 = noise(vUv * 12.0 + 3.1);
@@ -189,18 +201,20 @@ const HoloShaderMaterial = shaderMaterial(
       vec3 goldB = vec3(0.62, 0.42, 0.09);
       vec3 gold = mix(goldB, goldA, sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0) * 0.5 + 0.5);
 
-      // base finish: the card's own ink, lifted only slightly by the view angle
+      /* Every finish amount is zero in the reference's pose (front-on, at
+       * rest): the photo's cover is the printed ink and nothing else, so each
+       * term starts from the view/motion response instead of a constant. */
       vec3 baseTint = vec3(1.0);
-      float baseAmt = 0.02 + fresnel * 0.04;
+      float baseAmt = fresnel * 0.05 * uHover;
 
       vec3 holoTint = foil;
-      float holoAmt = clamp(foilMask * 0.7 + spec * 0.35 + fresnel * 0.2, 0.0, 0.7);
+      float holoAmt = clamp(foilMask * 0.7 + spec * 0.35 + fresnel * 0.2, 0.0, 0.7) * uHover;
 
       vec3 iceTint = ice * (0.6 + crack * 0.4) + vec3(crack * 0.35);
-      float iceAmt = clamp(0.24 + fresnel * 0.3 + crack * 0.45 + spec * 0.3, 0.0, 0.8);
+      float iceAmt = clamp(fresnel * 0.3 + crack * 0.45 + spec * 0.3, 0.0, 0.8) * uHover;
 
       vec3 goldTint = gold;
-      float goldAmt = clamp(0.4 + fresnel * 0.3 + spec * 0.5, 0.0, 0.95);
+      float goldAmt = clamp(fresnel * 0.3 + spec * 0.5, 0.0, 0.95) * uHover;
 
       vec3 effectColor = (baseTint * baseAmt * w0 + holoTint * holoAmt * w1 +
                           iceTint * iceAmt * w2 + goldTint * goldAmt * w3) / wSum;
@@ -216,7 +230,7 @@ const HoloShaderMaterial = shaderMaterial(
         gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
       } else {
         /* ---- base: the art itself, with the finish mixed in ---- */
-        vec3 baseTier = img * (0.97 + fresnel * 0.1);
+        vec3 baseTier = img * (0.99 + fresnel * 0.1);
         vec3 holoTier = mix(img, foil, clamp(foilMask * 0.75, 0.0, 1.0));
         holoTier += foil * (fresnel * 0.35 + spec * 0.45);
         vec3 iceTier = mix(img, ice, clamp(0.18 + n1 * 0.22 + fresnel * 0.45, 0.0, 1.0));
@@ -228,10 +242,9 @@ const HoloShaderMaterial = shaderMaterial(
         vec3 tinted = (baseTier * w0 + holoTier * w1 + iceTier * w2 + goldTier * w3) / wSum;
         vec3 col = mix(img, tinted, uIntensity);
 
-        float vignette = 1.0 - smoothstep(0.5, 1.2, length(vUv - 0.5) * 1.5);
-        col *= 0.88 + vignette * 0.12;
-        col *= sin(vUv.y * 420.0) * 0.015 + 0.985;
-
+        /* No vignette, no scanline: the reference's cover is flat to +-1 luma
+         * across the face, and both effects were inventing structure the photo
+         * does not have (a 12% corner falloff and a 420-line comb). */
         gl_FragColor = vec4(col, 1.0);
       }
 
@@ -440,6 +453,7 @@ export function HoloCardMaterial({
     pointer: new THREE.Vector2(0.5, 0.5),
     finish: FINISH_INDEX[finish],
     intensity,
+    hover: 0,
   });
 
   const imageAspect = useMemo(() => textureAspect(image), [image]);
@@ -498,11 +512,15 @@ export function HoloCardMaterial({
 
     a.finish = THREE.MathUtils.damp(a.finish, FINISH_INDEX[finish], 5, delta);
     a.intensity = THREE.MathUtils.damp(a.intensity, intensity * (hovered ? hoverBoost : 1), 8, delta);
+    // the foil's rest state is exactly zero (see uHover), so hover ramps in
+    // over ~150ms instead of cutting: the foil "wakes up" as the card is picked
+    a.hover = THREE.MathUtils.damp(a.hover, hovered ? 1 : 0, 9, delta);
 
     u.uTime.value = state.clock.elapsedTime + timeOffset;
     u.uPointer.value.copy(a.pointer);
     u.uFinish.value = a.finish;
     u.uIntensity.value = a.intensity;
+    u.uHover.value = a.hover;
   });
 
   return <holoShaderMaterial ref={materialRef} />;

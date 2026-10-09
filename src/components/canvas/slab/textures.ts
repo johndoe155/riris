@@ -216,6 +216,8 @@ export interface CardFaceText {
   artHeight: number;
   /** stroke width of the art frame, as a fraction of the card width */
   artStroke?: number;
+  /** the art panel is the whole face: no ring, no frame, no furniture */
+  fullBleed?: boolean;
 }
 
 export function drawCardFace(
@@ -233,7 +235,9 @@ export function drawCardFace(
   // #473642, a mauve that is nothing like the near-black the old painter used.
   // The case's own transmission adds a veil on top of this, so the ink starts a
   // little under the measured value.
-  const paper = o.dark ? REF_TONE.cardBodyInk : '#F4F2EE';
+  // dark-frame bodies have no measurement in the target photo (its card is a
+  // light full-bleed cover); this is the legacy body tone for those cards
+  const paper = o.dark ? '#3a2b35' : '#F4F2EE';
 
   ctx.clearRect(0, 0, W, H);
   ctx.save();
@@ -242,6 +246,39 @@ export function drawCardFace(
   // ---- card body (the dark/light panel inside the frame)
   ctx.fillStyle = paper;
   ctx.fillRect(0, 0, W, H);
+
+  /* ---- full-bleed cover -------------------------------------------------
+   * `reference-image.jpg`'s card is one printed panel edge to edge: no paper
+   * ring, no ink frame, no attribute furniture. The cover is drawn over the
+   * whole silhouette and the only edge treatment is the 2-3 px shade the
+   * acrylic wall casts on it (measured: the cover's own edge column reads
+   * #3d2c36 against #e3eaef one column in). */
+  if (o.fullBleed) {
+    const ir = art ? art.width / art.height : W / H;
+    const wr = W / H;
+    let sx = 0, sy = 0, sw = art ? art.width : 1, sh = art ? art.height : 1;
+    if (art) {
+      if (ir > wr) { sw = art.height * wr; sx = (art.width - sw) / 2; }
+      else { sh = art.width / wr; sy = (art.height - sh) / 2; }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(art, sx, sy, sw, sh, 0, 0, W, H);
+    }
+    const edge = Math.max(2, W * 0.006);
+    const shade = (x0: number, y0: number, x1: number, y1: number, horiz: boolean) => {
+      const g = horiz ? ctx.createLinearGradient(x0, y0, x1, y1) : ctx.createLinearGradient(x0, y0, x1, y1);
+      g.addColorStop(0, 'rgba(38,26,36,0.5)');
+      g.addColorStop(1, 'rgba(38,26,36,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0) || W, Math.abs(y1 - y0) || H);
+    };
+    shade(0, 0, edge, 0, true);
+    shade(W, 0, W - edge, 0, true);
+    shade(0, 0, 0, edge, false);
+    shade(0, H, 0, H - edge, false);
+    ctx.restore();
+    return;
+  }
 
   /* ---- ring frame ----
    * Measured: the ring hugs the card's own edge (card x 0.0000..0.0163 and
@@ -454,15 +491,30 @@ export interface LabelText {
 
 export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   const { width: W, height: H } = o;
-  ctx.fillStyle = o.blank ? '#FFFFFF' : o.plate;
+  ctx.fillStyle = o.blank ? REF_TONE.plate : o.plate;
   ctx.fillRect(0, 0, W, H);
 
   if (o.blank) {
-    // blank variant: just the recessed frame, ready for the upload path
-    ctx.strokeStyle = '#D8D5D0';
-    ctx.lineWidth = W * 0.012;
-    roundRect(ctx, W * 0.03, H * 0.09, W * 0.94, H * 0.82, H * 0.12);
-    ctx.stroke();
+    /* Blank variant — and `reference-image.jpg`'s plate is exactly this: a flat
+     * cool pale (#e3e9f0, luma 232, uniform to +-1 across the plate) let into
+     * the case. The photo's only plate furniture is a 1-2 px darker rim where
+     * the recess wall turns (#cfcbd0) and a faint sheen along the top edge
+     * from the overhead key. Nothing else: no border, no mark, no type. */
+    const sheen = ctx.createLinearGradient(0, 0, 0, H);
+    sheen.addColorStop(0, 'rgba(255,255,255,0.05)');
+    sheen.addColorStop(0.18, 'rgba(255,255,255,0.0)');
+    sheen.addColorStop(0.85, 'rgba(120,110,125,0.0)');
+    sheen.addColorStop(1, 'rgba(120,110,125,0.05)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(150,145,158,0.55)';
+    ctx.lineWidth = Math.max(1, W * 0.0016);
+    ctx.strokeRect(0, 0, W, H);
+    const recess = ctx.createLinearGradient(0, 0, 0, H * 0.05);
+    recess.addColorStop(0, 'rgba(96,86,102,0.16)');
+    recess.addColorStop(1, 'rgba(96,86,102,0)');
+    ctx.fillStyle = recess;
+    ctx.fillRect(0, 0, W, H * 0.05);
     return;
   }
 
@@ -614,10 +666,10 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
    * plate, and the plate darkens very slightly toward the bottom edge.
    */
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#4a3c46');
-  g.addColorStop(0.37, '#483a45');
-  g.addColorStop(0.75, '#463843');
-  g.addColorStop(1, '#41323e');
+  g.addColorStop(0, REF_TONE.trayTop);
+  g.addColorStop(0.37, REF_TONE.tray);
+  g.addColorStop(0.75, REF_TONE.tray);
+  g.addColorStop(1, REF_TONE.trayBottom);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
@@ -678,33 +730,61 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
   ctx.fillStyle = top;
   ctx.fillRect(0, 0, w, h * 0.045);
 
-  // side rails: a shade lighter than the plate on the key-light side (right),
-  // and a hair darker on the left — measured 0.04 luma either way, no more
-  const lightL = ctx.createLinearGradient(0, 0, w * 0.06, 0);
-  lightL.addColorStop(0, 'rgba(0,0,0,0.14)');
-  lightL.addColorStop(0.55, 'rgba(198,208,226,0.05)');
-  lightL.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = lightL;
-  ctx.fillRect(0, 0, w * 0.06, h);
-  const lightR = ctx.createLinearGradient(w, 0, w * 0.94, 0);
-  lightR.addColorStop(0, 'rgba(198,208,226,0.16)');
-  lightR.addColorStop(0.5, 'rgba(198,208,226,0.05)');
-  lightR.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = lightR;
-  ctx.fillRect(w * 0.94, 0, w * 0.06, h);
+  /* The two polished retaining rails that hug the card's left/right edges.
+   * Measured on the target: 11 px bright lines (#c0b9bf left, #d7d4d9 right —
+   * the right one catches the key) running y 602..1535, each with a 2-3 px
+   * dark shadow on the card side where the rail stands proud of the floor.
+   * They are painted because in the photo they are flat: no relief, no
+   * specular travel, just two bright die-cut lines. */
+  for (const [k, r] of (layout.rails ?? []).entries()) {
+    const rx = r.x * w;
+    const ry = r.y * h;
+    const rw = Math.max(2, r.w * w);
+    const rh = r.h * h;
+    const tone = k === 0 ? 'rgba(192,185,191,0.9)' : 'rgba(215,212,217,0.95)';
+    ctx.fillStyle = tone;
+    ctx.fillRect(rx, ry, rw, rh);
+    // rounded ends: the rails fade out over their last ~8 px
+    const fade = ctx.createLinearGradient(0, ry + rh - h * 0.012, 0, ry + rh);
+    fade.addColorStop(0, 'rgba(0,0,0,0)');
+    fade.addColorStop(1, REF_TONE.trayBottom);
+    ctx.fillStyle = fade;
+    ctx.fillRect(rx, ry + rh - h * 0.012, rw, h * 0.012);
+    const fadeT = ctx.createLinearGradient(0, ry, 0, ry + h * 0.012);
+    fadeT.addColorStop(0, REF_TONE.tray);
+    fadeT.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = fadeT;
+    ctx.fillRect(rx, ry, rw, h * 0.012);
+    // the shadow the rail casts on the card side
+    const sx = k === 0 ? rx + rw : rx - Math.max(1, w * 0.004);
+    const sh = ctx.createLinearGradient(k === 0 ? sx : sx + w * 0.004, 0, k === 0 ? sx + w * 0.004 : sx, 0);
+    sh.addColorStop(0, 'rgba(20,12,20,0.5)');
+    sh.addColorStop(1, 'rgba(20,12,20,0)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(Math.min(sx, sx + w * 0.004), ry, w * 0.004, rh);
+  }
 
-  // and the bottom ledge the card leans on: 0.06 luma darker than the middle,
-  // with a pale lip where the moulding turns
-  const bottom = ctx.createLinearGradient(0, h, 0, h * 0.95);
-  bottom.addColorStop(0, 'rgba(0,0,0,0.20)');
-  bottom.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = bottom;
-  ctx.fillRect(0, h * 0.95, w, h * 0.05);
-  const bottomLip = ctx.createLinearGradient(0, h, 0, h * 0.97);
-  bottomLip.addColorStop(0, 'rgba(196,206,224,0.14)');
-  bottomLip.addColorStop(1, 'rgba(196,206,224,0)');
-  ctx.fillStyle = bottomLip;
-  ctx.fillRect(0, h * 0.97, w, h * 0.03);
+  /* The bottom lip bar: px y 1588..1602, x 642..1270 — a bright moulded bar
+   * (#c7d4e3, luma ~205) under the card, the mirror of the window's top lip,
+   * with the dark pocket line above it where the card's bottom edge sits. */
+  const lb = layout.lipBottom;
+  if (lb) {
+    const lx = lb.x * w;
+    const ly = lb.y * h;
+    const lw = lb.w * w;
+    const lh = Math.max(2, lb.h * h);
+    const pocket = ctx.createLinearGradient(0, ly - h * 0.008, 0, ly);
+    pocket.addColorStop(0, 'rgba(0,0,0,0)');
+    pocket.addColorStop(1, 'rgba(18,10,18,0.55)');
+    ctx.fillStyle = pocket;
+    ctx.fillRect(lx, ly - h * 0.008, lw, h * 0.008);
+    const bar = ctx.createLinearGradient(0, ly, 0, ly + lh);
+    bar.addColorStop(0, 'rgba(231,238,246,0.95)');
+    bar.addColorStop(0.5, REF_TONE.lipBottom);
+    bar.addColorStop(1, 'rgba(140,150,168,0.55)');
+    ctx.fillStyle = bar;
+    ctx.fillRect(lx, ly, lw, lh);
+  }
 }
 
 export function buildTrayTexture(w = 512, h = 768, layout: TrayLayout = trayLayout()): THREE.CanvasTexture {

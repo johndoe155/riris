@@ -2,33 +2,40 @@
  * Every measurement of the graded-card slab, in one place, so tuning is a
  * one-line change and both scenes follow.
  *
- * ALL of these numbers come from `reference-image.jpg`, measured by the
- * scripts in `scripts/analysis/` (see `docs/reference-parity.md` for the table
- * and the diffs). The photo is close to orthographic — the slab box is
- * 665 x 1116 px against a true 1 : 1.678 — so a pixel fraction of that box *is*
- * the dimension, and every number below is a real measurement rather than a
- * guess. Two conventions:
+ * ALL of these numbers come from `reference-image.jpg` (1920 x 1920), re-derived
+ * on this branch by `scripts/analysis/_target_measure.mjs` (silhouette tracking
+ * by absolute-luma threshold, run/colour profiles along the key scanlines in
+ * `_target_scan.mjs`, corner arcs and tone means here and in the same script).
+ * An earlier table measured `public/reference.jpg` — a different slab, the dark
+ * Ghost-Lab card — and its case box (412..1077 x 187..1303) is not where the
+ * case sits in this photo, so every feature below was re-measured.
+ *
+ * The photo is close to orthographic — the case box is 930 x 1536 px against a
+ * true 1 : 1.6505 — so a pixel fraction of that box *is* the dimension. Two
+ * conventions:
  *
  *   x, z : world units. The slab is 1 wide, so an x fraction of the photo's
- *          slab box is the world number directly.
- *   y    : world units, measured DOWN from the slab's top edge. Multiply the
- *          photo's y fraction by h (1.677) to get it.
+ *          case box is the world number directly.
+ *   y    : world units, measured DOWN from the case's top edge. Multiply the
+ *          photo's y fraction by h (1.6505) to get it.
  *
- * Measured feature table (photo px → slab fractions / world units):
+ * Measured feature table (photo px, case box x 494..1424 / y 181..1717):
  *
- *   case             665 x 1116 px                     1 x 1.677
- *   corner radius    76.5 px                           R 0.115 (of min(w,h))
- *   corner profile   superellipse, exponent ~5.2       cornerPower 5.2
- *   outer chamfer    10 px (a dark band inside the edge) stepInset 0.015
- *   label plate      x 452..1036, y 227..379           x +-0.4391, top 0.0600, h 0.2284
- *   ridge rail       y 418..427, x 435..1055 (inner frame) top 0.3472, h 0.0134
- *   ridge tabs       x 459..512, 719..771, 982..1036   w 0.080, the only bright parts of the rail
- *   window lip       x 515..976, y 474..484 (bright)   one bar, w 0.6933, h 0.0150
- *   window opening   x 465..1030, y 470..1295          w 0.8496, top 0.4253, h 1.2396
- *   card             x 500..991,  y 508..1240          w 0.7384, top 0.4823, h 1.1000
- *   card ring        paper 0..8 px, ink band 10..25 px  ringInset 0.0203, stroke 0.0305 card-w
- *   art window       ink x 532..536 / 957..961,        inset 0.0630 card-w,
- *                        y 535..541 / 964..970          top 0.0365, bottom 0.3680 card-h
+ *   case             930 x 1536 px                    1 x 1.6505
+ *   corner radius    45 px                            R 0.0484 (of min(w,h))
+ *   corner profile   near-circular, slightly square   cornerPower 3.0
+ *   moulded rim      51 px, four bright hairlines     stepInset 0.0161 + band
+ *                    494 / 509 / 521 / 539            windowBand 0.0258
+ *   label plate      x 583..1337, y 239..437          w 0.8108, top 0.0622, h 0.2129
+ *   moulding rail    y 446..479, x 545..1370          top 0.2849, h 0.0354
+ *   window opening   x 545..1370, y 480..1658         w 0.8871, top 0.3214, h 1.2626
+ *   card             x 590..1328, y 560..1580         w 0.7935, top 0.4073, h 1.0960
+ *   card corner      48 px                            cardRadius 0.0516
+ *   lip bar (top)    x 642..1270, y 543..548          w 0.6753, h 0.0054
+ *   lip bar (bottom) x 642..1270, y 1588..1602        painted in the tray texture
+ *   retaining rails  x 576..587 / 1327..1338,         painted in the tray texture
+ *                    y 602..1535
+ *   card face        full-bleed cover — no ring, no frame, no furniture
  *
  * The z stack is the real thing, front to back (all world units, slab 1 wide):
  *
@@ -49,15 +56,17 @@ export interface SlabSpec {
   h: number;
   /** corner radius as a fraction of min(w, h) */
   radius: number;
-  /** 2 = circular fillet, 5.2 = the reference's squircle */
+  /** 2 = circular fillet, 5.2 = a squircle; the target's corner is near-circular */
   cornerPower: number;
   /** how far the rounded edge wraps over the front/back faces */
   bevel: number;
   /**
-   * Inset of the front face plate from the outline. The measured 10 px band
-   * between the silhouette and the first bright line on the front: the case's
-   * moulded rim. It reads *darker* than the face it borders, which is what
-   * makes the slab look like a moulding rather than a flat box.
+   * Inset of the front face plate from the outline. The target's rim carries
+   * four bright hairlines at px 494 / 509 / 521 / 539: the silhouette bevel,
+   * the face plate's outer bevel, the frosted band's outer bevel and the band's
+   * inner bevel at the window edge. The face plate therefore starts at the
+   * second line — 15 px in, not the 51 px rim width — and the band covers the
+   * rest of the rim down to the opening.
    */
   stepInset: number;
   /** how far the face plate stands proud of the shell body */
@@ -86,10 +95,9 @@ export interface SlabSpec {
 
   /* ---- ridge: the moulded rail between the label and the window ---- */
   /**
-   * How far in from the slab's edge the rail ends. The reference's rail is the
-   * top of an inner frame: its line runs x 435..1055 (inset 0.034), not out to
-   * the rim. The old inset (0.015) ran the rail's bright edge to both sides of
-   * the slab, which is the stray line across the whole case.
+   * How far in from the slab's edge the rail ends: the target's rail runs
+   * x 545..1370, i.e. exactly the window's width — it is the top of the inner
+   * frame, not a full-face line.
    */
   ridgeInset: number;
   ridgeH: number;
@@ -98,8 +106,9 @@ export interface SlabSpec {
   /** how far the ridge stands proud of the face */
   ridgeLift: number;
   /**
-   * Centres (world x) of the three bright tabs on the rail, and their width.
-   * Only the tabs catch the light; between them the rail reads as the face.
+   * Centres (world x) of bright tabs on the rail. The target's rail is one
+   * continuous moulding — its highlight runs the full inner width with no
+   * tabs — so this is empty and the rail body carries the highlight.
    */
   ridgeTabs: number[];
   ridgeTabW: number;
@@ -110,7 +119,7 @@ export interface SlabSpec {
   /** window top, from the slab's top edge */
   windowTop: number;
   windowRadius: number;
-  /** frosted band around the window on the front face */
+  /** frosted band around the window on the front face: px 521..545 of the rim */
   windowBand: number;
 
   /* ---- card ---- */
@@ -123,21 +132,23 @@ export interface SlabSpec {
   cardGap: number;
 
   /* ---- card face layout (fractions of the card) ---- */
-  /** inset of the printed ring at the card's edge */
+  /**
+   * The target's card is a full-bleed cover: there is no printed ring at its
+   * edge and no ink frame around an art window, so all four furniture numbers
+   * are zero and both the face painter and the foil mask use the whole face.
+   */
   ringInset: number;
   ringWidth: number;
-  /** inset of the art frame's stroke (its outer edge) */
   artInset: number;
-  /** stroke width of the art frame */
   artStroke: number;
   artTop: number;
   artBottom: number;
 
   /* ---- furniture ---- */
   /**
-   * The window's top lip: one bright bar along the top of the opening, x 515..976
-   * and y 474..484 in the photo. It was modelled as four 60 px ledges, which left
-   * dark gaps where the photo's lip is continuous, so it is now one bar.
+   * The window's top lip: one bright bar at px y 543..548, x 642..1270 — 63 px
+   * below the window's top edge, i.e. inside the apron above the card, not at
+   * the opening itself.
    */
   slotTop: number;
   slotH: number;
@@ -147,12 +158,12 @@ export interface SlabSpec {
 
 export const SLAB_SPEC: SlabSpec = {
   w: 1,
-  h: 1.6770,
+  h: 1.6505,
 
-  radius: 0.115,
-  cornerPower: 5.2,
+  radius: 0.0484,
+  cornerPower: 3.0,
   bevel: 0.012,
-  stepInset: 0.015,
+  stepInset: 0.0161,
   faceLift: 0.008,
 
   zFront: 0.045,
@@ -164,56 +175,49 @@ export const SLAB_SPEC: SlabSpec = {
   zBackPlateFront: -0.028,
   zBack: -0.045,
 
-  /** x 452..1036 px of the 665 px case: 584/665 */
-  labelW: 0.8781,
-  labelH: 0.2284,
-  labelTop: 0.0600,
-  labelRadius: 0.034,
+  /** x 583..1337 px of the 930 px case: 754/930 */
+  labelW: 0.8108,
+  labelH: 0.2129,
+  labelTop: 0.0622,
+  /** the plate's corners are near-square: ~6 px on a 754 px plate */
+  labelRadius: 0.008,
   labelD: 0.026,
   labelBorder: 0.0115,
 
-  ridgeInset: 0.034,
-  ridgeH: 0.0137,
-  ridgeTop: 0.3472,
+  ridgeInset: 0.05645,
+  ridgeH: 0.0354,
+  ridgeTop: 0.2849,
   ridgeLift: 0.004,
-  // tab centres 459..512, 719..771, 982..1036 px of the 665 px case, as
-  // (px centre - 744.5) / 665; the three tabs are 52..54 px wide
-  ridgeTabs: [-0.3895, 0.0008, 0.3963],
+  // the target's rail has no tabs: one continuous moulding line
+  ridgeTabs: [],
   ridgeTabW: 0.08,
 
-  windowW: 0.8496,
-  windowH: 1.2396,
-  windowTop: 0.4253,
-  windowRadius: 0.05,
-  windowBand: 0.014,
+  windowW: 0.8871,
+  windowH: 1.2658,
+  windowTop: 0.3214,
+  windowRadius: 0.035,
+  windowBand: 0.0258,
 
-  cardW: 0.7384,
-  cardH: 1.1000,
-  // centre y, measured down from the top: (0.2876 + 0.9435) / 2 * 1.677 = 1.0324
-  cardY: 1.6770 / 2 - 1.0324,
-  cardRadius: 0.042,
+  cardW: 0.7935,
+  cardH: 1.096,
+  // centre y, measured down from the top: (0.4073 + 0.4073 + 1.0960) / 2
+  cardY: 1.6505 / 2 - (0.4073 + 1.096 / 2),
+  cardRadius: 0.0516,
   cardGap: 0.012,
 
-  // the reference card at mid-height: paper 500..508 (outer 8 px), ink 510..526,
-  // paper 528..534, art from 536. 10 px of 492 = 0.0203; the ink band is 15-16 px = 0.0305
-  ringInset: 0.0203,
-  ringWidth: 0.0305,
-  /**
-   * The art frame's *outer* edge, as a fraction of the card width. Measured
-   * from the frame's ink: x 532..536 (left) and 957..961 (right) of a card
-   * spanning 500..991, so the outer edges average 0.0630 of the card width in.
-   */
-  artInset: 0.063,
-  /** the frame's ink line: 4 px on a 492 px card */
-  artStroke: 0.0081,
-  artTop: 0.0365,
-  artBottom: 0.368,
+  // full-bleed cover: no ring, no frame
+  ringInset: 0,
+  ringWidth: 0,
+  artInset: 0,
+  artStroke: 0,
+  artTop: 0,
+  artBottom: 0,
 
-  // 4 px below the window's top edge (474 px), 10 px tall, in world units
-  slotTop: 0.006,
-  slotH: 0.015,
-  // x 515..976 px of the 665 px case: 461 / 665, in world x
-  slotW: 0.6933,
+  // 63 px below the window's top edge (543 px), 5 px tall, in world units
+  slotTop: 0.0677,
+  slotH: 0.0054,
+  // x 642..1270 px of the 930 px case: 628 / 930, in world x
+  slotW: 0.6753,
   slots: 1,
 };
 
@@ -262,9 +266,7 @@ export function slabLayers(spec: SlabSpec = SLAB_SPEC): SlabLayers {
   /*
    * With one lip bar (`slots` 1) this is just its centre. For more than one, the
    * ledges spread across the middle of the window, each clear of its
-   * neighbours and of the window's walls. (The old rule — `windowW - slotW * 8`
-   * — assumed a 14 px-wide ledge; at the measured 60 px it collapsed the span to
-   * less than one ledge and stacked all four on top of each other.)
+   * neighbours and of the window's walls.
    */
   const span = Math.max(spec.slotW * 1.5, windowW - spec.slotW * 3.2);
   const slotX: number[] = [];
@@ -313,6 +315,14 @@ export interface TrayLayout {
   card: { x: number; y: number; w: number; h: number };
   /** retaining wells (fractions of the plane) */
   slots: { x: number; y: number; w: number; h: number }[];
+  /**
+   * The two polished retaining rails that hug the card's left/right edges
+   * (px x 576..587 and 1327..1338, y 602..1535): bright 11 px lines on the
+   * dark tray. Painted, not modelled — they are flat in the photo.
+   */
+  rails: { x: number; y: number; w: number; h: number }[];
+  /** the bottom lip bar (px y 1588..1602, x 642..1270), painted for the same reason */
+  lipBottom: { x: number; y: number; w: number; h: number };
 }
 
 export function trayLayout(spec: SlabSpec = SLAB_SPEC, layers: SlabLayers = slabLayers(spec)): TrayLayout {
@@ -324,6 +334,15 @@ export function trayLayout(spec: SlabSpec = SLAB_SPEC, layers: SlabLayers = slab
 
   const cardTop = spec.cardY + spec.cardH / 2;
   const slotTopWorld = layers.windowY + spec.windowH / 2 - spec.slotTop;
+  /* photo px -> world x / world y-down, through the case box (930 x 1536 px) */
+  const pxX = (px: number) => (px - 494) / 930 - 0.5;
+  const pxY = (px: number) => ((px - 181) / 1536) * spec.h;
+  const rail = (x0: number, x1: number): { x: number; y: number; w: number; h: number } => ({
+    x: fx((pxX(x0) + pxX(x1)) / 2) - ((x1 - x0) / 930) / planeW / 2,
+    y: fy(pxY(602)),
+    w: (x1 - x0) / 930 / planeW,
+    h: (pxY(1535) - pxY(602)) / planeH,
+  });
   return {
     planeW,
     planeH,
@@ -339,38 +358,59 @@ export function trayLayout(spec: SlabSpec = SLAB_SPEC, layers: SlabLayers = slab
       w: spec.slotW / planeW,
       h: spec.slotH / planeH,
     })),
+    rails: [rail(576, 587), rail(1327, 1338)],
+    lipBottom: {
+      x: fx((pxX(642) + pxX(1270)) / 2) - (628 / 930) / planeW / 2,
+      y: fy(pxY(1588)),
+      w: 628 / 930 / planeW,
+      h: (pxY(1602) - pxY(1588)) / planeH,
+    },
   };
 }
 
 /* ------------------------------------------------------------------ *
  * Reference tones
  *
- * Sampled straight off reference-image.jpg. Keeping them here (rather than in
+ * Sampled straight off reference-image.jpg (5x5 means, see
+ * `scripts/analysis/_target_measure.mjs`). Keeping them here (rather than in
  * the material set) means the 2-D painters and the 3-D materials can never
  * drift apart, and it documents what each surface is supposed to read as.
  * ------------------------------------------------------------------ */
 
 export const REF_TONE = {
-  /** the case's front face, top strip (catches the overhead light) */
-  faceTop: '#baa9b5',
-  /** the case's front face, mid (beside the window) */
-  faceMid: '#91808c',
-  /** the case's chamfered rim, left edge (in shadow) */
-  rimDark: '#42333f',
-  /** the case's chamfered rim, right edge (lit) */
-  rimLit: '#8a7685',
-  /** the ridge's highlight */
-  ridge: '#afa6af',
-  /** the tray / window floor — mauve smoke, and remarkably flat */
-  tray: '#483a45',
-  /** the label plate */
-  plate: '#3b2a36',
-  /** the card's printed body, as it reads *through* the acrylic */
-  cardInk: '#473642',
-  /** the card's body before the case's veil: cardInk minus the transmission lift */
-  cardBodyInk: '#3a2b35',
-  /** the card's frame ink */
-  cardPaper: '#fbf9fb',
-  /** the window's top lip: mean luma 122 across x 540..950, rows 476..482 */
-  lip: '#857683',
+  /** the rim's outer band, shadow side (left) */
+  rimDark: '#9b8096',
+  /** the rim's outer band, lit side (right) */
+  rimLit: '#b095ad',
+  /** the rim's mid step, left — the brightest flat on the case */
+  rimMidLeft: '#d4c8d2',
+  /** the rim's mid step, right */
+  rimMidRight: '#b6a9b3',
+  /** the case's edge hairlines (peak luma ~250, 2-3 px wide) */
+  edgeHairline: '#f6eef6',
+  /** the moulding rail between label and window */
+  ridge: '#c4b7c2',
+  /** the tray / window floor — dark mauve, flat, slightly lighter at the top */
+  tray: '#64505e',
+  trayTop: '#705969',
+  trayBottom: '#5d4555',
+  /** the blank label plate: a cool pale blue-white */
+  plate: '#e3e9f0',
+  /** the card's printed cover, as it reads *through* the acrylic */
+  cardPaper: '#e3eaef',
+  /** the card stock's edge, in shadow at the cutout */
+  cardEdge: '#3d2c36',
+  /** the window's top lip bar and the bottom one */
+  lip: '#cbd1d8',
+  lipBottom: '#c7d4e3',
+  /** the two retaining rails beside the card */
+  rail: '#cbc7cc',
+  /** backdrop: wall top, wall mid (darkest), wall at the floor line */
+  wallTop: '#a886a1',
+  wallMid: '#2b1429',
+  wallFloor: '#5e3b55',
+  /** backdrop: the floor, its centre reflection, and the contact shadow */
+  floor: '#55334c',
+  floorReflection: '#806578',
+  contact: '#492d42',
 } as const;
