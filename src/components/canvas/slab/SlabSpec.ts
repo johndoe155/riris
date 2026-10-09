@@ -148,7 +148,13 @@ export interface SlabSpec {
 
 export const SLAB_SPEC: SlabSpec = {
   w: 1,
-  h: 1.6770,
+  /* The case is deliberately taller than the reference photo's 1.677: the
+   * bottom is extended so the margin between the card's bottom edge and the
+   * slab's bottom edge equals the sideways margin between the card and the
+   * slab's side edges ((1 - cardW) / 2 = 0.1308). Card bottom sits 1.5824
+   * down from the top, so h = 1.5824 + 0.1308. Every feature above is
+   * anchored from the top edge and is unchanged; only the bottom grows. */
+  h: 1.7132,
 
   radius: 0.115,
   cornerPower: 5.2,
@@ -190,7 +196,7 @@ export const SLAB_SPEC: SlabSpec = {
   cardW: 0.7384,
   cardH: 1.1000,
   // centre y, measured down from the top: (0.2876 + 0.9435) / 2 * 1.677 = 1.0324
-  cardY: 1.6770 / 2 - 1.0324,
+  cardY: 1.7132 / 2 - 1.0324,
   cardRadius: 0.042,
   cardGap: 0.012,
 

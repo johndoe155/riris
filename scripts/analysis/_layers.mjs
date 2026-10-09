@@ -10,8 +10,8 @@ const name = (x, y) => {
   for (let k = 0; k < PALETTE.length; k++) if (Math.abs(c[0]-PALETTE[k][0])<20 && Math.abs(c[1]-PALETTE[k][1])<20 && Math.abs(c[2]-PALETTE[k][2])<20) return IDS[k];
   return c[0]===0&&c[1]===0&&c[2]===0 ? 'bg' : '?';
 };
-const R = { x: 412, y: 187, y1: 1303 };
-const fy = (y) => ((y - R.y) / 1116).toFixed(4);
+const R = { x: 412, y: 187, y1: 1327 };
+const fy = (y) => ((y - R.y) / 1140).toFixed(4);
 function runs(x, y0, y1) {
   const out = []; let cur = null;
   for (let y = y0; y <= y1; y++) {
@@ -23,11 +23,11 @@ function runs(x, y0, y1) {
   return out.filter((r) => r.y1 - r.y0 >= 2);
 }
 console.log('=== render, centre column x=744, top→bottom ===');
-for (const r of runs(744, 186, 1306)) console.log(`  ${r.n.padEnd(10)} y ${String(r.y0).padStart(5)}..${String(r.y1).padStart(5)}  frac ${fy(r.y0)}..${fy(r.y1)}`);
+for (const r of runs(744, 186, 1330)) console.log(`  ${r.n.padEnd(10)} y ${String(r.y0).padStart(5)}..${String(r.y1).padStart(5)}  frac ${fy(r.y0)}..${fy(r.y1)}`);
 console.log('\n=== render, column x=470 (inside left wall) ===');
-for (const r of runs(470, 186, 1306)) console.log(`  ${r.n.padEnd(10)} y ${String(r.y0).padStart(5)}..${String(r.y1).padStart(5)}  frac ${fy(r.y0)}..${fy(r.y1)}`);
+for (const r of runs(470, 186, 1330)) console.log(`  ${r.n.padEnd(10)} y ${String(r.y0).padStart(5)}..${String(r.y1).padStart(5)}  frac ${fy(r.y0)}..${fy(r.y1)}`);
 console.log('\n=== render, column x=1010 (inside right wall) ===');
-for (const r of runs(1010, 186, 1306)) console.log(`  ${r.n.padEnd(10)} y ${String(r.y0).padStart(5)}..${String(r.y1).padStart(5)}  frac ${fy(r.y0)}..${fy(r.y1)}`);
+for (const r of runs(1010, 186, 1330)) console.log(`  ${r.n.padEnd(10)} y ${String(r.y0).padStart(5)}..${String(r.y1).padStart(5)}  frac ${fy(r.y0)}..${fy(r.y1)}`);
 function hrun(y, x0, x1) {
   const out = []; let cur = null;
   for (let x = x0; x <= x1; x++) {

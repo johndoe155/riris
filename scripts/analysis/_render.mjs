@@ -19,7 +19,7 @@ const { SLAB_SPEC, slabLayers } = await jiti.import(root + 'src/components/canva
 
 const PXW = 1488, PXH = 1484;
 const S = 665;                       // px per world unit (measured slab width)
-const CX = (412 + 1077) / 2, CY = (187 + 1303) / 2;  // slab box centre → world origin
+const CX = (412 + 1077) / 2, CY = (187 + 1327) / 2;  // slab box centre → world origin
 const proj = (x, y) => [CX + x * S, CY - y * S];
 
 const geo = buildSlabGeometry('hero');

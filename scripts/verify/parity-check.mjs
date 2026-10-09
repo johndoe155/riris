@@ -26,7 +26,10 @@ const { SLAB_SPEC } = await jiti.import(root + 'src/components/canvas/slab/SlabS
 const { buildSlabGeometry } = await jiti.import(root + 'src/components/canvas/slab/geometry.ts');
 
 /** the case box in reference-image.jpg, px — background-deviation tracked */
-const CASE = { w: 665, h: 1116, x0: 412, y0: 187, x1: 1077, y1: 1303 };
+/* the design extends the case 0.0362 world (~24 px) past the photo's bottom
+ * weld zone so the card's bottom margin equals its sideways margin; every
+ * feature above is top-anchored, so the px scale (CASE.h / S.h) is unchanged */
+const CASE = { w: 665, h: 1140, x0: 412, y0: 187, x1: 1077, y1: 1327 };
 /** tolerance: how far a feature may sit from the photo before this fails */
 const TOL = 3.5;
 
@@ -49,7 +52,7 @@ const placedBox = (g, at) => {
 };
 
 const MODEL = {
-  'case aspect (w/h)': [S.w / S.h, 665 / 1116],
+  'case aspect (w/h)': [S.w / S.h, 665 / 1140],
   'case corner radius (of min(w,h))': [S.radius, 76.5 / 665],
 
   'label left': [fxc(-S.labelW / 2), 452 - CASE.x0, 'px'],
