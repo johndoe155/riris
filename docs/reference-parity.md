@@ -320,3 +320,40 @@ OK - every measured feature of the slab matches reference-image.jpg
   reference — it is a flat-lit frontal shot of a `base` card. Their behaviour was
   tightened (masking, grating) but not "matched", because there is nothing to
   match them against.
+
+## Reference swap and material pass (2026-10-09)
+
+**The reference has changed.** `reference-image.jpg` is now a 1920 × 1920 photo
+of a different slab: a white, full-bleed printed card ("THE RAINBOW zine") with
+painted mint, blue, magenta and yellow corner blobs, no art window and no
+furniture. `public/reference.jpg` (1488 × 1484) is still the image every number
+above was measured on, so `verify:parity` passing says the spec matches the
+**old** photo, not this one.
+
+Re-measured on the new photo (`reference-image.jpg`, pixel-sampled):
+
+| Feature | New photo | Spec (old photo) |
+| --- | --- | --- |
+| card paper box | x 593..1324, y ~562..1580 → 731 × ~1018 px, ratio ~0.72 (standard poker card) | x 0.1323..0.8707 of case |
+| card paper inside the case (case ≈ x 496..1424, y 169..1712, approx.) | x 0.105..0.892, y ~0.255..0.915 | x 0.132..0.871, y 0.288..0.944 |
+| label plate | x 582..1337, y 239..438 | x 0.060..0.938, y 0.036..0.172 |
+| card palette | paper `#dde8f1` (luma 228..234 across the face), mint `#8de3c4`, blue `#8dd3f8`, magenta `#ef6acb`, yellow `#f9dd67`, title ink `#1d262c` | `#473642` ink, art window |
+
+So the geometry is **not** the measured spec any more: the card is wider in the
+case, the label is taller, and there is no art window. Re-deriving SlabSpec and
+the parity table from the new photo is a separate geometry pass, and it changes
+the card's layout, so it is not done here.
+
+**Changes in this pass (shader and material):**
+
+- The hero loaded with **holo** foil. `useVaultStore.finishType` defaulted to
+  `'holo'`, and `ForgePreview` substitutes it into `DEFAULT_SLAB`, so the first
+  view was a rainbow grating on a card the photo shows as plain print. Default is
+  now `'base'`.
+- Base finish added a flat 2 % white veil (`baseAmt = 0.02 + fresnel * 0.04`).
+  The reference's paper is not lifted anywhere, so the veil is now fresnel-only.
+- The base-mode path (used by the gallery pit) had a corner vignette (≈ 11 %
+  darkening at the corners) and a 1.5 % scanline. The reference paper has no
+  falloff (centre 231 against corners 229..234) and no line structure, so both
+  are removed.
+

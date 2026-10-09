@@ -191,7 +191,9 @@ const HoloShaderMaterial = shaderMaterial(
 
       // base finish: the card's own ink, lifted only slightly by the view angle
       vec3 baseTint = vec3(1.0);
-      float baseAmt = 0.02 + fresnel * 0.04;
+      // no flat veil: the reference paper reads the same at every point of the
+      // card (luma 228..234), so at rest a base card must add nothing to it.
+      float baseAmt = fresnel * 0.04;
 
       vec3 holoTint = foil;
       float holoAmt = clamp(foilMask * 0.7 + spec * 0.35 + fresnel * 0.2, 0.0, 0.7);
@@ -228,10 +230,8 @@ const HoloShaderMaterial = shaderMaterial(
         vec3 tinted = (baseTier * w0 + holoTier * w1 + iceTier * w2 + goldTier * w3) / wSum;
         vec3 col = mix(img, tinted, uIntensity);
 
-        float vignette = 1.0 - smoothstep(0.5, 1.2, length(vUv - 0.5) * 1.5);
-        col *= 0.88 + vignette * 0.12;
-        col *= sin(vUv.y * 420.0) * 0.015 + 0.985;
-
+        // No vignette and no scanlines: the reference paper has no corner
+        // falloff (centre luma 231, corners 229..234) and no line structure.
         gl_FragColor = vec4(col, 1.0);
       }
 

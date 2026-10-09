@@ -59,7 +59,10 @@ export const useVaultStore = create<VaultState>((set) => ({
   scrollProgress: 0,
   setScrollProgress: (p) => set({ scrollProgress: p }),
   
-  finishType: 'holo',
+  // 'base' matches reference-image.jpg: a matte printed card with no foil.
+  // The holo grating was the hero's default, which put a rainbow on a card the
+  // photo shows as plain paper.
+  finishType: 'base',
   setFinishType: (f) => set({ finishType: f }),
   slabType: 'standard',
   setSlabType: (s) => set({ slabType: s }),
