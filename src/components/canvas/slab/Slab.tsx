@@ -6,6 +6,7 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import type { SlabCard } from '@/data/slabCards';
 import { HoloCardMaterial, useCardPointer } from '@/components/canvas/HoloMaterial';
 import { getSlabGeometry } from './geometry';
+import { fluidEngine, holoShaderPalette } from './fluidPalette';
 import { REF_TONE, SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
 import { getWearMaps } from './textures';
 import {
@@ -184,6 +185,14 @@ export interface SlabProps {
   };
   timeOffset?: number;
   children?: ReactNode;
+  /**
+   * Fluid palette (Forge only): clone the hero glass so the shared
+   * singletons — the pit's cheap glass AND the reference view's hero glass —
+   * are never tinted, follow the engine's smoothed channels for the glass
+   * body/attenuation, and feed the live palette to the foil overlays. When
+   * absent (pit, reference view) nothing changes by a single bit.
+   */
+  fluid?: boolean;
 }
 
 const FLIP_SPEED = Math.PI / 0.55;
@@ -214,6 +223,7 @@ export function Slab({
   cardHandlers,
   timeOffset = 0,
   children,
+  fluid = false,
 }: SlabProps) {
   const geo = useMemo(() => getSlabGeometry(quality), [quality]);
   const mat = useMemo(() => getMaterials(), []);
@@ -264,6 +274,13 @@ export function Slab({
   const isActive = active || hovered;
   const foilPointer = pointer ?? localPointer;
 
+  /* --- pick the glass: real transmission in the Forge, and in the pit only
+         while this slab is hovered or held. The fluid (Forge) variant is a
+         clone, so the engine can tint it without touching the shared
+         singleton the pit's upgrade and the reference view rely on. --- */
+  const fluidGlass = useMemo(() => (fluid ? mat.glass.clone() : null), [fluid, mat]);
+  const glassMat = fluidGlass ?? (quality === 'hero' || upgradeGlass || isActive ? mat.glass : mat.glassCheap);
+
   /* --- flip + spin --- */
   const cardRef = useRef<THREE.Mesh>(null);
   const innerRef = useRef<THREE.Group>(null);
@@ -281,11 +298,13 @@ export function Slab({
       spinRef.current = THREE.MathUtils.damp(spinRef.current, spinSource ? spinSource() : spin, 9, delta);
       inner.rotation.z = spinRef.current;
     }
+    if (fluidGlass) {
+      // the engine's channels are already smoothed; following them here is
+      // the last hop of the fluid transition
+      fluidGlass.color.copy(fluidEngine.current.glass);
+      fluidGlass.attenuationColor.copy(fluidEngine.current.glassAtten);
+    }
   });
-
-  /* --- pick the glass: real transmission in the Forge, and in the pit only
-         while this slab is hovered or held --- */
-  const glassMat = quality === 'hero' || upgradeGlass || isActive ? mat.glass : mat.glassCheap;
 
   const cardFaceZ = L.cardFace + 0.0012;
   const foilZ = cardFaceZ + 0.0016;
@@ -369,6 +388,7 @@ export function Slab({
               maskFeather={0.012}
               outside={0.015}
               timeOffset={timeOffset}
+              palette={fluid ? holoShaderPalette() : undefined}
             />
           </mesh>
           {/* back face: the front design again — same geometry, same shape-space
@@ -410,6 +430,7 @@ export function Slab({
               maskFeather={0.012}
               outside={0.015}
               timeOffset={timeOffset}
+              palette={fluid ? holoShaderPalette() : undefined}
             />
           </mesh>
         </mesh>
