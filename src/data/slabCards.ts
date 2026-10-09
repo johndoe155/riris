@@ -768,4 +768,19 @@ export function cardFromNft(
 }
 
 /** The slab the Forge opens with. */
-export const DEFAULT_SLAB: SlabCard = slabCards[0];
+const REFERENCE_SOURCE = slabCards.find((card) => card.art === '/cards/Gjw0CRRXoAMjU8i.jpg') ?? slabCards[0];
+
+/** The supplied reference image is the default Forge subject, not the first gallery card. */
+export const DEFAULT_SLAB: SlabCard = {
+  ...REFERENCE_SOURCE,
+  id: 'reference',
+  title: 'GHOST LAB #7389',
+  collection: 'Ghost Lab',
+  style: 'base',
+  type: 'batch',
+  grade: '10',
+  serial: '7389/8900',
+  handle: '@jeremyRysnyder',
+  color: '#352334',
+  color2: '#352334',
+};

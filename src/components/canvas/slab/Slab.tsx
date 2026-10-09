@@ -282,6 +282,9 @@ export function Slab({
         {geo.place.ridgeTabs.map((p, i) => (
           <mesh key={i} geometry={geo.ridgeTab} material={mat.ridgeTab} position={p} />
         ))}
+        {geo.edgeTabs.map((tab, i) => (
+          <mesh key={`edge-${i}`} geometry={tab.geometry} material={mat.ridgeTab} position={tab.position} />
+        ))}
         {/* the window's top lip: one bar */}
         {geo.slots.map((g, i) => (
           <mesh key={i} geometry={g} material={mat.slot} position={[0, 0, geo.at.slot]} />

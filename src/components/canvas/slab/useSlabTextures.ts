@@ -38,18 +38,6 @@ export function loadImage(src: string): Promise<HTMLImageElement | null> {
   return imageCache.get(src)!;
 }
 
-/** "Bored Ape Yacht Club" -> "Bored Ape": what fits on a label line. */
-function shortCollection(collection: string, max = 14) {
-  const words = collection.split(' ');
-  let out = '';
-  for (const w of words) {
-    const next = out ? `${out} ${w}` : w;
-    if (next.length > max) break;
-    out = next;
-  }
-  return out || collection.slice(0, max);
-}
-
 /** Pixel box of the art panel inside the drawn face. */
 function artBox(o: CardFaceText) {
   return {
@@ -89,14 +77,23 @@ const FACE_ASPECT = SLAB_SPEC.cardH / SLAB_SPEC.cardW;
 const LABEL_ASPECT = SLAB_SPEC.labelH / SLAB_SPEC.labelW;
 
 export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): CardFaceText {
-  const traits: [string, string][] = [
-    ['BACKGROUND', 'Graded'],
-    ['RARITY', card.type === '1/1' ? 'Unique (0.01%)' : 'Batch (2.4%)'],
-    ['GRADE', card.grade],
-    ['COLLECTION', card.collection],
-    ['SERIAL', card.serial],
-    ['OWNER', card.handle],
-  ];
+  const traits: [string, string][] = card.id === 'reference'
+    ? [
+        ['BACKGROUNDS', 'Pink Starry (5%)'],
+        ['BASES', 'Rainbow (4%)'],
+        ['BODYWEAR', 'Hawaiian (2%)'],
+        ['EYES', 'None (36%)'],
+        ['HANDS', 'Plutonium (3%)'],
+        ['HATS', 'None (41%)'],
+      ]
+    : [
+        ['BACKGROUND', 'Graded'],
+        ['RARITY', card.type === '1/1' ? 'Unique (0.01%)' : 'Batch (2.4%)'],
+        ['GRADE', card.grade],
+        ['COLLECTION', card.collection],
+        ['SERIAL', card.serial],
+        ['OWNER', card.handle],
+      ];
   return {
     title: card.title,
     collection: card.collection,
@@ -227,10 +224,9 @@ export function getLabelTexture(
   const hit = labelCache.get(key);
   if (hit) return hit;
   const accent = blank ? '#D8D5D0' : card.color;
-  const collection = shortCollection(card.collection);
   const width = LABEL_TIERS[tier];
   const o: LabelText = {
-    title: `${card.title.replace(/\s*#?\d+$/, '')}\n${collection}`.toUpperCase(),
+    title: `${card.title.replace(/\s*#?\d+$/, '')}\nCOLLECTION`.toUpperCase(),
     grade: card.grade,
     serial: card.serial,
     width,

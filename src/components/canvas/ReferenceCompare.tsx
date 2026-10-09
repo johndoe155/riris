@@ -1,7 +1,7 @@
 'use client';
 import { Suspense, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Environment, Lightformer, useTexture, Line, PerspectiveCamera } from '@react-three/drei';
+import { Environment, Lightformer, useTexture, Line, OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { Slab } from '@/components/canvas/slab/Slab';
 import { SLAB_SPEC } from '@/components/canvas/slab/SlabSpec';
@@ -120,10 +120,9 @@ function Guides({ show }: { show: boolean }) {
 }
 
 function StraightScene({ card, showPhoto, showGuides }: { card: SlabCard; showPhoto: number; showGuides: boolean }) {
-  const dist = (SLAB_H * 1.5) / (2 * Math.tan((12 * Math.PI) / 180 / 2));
   return (
     <>
-      <PerspectiveCamera makeDefault position={[0, 0, dist]} fov={12} near={1} far={60} />
+      <OrthographicCamera makeDefault position={[0, 0, 5]} zoom={1.72} near={0.1} far={60} />
       <ambientLight intensity={0.55} />
       <directionalLight position={[3, 4, 6]} intensity={0.8} />
       <Environment resolution={256} frames={1} environmentIntensity={0.9}>
@@ -193,7 +192,7 @@ export default function ReferenceCompare() {
           <li>orange — header label plate</li>
           <li>#FF2D9B — ridge line</li>
           <li>green — window recess</li>
-          <li>straight-on fov 12° — no perspective skew</li>
+          <li>straight-on orthographic — no perspective skew</li>
         </ul>
         <p className="text-[10px] leading-relaxed text-[#F5F3EF]/35">
           Reference: 665 × 1116 px case in a 1488 × 1484 photo. Plate 0.878 w, card 0.738 w
