@@ -359,17 +359,33 @@ export function Slab({
               timeOffset={timeOffset}
             />
           </mesh>
-          {/* back face: the front design again, on the PI-rotated plane, so it
-              reads as its mirror when the card is spun — same furniture, same
-              art window, flipped left-to-right like a reflection */}
-          <mesh geometry={geo.cardFace} position={[0, 0, -SLAB_SPEC.cardD / 2 - 0.0008]} rotation={[0, Math.PI, 0]}>
+          {/* back face: the front design again — same geometry, same shape-space
+              UVs, same shared texture — mounted as a PI-rotated plane just
+              outside the case's back plane (zBack - 0.0008), where it is the
+              outermost rear surface. That placement is the fix for the blank
+              back: the clones used to sit at -cardD/2 behind the card, INSIDE
+              the opaque back plate's solid (zBackPlateFront..zBack), so both
+              the drag-to-spin orbit and the double-click flip saw the plate's
+              blank rear cap instead. The rigid PI rotation is the back-specific
+              UV/orientation adjustment: a rigid flip mirrors nothing, so the
+              design and text read NORMALLY from the rear (the old comment
+              claimed a mirror — a rotation cannot produce one), and the plane's
+              normal genuinely faces the rear camera, which keeps the foil
+              shader's vNormal/vViewDir fresnel and specular terms correct with
+              no shader-side front/back special cases. The base stays unlit
+              exactly like the front (the printed inks are albedo; see the
+              front face above), so the rear is the front's pixel match at
+              rest, and the foil overlay below carries the live effects. */}
+          <mesh geometry={geo.cardFace} position={[0, 0, SLAB_SPEC.zBack - 0.0008 - geo.at.card]} rotation={[0, Math.PI, 0]}>
             {/* unlit: the printed face must read exactly as painted — the
                 photo's inks are albedo, and a lit standard material under the
                 studio rig multiplied them past their texture values */}
             <meshBasicMaterial map={face ?? undefined} color={face ? '#ffffff' : card.color} toneMapped={false} />
           </mesh>
-          {/* foil on the back too, so the flipped card carries the same finish */}
-          <mesh geometry={geo.cardFace} position={[0, 0, -SLAB_SPEC.cardD / 2 - 0.0024]} rotation={[0, Math.PI, 0]}>
+          {/* foil on the back too, so the spun card carries the same finish:
+              0.0016 nearer the rear camera than the design (smaller z), the
+              mirror of the front's design->foil spacing */}
+          <mesh geometry={geo.cardFace} position={[0, 0, SLAB_SPEC.zBack - 0.0024 - geo.at.card]} rotation={[0, Math.PI, 0]}>
             <HoloCardMaterial
               finish={card.style}
               pointer={foilPointer}
