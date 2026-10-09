@@ -65,108 +65,6 @@ export interface Rect {
   y?: number;
 }
 
-/**
- * The face plate's outline with the window opening as a notch that runs out
- * through the bottom edge, instead of a closed hole. The window's bottom sits
- * only ~8 px above the case's bottom edge while the face plate is inset a full
- * moulding step, so a hole reaching the window's bottom pokes through the
- * plate's outer boundary and the triangulator collapses it — which is what
- * used to paint the opaque plate across the cavity's bottom strip, right at
- * the card's bottom edge, leaving the card and the inner frame with zero
- * margin at the bottom of the visible cavity. One notched contour
- * triangulates cleanly and keeps the cavity open to its measured bottom edge.
- *
- * `grow` plays the role `fit()` plays for holes: the extrusion bevel dilates
- * the material into the opening, so the notch is grown here and lands on the
- * measured window rectangle after the bevel.
- */
-export function notchedFaceOutline(
-  faceW: number,
-  faceH: number,
-  faceR: number,
-  windowRect: Rect,
-  power: number,
-  grow: number,
-  cornerSegs: number
-): THREE.Shape {
-  const hw = faceW / 2 - grow;
-  const hh = faceH / 2 - grow;
-  const rr = Math.max(0.002, faceR - grow);
-  const kappa = THREE.MathUtils.clamp(CIRCLE_KAPPA + (power - 2) * 0.0485, 0.5523, 0.86);
-  const c = rr * kappa;
-  const segs = Math.max(2, Math.round(cornerSegs));
-
-  // the notch: the window opening grown by `grow`, open at the bottom edge
-  const xr = windowRect.w / 2 + grow;
-  const yt = (windowRect.y ?? 0) + windowRect.h / 2 + grow;
-  const rc = Math.max(0.004, windowRect.r);
-  const ck = rc * CIRCLE_KAPPA;
-
-  const bez = new THREE.CubicBezierCurve(new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2());
-  const pts: THREE.Vector2[] = [];
-  const corner = (v0: [number, number], v1: [number, number], v2: [number, number], v3: [number, number], n = segs) => {
-    bez.v0.set(v0[0], v0[1]); bez.v1.set(v1[0], v1[1]); bez.v2.set(v2[0], v2[1]); bez.v3.set(v3[0], v3[1]);
-    for (let i = 0; i <= n; i++) pts.push(bez.getPoint(i / n).clone());
-  };
-  const line = (x: number, y: number) => pts.push(new THREE.Vector2(x, y));
-
-  /* The window is wider than the straight part of the outline's bottom edge:
-   * the outer corner arcs (radius ~0.1) sweep inboard of the notch walls, so a
-   * full bottom edge would cross the walls and the self-intersecting outline
-   * triangulated into a slanting fill — the case sides visibly pinched inward
-   * toward the base. Instead, each bottom corner arc is trimmed where it
-   * reaches the notch wall and drops vertically from there, keeping the
-   * contour simple (no crossings) and the walls perfectly parallel. */
-  const BR: [number, number][] = [
-    [hw, -hh + rr], [hw, -hh + rr - c], [hw - rr + c, -hh], [hw - rr, -hh],
-  ];
-  bez.v0.set(BR[0][0], BR[0][1]); bez.v1.set(BR[1][0], BR[1][1]); bez.v2.set(BR[2][0], BR[2][1]); bez.v3.set(BR[3][0], BR[3][1]);
-  // x falls monotonically along the arc: bisect the parameter where x == xr
-  let lo = 0, hi = 1;
-  for (let i = 0; i < 24; i++) {
-    const mid = (lo + hi) / 2;
-    if (bez.getPoint(mid).x > xr) lo = mid; else hi = mid;
-  }
-  const tCut = (lo + hi) / 2;
-  const yCut = bez.getPoint(tCut).y;
-
-  // top edge, left → right, then down the right side (same rotation the
-  // squircle outlines use, so holes keep their reversed winding)
-  line(-hw + rr, hh);
-  corner([hw - rr, hh], [hw - rr + c, hh], [hw, hh - rr + c], [hw, hh - rr]);
-  line(hw, -hh + rr);
-  // right bottom corner, trimmed at the notch wall, then drop to the bottom
-  bez.v0.set(BR[0][0], BR[0][1]); bez.v1.set(BR[1][0], BR[1][1]); bez.v2.set(BR[2][0], BR[2][1]); bez.v3.set(BR[3][0], BR[3][1]);
-  bez.getPoints(segs).forEach((p, i) => {
-    if (i > 0 && p.x > xr + 1e-6) pts.push(p.clone());
-  });
-  line(xr, yCut);
-  line(xr, -hh);
-  line(xr, yt - rc);
-  // notch's top-right corner (concave in the material, rounded like the window)
-  corner([xr, yt - rc], [xr, yt - rc + ck], [xr - rc + ck, yt], [xr - rc, yt], Math.max(6, segs));
-  line(-xr + rc, yt);
-  corner([-xr + rc, yt], [-xr + rc - ck, yt], [-xr, yt - rc + ck], [-xr, yt - rc], Math.max(6, segs));
-  // down the notch's left wall, rise to the trimmed left bottom corner
-  line(-xr, -hh);
-  line(-xr, yCut);
-  {
-    const b = bez;
-    b.v0.set(-hw + rr, -hh); b.v1.set(-hw + rr - c, -hh); b.v2.set(-hw, -hh + rr - c); b.v3.set(-hw, -hh + rr);
-    const arc = b.getPoints(segs);
-    // walk from the cut (x == -xr) outboard and up the left side
-    let started = false;
-    for (const p of arc) {
-      if (!started && p.x <= -xr) started = true;
-      if (started) pts.push(p.clone());
-    }
-  }
-  line(-hw, hh - rr);
-  corner([-hw, hh - rr], [-hw, hh - rr + c], [-hw + rr - c, hh], [-hw + rr, hh]);
-
-  return new THREE.Shape(pts);
-}
-
 function addHole(shape: THREE.Shape, hole: Rect, power: number, segs: number) {
   const path = squircle(hole.w, hole.h, hole.r, power, segs, hole.x ?? 0, hole.y ?? 0);
   shape.holes.push(new THREE.Path(path.getPoints(0).slice().reverse()));
@@ -378,13 +276,12 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
 
   // --- shell: full silhouette, window + label cut through, chamfered rim
   const shellShape = plain({ w, h, r: radius }, bevel);
-  // The window hole is NOT grown to compensate the bevel: the compensated hole
-  // left only a ~6 px web between opening and case bottom, and the bevel
-  // contour self-intersected on it, collapsing the triangulation so the glass
-  // skin painted over the cavity's bottom strip. The bevel now shrinks the
-  // opening one wall-thickness inside the measured window on every side — the
-  // moulded wall the reference shows at the opening; with the frosted band
-  // removed it is the opening's only edge, clean and uncluttered.
+  // The window hole keeps the raw measured rect (fit with bevel 0: no
+  // compensation), so the finished opening sits one wall-thickness — one
+  // bevel — inside it on every side: the moulded lip at the opening. With the
+  // cavity clipped symmetric about the card (SlabSpec.windowH), the web under
+  // the opening is ~57 px of the shell's own glass; the old 11 px web was why
+  // this hole had to stay uncompensated and the face plate had to go notched.
   addHole(shellShape, fit(windowRect, 0, -1), P, q.corner);
   addHole(shellShape, fit(labelHole, bevel, -1), P, q.corner);
   const shell = extrudedLayer(shellShape, {
@@ -397,11 +294,15 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
 
   // --- face plate: the silhouette minus the moulding step, proud of the body
   // by faceLift. Its bevelled edge is the bright line 10 px inside the case.
-  // The window is a notch open at the bottom edge (not a hole): the window
-  // reaches so close to the case's bottom that a closed hole would escape the
-  // inset outline and collapse, painting the plate over the cavity floor and
-  // leaving the card zero margin at the bottom of the visible cavity.
-  const faceShape = notchedFaceOutline(L.faceW, L.faceH, L.faceRadius, windowRect, P, 0.006, q.corner);
+  // The window is a closed hole like the label's: with the cavity clipped
+  // symmetric about the card (SlabSpec.windowH) the opening now clears the
+  // plate's bottom edge by ~54 px, so the notched outline this used to need —
+  // the window once sat 8 px above that edge and a closed hole escaped the
+  // inset outline — is gone. The plate's band now wraps under the cavity
+  // exactly as it wraps the card's sides, which is what makes the reclaimed
+  // strip below the window read as case glass.
+  const faceShape = squircle(L.faceW, L.faceH, L.faceRadius, P, q.corner);
+  addHole(faceShape, fit(windowRect, 0.006, -1), P, q.corner);
   addHole(faceShape, fit(labelHole, 0.006, -1), P, q.corner);
   const face = extrudedLayer(faceShape, {
     depth: zFront - L.shellFront + spec.faceLift,

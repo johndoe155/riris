@@ -53,7 +53,11 @@ const placedBox = (g, at) => {
 
 const MODEL = {
   'case aspect (w/h)': [S.w / S.h, 665 / 1116],
-  'case corner radius (of min(w,h))': [S.radius, 76.5 / 665],
+  // DESIGN, not measurement: the photo's corner measures 76.5 px (0.115), but
+  // the body is deliberately cut at 0.045 — flatter edges, a very mild
+  // rounding (SlabSpec.radius). Pinned here so drift from the design value
+  // still fails the run.
+  'case corner radius (of min(w,h))': [S.radius, 0.045],
 
   'label left': [fxc(-S.labelW / 2), 452 - CASE.x0, 'px'],
   'label right': [fxc(S.labelW / 2), 1036 - CASE.x0, 'px'],
@@ -73,7 +77,11 @@ const MODEL = {
   'window left': [fxc(-S.windowW / 2), 465 - CASE.x0, 'px'],
   'window right': [fxc(S.windowW / 2), 1030 - CASE.x0, 'px'],
   'window top': [fy(S.windowTop), 470 - CASE.y0],
-  'window bottom': [fy(S.windowTop + S.windowH), 1292 - CASE.y0],
+  // DESIGN, not measurement: the cavity is clipped symmetric about the card
+  // (SlabSpec.windowH) — its below-card fog margin equals the 38 px apron
+  // above the card: card bottom 1205 + 38 = 1243 px, where the photo measures
+  // 1292. The 49 px strip it gave up is the case's own glass.
+  'window bottom': [fy(S.windowTop + S.windowH), 1243 - CASE.y0],
 
   'card left': [fxc(-S.cardW / 2), 500 - CASE.x0, 'px'],
   'card right': [fxc(S.cardW / 2), 991 - CASE.x0, 'px'],

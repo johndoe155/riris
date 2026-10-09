@@ -1,7 +1,7 @@
 'use client';
 
 import * as THREE from 'three';
-import { trayLayout, type TrayLayout } from './SlabSpec';
+import { SLAB_SPEC, trayLayout, type TrayLayout } from './SlabSpec';
 import { squircle } from './geometry';
 
 /* ------------------------------------------------------------------ *
@@ -783,7 +783,12 @@ export function buildTrayTexture(w = 512, h = 768, layout: TrayLayout = trayLayo
 
 const FACE_PHOTO = { x0: 422, y0: 197, w: 645, h: 1096 };
 
-/** measured tone grid over the face plate, photo px (docs/card-parity-plan.md §3) */
+/** measured tone grid over the face plate, photo px (docs/card-parity-plan.md §3).
+ * One deliberate deviation (row y 1240..1293, middle columns): with the cavity
+ * clipped symmetric about the card (SlabSpec.windowH) that band is the case's
+ * own glass now, not the photo's cavity floor, so it grades between the
+ * measured wall tones on either side (#352531 left, #4a3a46 right) instead of
+ * repeating the tray's #423440. */
 const FACE_GRID_X = [422, 440, 465, 600, 744, 900, 1030, 1050, 1067];
 const FACE_GRID_Y = [197, 300, 400, 430, 700, 900, 1100, 1240, 1293];
 const FACE_GRID: string[][] = [
@@ -794,7 +799,7 @@ const FACE_GRID: string[][] = [
   ['#3b2b37', '#40303c', '#43333f', '#473844', '#473844', '#473844', '#99889a', '#907f8b', '#907e8b'],
   ['#392935', '#40303c', '#43333f', '#473844', '#473844', '#473844', '#9c8b9d', '#93828f', '#8f7e8b'],
   ['#372733', '#3d2d39', '#40303c', '#473844', '#473844', '#473844', '#8f7e8b', '#877683', '#847380'],
-  ['#352531', '#352531', '#3a2a36', '#423440', '#423440', '#423440', '#4a3a46', '#4a3a46', '#4a3a46'],
+  ['#352531', '#352531', '#392936', '#3e303b', '#41333e', '#453742', '#483a45', '#4a3a46', '#4a3a46'],
   ['#33232f', '#33232f', '#372733', '#3f303c', '#3f303c', '#3f303c', '#3f303c', '#3f303c', '#3f303c'],
 ];
 
@@ -848,7 +853,11 @@ export function drawFaceMap(ctx: CanvasRenderingContext2D, w: number, h: number)
 
   // moulded chamfer: the 10 px band inside the silhouette, dark on the shadow
   // side and lit on the key side, with the bright hairline where the face
-  // plate's bevel turns
+  // plate's bevel turns. Its corner radius tracks SLAB_SPEC.radius (in this
+  // map's px): the old hardcodes 71/64 were exactly radius − inset for the
+  // measured 0.115 corner, and these expressions reproduce those values while
+  // following the spec when it moves.
+  const R = (SLAB_SPEC.radius / (SLAB_SPEC.w - SLAB_SPEC.stepInset * 2)) * w;
   const chamfer = ctx.createLinearGradient(0, 0, w, 0);
   chamfer.addColorStop(0, 'rgba(59,42,55,0.85)');
   chamfer.addColorStop(0.5, 'rgba(59,42,55,0.35)');
@@ -856,7 +865,7 @@ export function drawFaceMap(ctx: CanvasRenderingContext2D, w: number, h: number)
   chamfer.addColorStop(1, 'rgba(144,126,139,0.85)');
   ctx.strokeStyle = chamfer;
   ctx.lineWidth = S(10);
-  roundRect(ctx, S(5), S(5), w - S(10), h - S(10), S(71));
+  roundRect(ctx, S(5), S(5), w - S(10), h - S(10), R - S(5));
   ctx.stroke();
   const hair = ctx.createLinearGradient(0, 0, w, 0);
   hair.addColorStop(0, 'rgba(255,247,255,0.10)');
@@ -864,7 +873,7 @@ export function drawFaceMap(ctx: CanvasRenderingContext2D, w: number, h: number)
   hair.addColorStop(1, 'rgba(255,247,255,0.55)');
   ctx.strokeStyle = hair;
   ctx.lineWidth = Math.max(1.5, S(2.5));
-  roundRect(ctx, S(12), S(12), w - S(24), h - S(24), S(64));
+  roundRect(ctx, S(12), S(12), w - S(24), h - S(24), R - S(12));
   ctx.stroke();
 
   // shoulder step: 1 px hairline above the rail, 1 px shadow under it

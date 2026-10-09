@@ -29,6 +29,9 @@
  *   side wall tabs   x 438..446 / 1043..1051, y 647..697  one muted tab per wall
  *   window top wall  y 476..483, face tone (L124)      a lit band, NOT a bright bar
  *   window opening   x 465..1030, y 470..1292          w 0.8496, top 0.4253, h 1.2352
+ *                    └─ design change: bottom clipped to y 1243 (h 1.1617) so the
+ *                       cavity's below-card margin equals its 38 px apron above
+ *                       the card; the strip it gave up is case glass — `windowH`
  *   card             x 500..991,  y 508..1205          w 0.7383, top 0.4824, h 1.0475
  *   card keyline     stroke 501..507 (7 px), radius 24 px, flush with the card edge
  *   art frame        square stroke 528..534 / 535..541  inset 0.0570 card-w, stroke 0.0143
@@ -174,7 +177,15 @@ export const SLAB_SPEC: SlabSpec = {
    * 1205 = 87 px) already equals the side margin (87 px), so nothing extends. */
   h: 1.677,
 
-  radius: 0.115,
+  /*
+   * The measured 0.115 (76.5 px) corner read too rounded, so the outer body is
+   * cut at 0.045 — 30 px on the 665 px case: a very mild, subtle rounding that
+   * keeps the moulded-plastic read while the edges run flat. The painted
+   * chamfer band and its hairline in `drawFaceMap` derive from this number, so
+   * the rim keeps tracking the silhouette at any radius. (0.115 remains what
+   * the photo measures; this is a deliberate design change.)
+   */
+  radius: 0.045,
   cornerPower: 5.2,
   bevel: 0.004,
   stepInset: 0.015,
@@ -216,7 +227,19 @@ export const SLAB_SPEC: SlabSpec = {
   sideTabH: 0.0766,
 
   windowW: 0.8496,
-  windowH: 1.2352,
+  /*
+   * The window — the foggy cavity that surrounds the card — is clipped
+   * symmetrically about that card: its margin below the card equals its apron
+   * above it (0.4824 - 0.4253 = 0.0571 world, 38 photo px). The measured
+   * cavity ran to y 1292, leaving 87 px of fog under the card; the 49 px strip
+   * clipped away (y 1243..1292) is now the case's own glassy body, reading
+   * exactly like the glass beside the card, because the face plate closes over
+   * the window with a proper hole (see geometry.ts) over the shell's glass web
+   * — the same stack the card's sides show. The expression keeps that
+   * symmetry exact if the card or the apron ever moves:
+   * card bottom (0.4824 + 1.0475) + the apron margin, measured back to the top.
+   */
+  windowH: 0.4824 + 1.0475 + (0.4824 - 0.4253) - 0.4253,
   windowTop: 0.4253,
   windowRadius: 0.012,
 
