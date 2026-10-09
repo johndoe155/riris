@@ -613,11 +613,15 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
    * the reference is off to that side): the rails are a shade lighter than the
    * plate, and the plate darkens very slightly toward the bottom edge.
    */
+  // the floor stays lit all the way to the bottom wall: an earlier version
+  // darkened the last 25% toward #41323e, which made the strip under the card
+  // read as a continuation of the dark inner frame instead of the margin it
+  // is — the bottom now falls off no more than the middle does
   const g = ctx.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, '#4a3c46');
   g.addColorStop(0.37, '#483a45');
-  g.addColorStop(0.75, '#463843');
-  g.addColorStop(1, '#41323e');
+  g.addColorStop(0.75, '#473944');
+  g.addColorStop(1, '#463843');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
@@ -648,12 +652,14 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
   const ch = layout.card.h * h;
   const cx = layout.card.x * w;
   const cy = layout.card.y * h;
+  // symmetric and tight: an offset shadow bled down the card's bottom edge and
+  // visually dragged the inner frame into the floor margin below it
   const pad = Math.max(5, w * 0.022);
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.62)';
-  ctx.shadowBlur = pad * 1.1;
-  ctx.shadowOffsetY = pad * 0.16;
-  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.shadowBlur = pad * 0.9;
+  ctx.shadowOffsetY = 0;
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
   roundRect(ctx, cx, cy, cw, ch, w * 0.05);
   ctx.fill();
   ctx.restore();
@@ -693,18 +699,19 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
   ctx.fillStyle = lightR;
   ctx.fillRect(w * 0.94, 0, w * 0.06, h);
 
-  // and the bottom ledge the card leans on: 0.06 luma darker than the middle,
-  // with a pale lip where the moulding turns
+  // and the bottom ledge the card leans on: barely shaded, with a strong pale
+  // lip where the moulding turns — the lit line that separates the floor
+  // margin from the cavity wall, the same way the top lip separates the apron
   const bottom = ctx.createLinearGradient(0, h, 0, h * 0.95);
-  bottom.addColorStop(0, 'rgba(0,0,0,0.20)');
+  bottom.addColorStop(0, 'rgba(0,0,0,0.06)');
   bottom.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = bottom;
   ctx.fillRect(0, h * 0.95, w, h * 0.05);
-  const bottomLip = ctx.createLinearGradient(0, h, 0, h * 0.97);
-  bottomLip.addColorStop(0, 'rgba(196,206,224,0.14)');
+  const bottomLip = ctx.createLinearGradient(0, h, 0, h * 0.94);
+  bottomLip.addColorStop(0, 'rgba(196,206,224,0.28)');
   bottomLip.addColorStop(1, 'rgba(196,206,224,0)');
   ctx.fillStyle = bottomLip;
-  ctx.fillRect(0, h * 0.97, w, h * 0.03);
+  ctx.fillRect(0, h * 0.94, w, h * 0.06);
 }
 
 export function buildTrayTexture(w = 512, h = 768, layout: TrayLayout = trayLayout()): THREE.CanvasTexture {

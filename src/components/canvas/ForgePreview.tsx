@@ -30,6 +30,12 @@ function StudioEnvironment() {
       <Lightformer form="rect" intensity={0.5} color="#6d5b66" position={[0, -6, 2]} rotation={[-Math.PI * 0.4, 0, 0]} scale={[16, 3, 1]} />
       {/* a narrow vertical strip: the hairline the moulding's bevel catches */}
       <Lightformer form="rect" intensity={1.1} color="#ffffff" position={[3.2, 0, 3]} rotation={[0, -Math.PI * 0.18, 0]} scale={[0.7, 7, 1]} />
+      {/* overhead softbox: the long body reflection that runs down the apron and
+          turns on the clearcoat — the reference's bright top strip */}
+      <Lightformer form="rect" intensity={1.3} color="#fff4fa" position={[0, 6, 2]} rotation={[-Math.PI / 2.2, 0, 0]} scale={[12, 3.5, 1]} />
+      {/* faint counter-strip on the left so the dark chamfer still carries a
+          hairline of reflected light instead of reading flat */}
+      <Lightformer form="rect" intensity={0.8} color="#f6eef6" position={[-3.4, 0, 3]} rotation={[0, Math.PI * 0.2, 0]} scale={[0.5, 7, 1]} />
     </Environment>
   );
 }

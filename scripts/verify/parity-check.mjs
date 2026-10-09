@@ -11,7 +11,7 @@
  *
  * so a spec drift shows up as a delta with a sign and a magnitude in photo
  * pixels. Fails on any feature that moves more than TOL px on the 665 x 1116 px
- * case. The band and the rail's tabs are checked from the BUILT geometry with
+ * case. The rail's tabs are checked from the BUILT geometry with
  * its `place` offset applied, because layers are centred on their own bounds and
  * a spec-only check cannot see a position error.
  *
@@ -47,7 +47,6 @@ const placedBox = (g, at) => {
   const b = g.boundingBox;
   return { minX: b.min.x + at[0], maxX: b.max.x + at[0], minY: b.min.y + at[1], maxY: b.max.y + at[1] };
 };
-const band = placedBox(geo.band, geo.place.band);
 
 const MODEL = {
   'case aspect (w/h)': [S.w / S.h, 665 / 1116],
@@ -72,12 +71,6 @@ const MODEL = {
   'window right': [fxc(S.windowW / 2), 1030 - CASE.x0, 'px'],
   'window top': [fy(S.windowTop), 470 - CASE.y0],
   'window bottom': [fy(S.windowTop + S.windowH), 1295 - CASE.y0],
-  // the band is the window's frosted lip: its outer edge is windowBand outside the opening.
-  // Measured from the built mesh, so a misplaced band fails here
-  'band top (outer)': [fy(fromTop(band.maxY)), 470 - S.windowBand * 665 - CASE.y0],
-  'band bottom (outer)': [fy(fromTop(band.minY)), 1295 + S.windowBand * 665 - CASE.y0],
-  'band left (outer)': [fxc(band.minX), 465 - S.windowBand * 665 - CASE.x0, 'px'],
-  'band right (outer)': [fxc(band.maxX), 1030 + S.windowBand * 665 - CASE.x0, 'px'],
 
   'card left': [fxc(-S.cardW / 2), 500 - CASE.x0, 'px'],
   'card right': [fxc(S.cardW / 2), 991 - CASE.x0, 'px'],

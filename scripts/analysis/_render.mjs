@@ -44,7 +44,6 @@ const MATS = {
   backplate:['#232329', 0.84, 0.05, 1.0, 'opaque'],
   tray:     ['#232329', 0.84, 0.05, 1.0, 'opaque'],
   trayplate:['#4a3d47', 0.86, 0.04, 1.0, 'opaque'],
-  band:     ['#f4f8fd', 0.24, 0.12, 0.68, 'glass'],
   label:    ['#15151a', 0.60, 0.05, 1.0, 'opaque'],
   ridge:    ['#f2f5fa', 0.12, 0.16, 1.0, 'opaque'],
   card:     ['#f4f2ee', 0.46, 0.05, 1.0, 'opaque'],
@@ -144,10 +143,9 @@ for (let y = 0; y < PXH; y++) for (let x = 0; x < PXW; x++) {
 // back to front
 draw(geo.shell, 'shell', 0, 0, geo.at.shell);
 draw(geo.face, 'face', 0, 0, geo.at.face);
-draw(geo.backPlate, 'backplate', 0, 0, geo.at.backPlate);
+draw(geo.backPlate, 'backplate', ...geo.place.backPlate);
 draw(geo.tray, 'tray', ...geo.place.tray);
 draw(geo.trayPlate, 'trayplate', 0, 0, L.trayFront + 0.0012);
-draw(geo.band, 'band', ...geo.place.band);
 draw(geo.labelPlate, 'label', 0, L.labelY, geo.at.labelPlate);
 draw(geo.ridge, 'ridge', ...geo.place.ridge);
 for (const p of geo.place.ridgeTabs) draw(geo.ridgeTab, 'ridge', ...p);

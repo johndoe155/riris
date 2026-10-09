@@ -9,15 +9,11 @@ import { getSlabGeometry } from './geometry';
 import { REF_TONE, SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
 import { getWearMaps } from './textures';
 import {
-  ensureBackTexture,
   ensureCardTexture,
-  getBackTexture,
   getCardFaceTexture,
   getLabelTexture,
   getTrayTexture,
-  latestBackTexture,
   latestCardTexture,
-  onBackTextureReady,
   onCardTextureReady,
 } from './useSlabTextures';
 
@@ -30,7 +26,6 @@ interface SlabMaterials {
   glassCheap: THREE.MeshPhysicalMaterial;
   /** the front face plate: the layer the reference's moulded step exposes */
   face: THREE.MeshPhysicalMaterial;
-  band: THREE.MeshPhysicalMaterial;
   label: THREE.MeshStandardMaterial;
   ridge: THREE.MeshStandardMaterial;
   ridgeTab: THREE.MeshStandardMaterial;
@@ -51,20 +46,25 @@ function getMaterials(): SlabMaterials {
     // the blue-white this used to carry, and the attenuation is short enough
     // that the case reads as tinted acrylic instead of clear glass.
     glass: new THREE.MeshPhysicalMaterial({
-      // mostly opaque, so the chamfer can take the key light: the reference's rim
-      // is dark on the left (#42333f) and lit on the right (#8a7685), and a fully
-      // transmissive shell shows only the dark back plate on both sides
-      transmission: 0.2,
-      thickness: 0.42,
-      roughness: 0.16,
+      // transmissive enough that the moulded walls visibly bend what is behind
+      // them (the card edge shifts where the chamfer turns), while the clearcoat
+      // layer still takes the key light: the reference's rim is dark on the left
+      // (#42333f) and lit on the right (#8a7685).
+      transmission: 0.55,
+      thickness: 0.3,
+      roughness: 0.08,
       metalness: 0,
-      ior: 1.46,
-      clearcoat: 0.85,
-      clearcoatRoughness: 0.12,
+      ior: 1.49,
+      // a hint of dispersion: the refraction fringes separate at the chamfer the
+      // way a real cast-acrylic edge does, without turning into a prism
+      dispersion: 0.12,
+      clearcoat: 1,
+      clearcoatRoughness: 0.06,
+      specularIntensity: 1,
       color: new THREE.Color(REF_TONE.rimLit),
       attenuationColor: new THREE.Color('#b7a2b4'),
       attenuationDistance: 1.35,
-      envMapIntensity: 0.95,
+      envMapIntensity: 1.35,
       roughnessMap: wear.roughness,
       bumpMap: wear.bump,
       bumpScale: 0.01,
@@ -80,41 +80,35 @@ function getMaterials(): SlabMaterials {
      */
     face: new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(REF_TONE.faceMid),
-      roughness: 0.42,
+      // polished enough that the strip lights drag a long soft highlight down
+      // the apron (the reference's #baa9b5 top strip is exactly that sheen),
+      // rough enough that the body keeps its measured #91808c
+      roughness: 0.32,
       metalness: 0,
-      clearcoat: 0.5,
-      clearcoatRoughness: 0.2,
-      envMapIntensity: 1,
+      clearcoat: 0.8,
+      clearcoatRoughness: 0.12,
+      specularIntensity: 0.9,
+      envMapIntensity: 1.2,
       roughnessMap: wear.roughness,
       bumpMap: wear.bump,
       bumpScale: 0.006,
     }),
-    // pit fake: low opacity + env map, no transmission pass
+    // pit fake: low opacity + env map, no transmission pass — but the same
+    // optical vocabulary as the hero glass, so the cheap case still shows a
+    // body reflection and a hard streak instead of a flat tint
     glassCheap: new THREE.MeshPhysicalMaterial({
       color: '#e4dbe4',
-      roughness: 0.2,
+      roughness: 0.12,
       metalness: 0.04,
       clearcoat: 1,
-      clearcoatRoughness: 0.1,
+      clearcoatRoughness: 0.06,
       transparent: true,
-      opacity: 0.22,
-      envMapIntensity: 1.15,
-      ior: 1.46,
+      opacity: 0.3,
+      envMapIntensity: 1.4,
+      ior: 1.49,
+      specularIntensity: 1,
       roughnessMap: wear.roughness,
       side: THREE.DoubleSide,
-    }),
-    // frosted band: the moulded lip that runs around the window. The reference
-    // reads it *brighter* than the tray it sits on, so it stays near-white and
-    // semi-transparent rather than tinted.
-    band: new THREE.MeshPhysicalMaterial({
-      color: '#eef1f7',
-      roughness: 0.26,
-      metalness: 0.1,
-      clearcoat: 1,
-      clearcoatRoughness: 0.14,
-      transparent: true,
-      opacity: 0.5,
-      envMapIntensity: 1.2,
     }),
     // measured off the reference's plate: #3b2a36, not the near-black it was
     label: new THREE.MeshStandardMaterial({ color: REF_TONE.plate, roughness: 0.62, metalness: 0.05 }),
@@ -218,32 +212,14 @@ export function Slab({
   }, [card, tier]);
 
   const labelTex = useMemo(() => getLabelTexture(card, false, tier), [card, tier]);
-
-  // the card's own branded back: drawn fallback first, photo when it lands
-  const [backTex, setBackTex] = useState<THREE.CanvasTexture>(() => latestBackTexture(card.back) ?? getBackTexture());
-  useEffect(() => {
-    let live = true;
-    ensureBackTexture(card.back).then((tex) => {
-      if (live) setBackTex(tex);
-    });
-    const off = onBackTextureReady((style) => {
-      if (!live || style !== card.back) return;
-      const next = latestBackTexture(card.back);
-      if (next) setBackTex(next);
-    });
-    return () => {
-      live = false;
-      off();
-    };
-  }, [card.back]);
   const trayTex = useMemo(() => getTrayTexture(), []);
 
   useEffect(() => {
     const max = gl.capabilities.getMaxAnisotropy();
-    for (const t of [labelTex, trayTex, face, backTex]) {
+    for (const t of [labelTex, trayTex, face]) {
       if (t) t.anisotropy = Math.min(8, max);
     }
-  }, [gl, labelTex, trayTex, face, backTex]);
+  }, [gl, labelTex, trayTex, face]);
 
   /* --- pointer + hover --- */
   const { pointer: localPointer, hovered, bind } = useCardPointer(SLAB_SPEC.cardW, SLAB_SPEC.cardH);
@@ -284,8 +260,8 @@ export function Slab({
         {/* front face plate: the silhouette inset one moulding step. Its
             bevelled edge is the reference's 10 px chamfer + hairline */}
         <mesh geometry={geo.face} material={quality === 'hero' || upgradeGlass || isActive ? mat.face : glassMat} position={[0, 0, geo.at.face]} />
-        {/* back plate closes the case */}
-        <mesh geometry={geo.backPlate} material={mat.tray} position={[0, 0, geo.at.backPlate]} />
+        {/* back plate closes the case (centred on the window, like the tray) */}
+        <mesh geometry={geo.backPlate} material={mat.tray} position={geo.place.backPlate} />
         {/* tray ring — a plate with the card's cutout */}
         <mesh geometry={geo.tray} material={mat.tray} position={geo.place.tray} />
         {/* window floor: the tray texture's plane, with the card cutout in it
@@ -294,8 +270,6 @@ export function Slab({
         <mesh geometry={geo.trayPlate} position={[0, 0, L.trayFront + 0.0012]} raycast={() => null}>
           <meshStandardMaterial map={trayTex} roughness={0.86} metalness={0.04} />
         </mesh>
-        {/* frosted band around the window */}
-        <mesh geometry={geo.band} material={mat.band} position={geo.place.band} />
         {/* label plate + its printed face */}
         <mesh geometry={geo.labelPlate} material={mat.label} position={[0, L.labelY, geo.at.labelPlate]} />
         <mesh position={[0, L.labelY, L.labelFace]}>
@@ -351,9 +325,33 @@ export function Slab({
               timeOffset={timeOffset}
             />
           </mesh>
-          {/* back face */}
+          {/* back face: the front design again, on the PI-rotated plane, so it
+              reads as its mirror when the card is spun — same furniture, same
+              art window, flipped left-to-right like a reflection */}
           <mesh geometry={geo.cardFace} position={[0, 0, -SLAB_SPEC.cardD / 2 - 0.0008]} rotation={[0, Math.PI, 0]}>
-            <meshStandardMaterial map={backTex} roughness={0.52} metalness={0.04} toneMapped={false} />
+            <meshStandardMaterial
+              map={face ?? undefined}
+              color={face ? '#ffffff' : card.color}
+              roughness={0.46}
+              metalness={0.05}
+              toneMapped={false}
+            />
+          </mesh>
+          {/* foil on the back too, so the flipped card carries the same finish */}
+          <mesh geometry={geo.cardFace} position={[0, 0, -SLAB_SPEC.cardD / 2 - 0.0024]} rotation={[0, Math.PI, 0]}>
+            <HoloCardMaterial
+              finish={card.style}
+              pointer={foilPointer}
+              hovered={isActive}
+              overlay
+              intensity={intensity}
+              hoverBoost={1.5}
+              cardAspect={SLAB_SPEC.cardW / SLAB_SPEC.cardH}
+              mask={[SLAB_SPEC.artInset, SLAB_SPEC.artBottom, 1 - SLAB_SPEC.artInset, 1 - SLAB_SPEC.artTop]}
+              maskFeather={0.012}
+              outside={0.015}
+              timeOffset={timeOffset}
+            />
           </mesh>
         </mesh>
         {children}

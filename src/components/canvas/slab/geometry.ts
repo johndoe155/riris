@@ -65,6 +65,74 @@ export interface Rect {
   y?: number;
 }
 
+/**
+ * The face plate's outline with the window opening as a notch that runs out
+ * through the bottom edge, instead of a closed hole. The window's bottom sits
+ * only ~8 px above the case's bottom edge while the face plate is inset a full
+ * moulding step, so a hole reaching the window's bottom pokes through the
+ * plate's outer boundary and the triangulator collapses it — which is what
+ * used to paint the opaque plate across the cavity's bottom strip, right at
+ * the card's bottom edge, leaving the card and the inner frame with zero
+ * margin at the bottom of the visible cavity. One notched contour
+ * triangulates cleanly and keeps the cavity open to its measured bottom edge.
+ *
+ * `grow` plays the role `fit()` plays for holes: the extrusion bevel dilates
+ * the material into the opening, so the notch is grown here and lands on the
+ * measured window rectangle after the bevel.
+ */
+export function notchedFaceOutline(
+  faceW: number,
+  faceH: number,
+  faceR: number,
+  windowRect: Rect,
+  power: number,
+  grow: number,
+  cornerSegs: number
+): THREE.Shape {
+  const hw = faceW / 2 - grow;
+  const hh = faceH / 2 - grow;
+  const rr = Math.max(0.002, faceR - grow);
+  const kappa = THREE.MathUtils.clamp(CIRCLE_KAPPA + (power - 2) * 0.0485, 0.5523, 0.86);
+  const c = rr * kappa;
+  const segs = Math.max(2, Math.round(cornerSegs));
+
+  // the notch: the window opening grown by `grow`, open at the bottom edge
+  const xr = windowRect.w / 2 + grow;
+  const yt = (windowRect.y ?? 0) + windowRect.h / 2 + grow;
+  const rc = Math.max(0.004, windowRect.r);
+  const ck = rc * CIRCLE_KAPPA;
+
+  const bez = new THREE.CubicBezierCurve(new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2());
+  const pts: THREE.Vector2[] = [];
+  const corner = (v0: [number, number], v1: [number, number], v2: [number, number], v3: [number, number], n = segs) => {
+    bez.v0.set(v0[0], v0[1]); bez.v1.set(v1[0], v1[1]); bez.v2.set(v2[0], v2[1]); bez.v3.set(v3[0], v3[1]);
+    for (let i = 0; i <= n; i++) pts.push(bez.getPoint(i / n).clone());
+  };
+  const line = (x: number, y: number) => pts.push(new THREE.Vector2(x, y));
+
+  // top edge, left → right, then down the right side (same rotation the
+  // squircle outlines use, so holes keep their reversed winding)
+  line(-hw + rr, hh);
+  corner([hw - rr, hh], [hw - rr + c, hh], [hw, hh - rr + c], [hw, hh - rr]);
+  line(hw, -hh + rr);
+  corner([hw, -hh + rr], [hw, -hh + rr - c], [hw - rr + c, -hh], [hw - rr, -hh]);
+  // bottom edge in to the notch's right wall
+  line(xr, -hh);
+  line(xr, yt - rc);
+  // notch's top-right corner (concave in the material, rounded like the window)
+  corner([xr, yt - rc], [xr, yt - rc + ck], [xr - rc + ck, yt], [xr - rc, yt], Math.max(6, segs));
+  line(-xr + rc, yt);
+  corner([-xr + rc, yt], [-xr + rc - ck, yt], [-xr, yt - rc + ck], [-xr, yt - rc], Math.max(6, segs));
+  // down the notch's left wall and out the bottom edge
+  line(-xr, -hh);
+  line(-hw + rr, -hh);
+  corner([-hw + rr, -hh], [-hw + rr - c, -hh], [-hw, -hh + rr - c], [-hw, -hh + rr]);
+  line(-hw, hh - rr);
+  corner([-hw, hh - rr], [-hw, hh - rr + c], [-hw + rr - c, hh], [-hw + rr, hh]);
+
+  return new THREE.Shape(pts);
+}
+
 function addHole(shape: THREE.Shape, hole: Rect, power: number, segs: number) {
   const path = squircle(hole.w, hole.h, hole.r, power, segs, hole.x ?? 0, hole.y ?? 0);
   shape.holes.push(new THREE.Path(path.getPoints(0).slice().reverse()));
@@ -192,10 +260,10 @@ export function buildWindowPlate(
 export type Vec3 = [number, number, number];
 
 export interface SlabPlacement {
-  band: Vec3;
   tray: Vec3;
   ridge: Vec3;
   ridgeTabs: Vec3[];
+  backPlate: Vec3;
 }
 
 export interface SlabGeometry {
@@ -211,8 +279,6 @@ export interface SlabGeometry {
   backPlate: THREE.BufferGeometry;
   /** tray ring (a plate with a card cutout) the card sits inside */
   tray: THREE.BufferGeometry;
-  /** frosted band around the window on the front face */
-  band: THREE.BufferGeometry;
   /** the dark label plate */
   labelPlate: THREE.BufferGeometry;
     /** the moulded rail between the label and the window (inner-frame width) */
@@ -234,7 +300,6 @@ export interface SlabGeometry {
       face: number;
       backPlate: number;
       tray: number;
-      band: number;
       labelPlate: number;
       ridge: number;
       ridgeTab: number;
@@ -257,7 +322,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   const P = spec.cornerPower;
   const {
     w, h, radius, bevel, labelW, labelH, labelRadius, cardW, cardH, cardRadius, cardD,
-    windowW, windowH, windowRadius, windowBand, zFront, zBack, zBackPlateFront, zCardBack, zTrayFront,
+    windowW, windowH, windowRadius, zFront, zBack, zBackPlateFront, zCardBack, zTrayFront,
     stepInset, ridgeInset,
   } = spec;
 
@@ -277,7 +342,14 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
 
   // --- shell: full silhouette, window + label cut through, chamfered rim
   const shellShape = plain({ w, h, r: radius }, bevel);
-  addHole(shellShape, fit(windowRect, bevel, -1), P, q.corner);
+  // The window hole is NOT grown to compensate the bevel: the compensated hole
+  // left only a ~6 px web between opening and case bottom, and the bevel
+  // contour self-intersected on it, collapsing the triangulation so the glass
+  // skin painted over the cavity's bottom strip. The bevel now shrinks the
+  // opening one wall-thickness inside the measured window on every side — the
+  // moulded wall the reference shows at the opening; with the frosted band
+  // removed it is the opening's only edge, clean and uncluttered.
+  addHole(shellShape, fit(windowRect, 0, -1), P, q.corner);
   addHole(shellShape, fit(labelHole, bevel, -1), P, q.corner);
   const shell = extrudedLayer(shellShape, {
     depth: L.shellFront - zBack,
@@ -289,8 +361,11 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
 
   // --- face plate: the silhouette minus the moulding step, proud of the body
   // by faceLift. Its bevelled edge is the bright line 10 px inside the case.
-  const faceShape = plain({ w: L.faceW, h: L.faceH, r: L.faceRadius }, 0.006);
-  addHole(faceShape, fit(windowRect, 0.006, -1), P, q.corner);
+  // The window is a notch open at the bottom edge (not a hole): the window
+  // reaches so close to the case's bottom that a closed hole would escape the
+  // inset outline and collapse, painting the plate over the cavity floor and
+  // leaving the card zero margin at the bottom of the visible cavity.
+  const faceShape = notchedFaceOutline(L.faceW, L.faceH, L.faceRadius, windowRect, P, 0.006, q.corner);
   addHole(faceShape, fit(labelHole, 0.006, -1), P, q.corner);
   const face = extrudedLayer(faceShape, {
     depth: zFront - L.shellFront + 0.004,
@@ -303,7 +378,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   // --- back plate closing the case (so the window isn't a see-through hole)
   const backPlate = extrudedLayer(plain({ w: windowW * 0.995, h: windowH * 0.995, r: windowRadius }, 0.006), {
     depth: zBackPlateFront - zBack,
-    bevel: 0.006,
+    bevel: 0.004,
     bevelSegments: q.bevel,
     curveSegments: q.curve,
   });
@@ -320,24 +395,10 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     curveSegments: q.curve,
   });
 
-    // --- frosted band: the moulded lip hugging the window's opening. Built about
-    // its own origin, then moved to the window's centre by `place.band`. The old
-    // version kept the window's y offset inside the outline, and extrudedLayer's
-    // re-centre threw that offset away, so the band rode 0.21 units up into the
-    // label plate and cut through the printed name.
-    const bandShape = plain({ w: windowW + windowBand * 2, h: windowH + windowBand * 2, r: windowRadius + windowBand }, 0.004);
-    addHole(bandShape, fit({ w: windowW, h: windowH, r: windowRadius }, 0.004, -1), P, q.corner);
-  const band = extrudedLayer(bandShape, {
-    depth: 0.008,
-    bevel: 0.004,
-    bevelSegments: q.bevel,
-    curveSegments: q.curve,
-  });
-
   // --- label plate + the thin pale lip printed inside it
   const labelPlate = extrudedLayer(plain(labelPlateRect, 0.005), {
     depth: spec.labelD,
-    bevel: 0.005,
+    bevel: 0.004,
     bevelSegments: q.bevel,
     curveSegments: q.curve,
   });
@@ -353,7 +414,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     // inner frame, x 435..1055, and not at the rim (`ridgeInset`).
     const ridgeW = w - ridgeInset * 2;
     const ridge = extrudedLayer(plain({ w: ridgeW, h: spec.ridgeH, r: spec.ridgeH / 2 }, 0.003), {
-      depth: 0.01,
+      depth: 0.008,
       bevel: 0.003,
       bevelSegments: q.bevel,
       curveSegments: q.curve,
@@ -361,7 +422,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     // the three bright tabs on the rail: one geometry, placed at `place.ridgeTabs`
     // and set proud of the rail (`at.ridgeTab`)
     const ridgeTab = extrudedLayer(plain({ w: spec.ridgeTabW, h: spec.ridgeH, r: spec.ridgeH / 2 }, 0.002), {
-      depth: 0.006,
+      depth: 0.005,
       bevel: 0.002,
       bevelSegments: q.bevel,
       curveSegments: q.curve,
@@ -397,14 +458,14 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
     apronBottom + 0.005 + spec.slotH / 2
   );
   const slots = L.slotX.map((x) => {
-    const g = new THREE.BoxGeometry(spec.slotW, spec.slotH, 0.01);
+    const g = new THREE.BoxGeometry(spec.slotW, spec.slotH, 0.006);
     g.translate(x, slotY, 0);
     return g;
   });
 
   const tri = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
     const triangles =
-      tri(trayPlate) + tri(shell) + tri(face) + tri(backPlate) + tri(tray) + tri(band) + tri(labelPlate) + tri(ridge) +
+      tri(trayPlate) + tri(shell) + tri(face) + tri(backPlate) + tri(tray) + tri(labelPlate) + tri(ridge) +
       tri(ridgeTab) * L.ridgeTabX.length + tri(card) + tri(cardFace) + slots.reduce((a, s) => a + tri(s), 0);
 
     const at = {
@@ -412,12 +473,11 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
       face: (zFront + L.shellFront - 0.004) / 2,
       backPlate: (zBackPlateFront + zBack) / 2,
       tray: (zTrayFront + zCardBack) / 2,
-      band: zFront + 0.0005,
       labelPlate: zFront - spec.labelD / 2 - 0.002,
       ridge: L.ridge,
       ridgeTab: L.ridge + 0.003,
       card: zCardBack + cardD / 2,
-      slot: zTrayFront + 0.006,
+      slot: zTrayFront + 0.004,
     };
 
     return {
@@ -425,7 +485,6 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
       face,
       backPlate,
       tray,
-      band,
       labelPlate,
       ridge,
       ridgeTab,
@@ -442,10 +501,14 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
        * read these; they must not assume (0, 0).
        */
       place: {
-        band: [0, L.windowY, at.band],
         tray: [0, L.windowY, at.tray],
         ridge: [0, L.ridgeY, at.ridge],
         ridgeTabs: L.ridgeTabX.map((x): Vec3 => [x, L.ridgeY, at.ridgeTab]),
+        // the plate is built centred on its own bounds; the window it closes
+        // sits `windowY` below the slab centre, so it must be placed there —
+        // at y=0 its bottom edge stopped mid-cavity and the case showed
+        // straight through under the card
+        backPlate: [0, L.windowY, at.backPlate],
       },
       triangles,
     };

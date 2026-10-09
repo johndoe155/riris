@@ -30,15 +30,18 @@
  *   art window       ink x 532..536 / 957..961,        inset 0.0630 card-w,
  *                        y 535..541 / 964..970          top 0.0365, bottom 0.3680 card-h
  *
- * The z stack is the real thing, front to back (all world units, slab 1 wide):
+ * The z stack is the real thing, front to back (all world units, slab 1 wide).
+ * The case is deliberately slim — a touch over half the original depth — so
+ * the slab reads as a modern flat acrylic holder rather than a deep box:
  *
- *   zFront        +0.045  front face of the case (the plate that carries the holes)
- *   zShellFront   +0.037  front of the shell body, one step behind the face
- *   zPlateBack    +0.017  back of the front plate (the window is this deep)
- *   cardFace      -0.010  the card's front surface
- *   zCardBack     -0.028  the card's back, and the tray's back plane
- *   zTrayFront    -0.012  front of the tray ring that the card sits in
- *   zBackPlate    -0.045  back face of the case
+ *   zFront        +0.026  front face of the case (the plate that carries the holes)
+ *   zShellFront   +0.021  front of the shell body, one step behind the face
+ *   zPlateBack    +0.010  back of the front plate (the window is this deep)
+ *   cardFace      -0.005  the card's front surface
+ *   zCardBack     -0.016  the card's back, and the tray's back plane
+ *   zTrayFront    -0.007  front of the tray ring that the card sits in
+ *   zBackPlate    -0.016  front of the back plate closing the window
+ *   zBack         -0.026  back face of the case
  */
 
 export type SlabQuality = 'hero' | 'cheap';
@@ -110,8 +113,6 @@ export interface SlabSpec {
   /** window top, from the slab's top edge */
   windowTop: number;
   windowRadius: number;
-  /** frosted band around the window on the front face */
-  windowBand: number;
 
   /* ---- card ---- */
   cardW: number;
@@ -151,31 +152,31 @@ export const SLAB_SPEC: SlabSpec = {
 
   radius: 0.115,
   cornerPower: 5.2,
-  bevel: 0.012,
+  bevel: 0.009,
   stepInset: 0.015,
-  faceLift: 0.008,
+  faceLift: 0.005,
 
-  zFront: 0.045,
-  zShellFront: 0.037,
-  zPlateBack: 0.017,
-  cardD: 0.018,
-  zCardBack: -0.028,
-  zTrayFront: -0.012,
-  zBackPlateFront: -0.028,
-  zBack: -0.045,
+  zFront: 0.026,
+  zShellFront: 0.021,
+  zPlateBack: 0.010,
+  cardD: 0.011,
+  zCardBack: -0.016,
+  zTrayFront: -0.007,
+  zBackPlateFront: -0.016,
+  zBack: -0.026,
 
   /** x 452..1036 px of the 665 px case: 584/665 */
   labelW: 0.8781,
   labelH: 0.2284,
   labelTop: 0.0600,
   labelRadius: 0.034,
-  labelD: 0.026,
+  labelD: 0.015,
   labelBorder: 0.0115,
 
   ridgeInset: 0.034,
   ridgeH: 0.0137,
   ridgeTop: 0.3472,
-  ridgeLift: 0.004,
+  ridgeLift: 0.003,
   // tab centres 459..512, 719..771, 982..1036 px of the 665 px case, as
   // (px centre - 744.5) / 665; the three tabs are 52..54 px wide
   ridgeTabs: [-0.3895, 0.0008, 0.3963],
@@ -185,7 +186,6 @@ export const SLAB_SPEC: SlabSpec = {
   windowH: 1.2396,
   windowTop: 0.4253,
   windowRadius: 0.05,
-  windowBand: 0.014,
 
   cardW: 0.7384,
   cardH: 1.1000,
