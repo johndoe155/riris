@@ -618,9 +618,14 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
 }
 
 /**
- * The collection mark: three fanned cards — white bodies with orange panels
- * and a black outer stroke, the middle card orange-bodied with a white border
- * — in the measured header slot (photo x 892..995, y 262..343 of the plate).
+ * The collection mark: three rounded cards fanned over a shared navy
+ * silhouette — the middle card plain white and behind, the left card white
+ * with an orange panel, the right card solid orange. Remodelled to match the
+ * supplied brand artwork (the old fan carried a black outline and an
+ * orange-bodied middle card, which the brand does not). Each card is painted
+ * as a navy band, then a white band, then its body, so a front card's rings
+ * cut across the card behind it exactly as the artwork shows — and the whole
+ * mark stays vector-crisp at every plate tier.
  */
 export function drawLogoMark(
   ctx: CanvasRenderingContext2D,
@@ -629,35 +634,57 @@ export function drawLogoMark(
   w: number,
   h: number
 ) {
-  const card = (
-    dx: number,
-    dy: number,
-    rot: number,
+  const NAVY = '#221f70';
+  const WHITE = '#fdfdfd';
+  const ORANGE = '#ee5c28';
+  // the mark's own aspect, contained in whatever slot the plate gives it
+  const ASPECT = 1.3;
+  const mw = Math.min(w, h * ASPECT);
+  const mh = mw / ASPECT;
+  const x0 = cx - mw / 2;
+  const y0 = cy - mh / 2;
+  const tNavy = 0.03 * mw;
+  const tWhite = 0.02 * mw;
+  const cw = 0.38 * mw;
+  const ch = 0.6 * mw;
+  const cr = 0.2 * cw;
+
+  const paintCard = (
+    nx: number,
+    ny: number,
+    deg: number,
     body: string,
     panel: string | null,
-    inset: number
+    inset: number,
+    scaleH = 1
   ) => {
     ctx.save();
-    ctx.translate(cx + dx * w, cy + dy * h);
-    ctx.rotate(rot);
-    const cw = w * 0.44;
-    const ch = h * 0.62;
-    ctx.lineWidth = w * 0.045;
-    ctx.strokeStyle = '#141416';
-    ctx.fillStyle = body;
-    roundRect(ctx, -cw / 2, -ch / 2, cw, ch, w * 0.05);
-    ctx.fill();
+    ctx.translate(x0 + nx * mw, y0 + ny * mh);
+    ctx.rotate((deg * Math.PI) / 180);
+    const chh = ch * scaleH;
+    roundRect(ctx, -cw / 2, -chh / 2, cw, chh, cr);
+    ctx.lineWidth = 2 * (tNavy + tWhite);
+    ctx.strokeStyle = NAVY;
     ctx.stroke();
+    ctx.lineWidth = 2 * tWhite;
+    ctx.strokeStyle = WHITE;
+    ctx.stroke();
+    ctx.fillStyle = body;
+    ctx.fill();
     if (panel) {
+      const pw = cw * (1 - inset * 2);
+      const ph = chh * (1 - inset * 2);
+      roundRect(ctx, -pw / 2, -ph / 2, pw, ph, cr * (1 - inset * 1.4));
       ctx.fillStyle = panel;
-      roundRect(ctx, -cw / 2 + cw * inset, -ch / 2 + ch * inset, cw * (1 - inset * 2), ch * (1 - inset * 2), w * 0.03);
       ctx.fill();
     }
     ctx.restore();
   };
-  card(-0.3, 0.02, (-12 * Math.PI) / 180, '#fdfdfd', '#e2622a', 0.16);
-  card(0.32, 0.06, (10 * Math.PI) / 180, '#fdfdfd', '#ef7f35', 0.16);
-  card(-0.02, -0.04, (-3 * Math.PI) / 180, '#fdfdfd', '#e2622a', 0.1);
+
+  // back to front: the plain middle card, then the side cards across it
+  paintCard(0.48, 0.47, 8, WHITE, null, 0, 1.12);
+  paintCard(0.205, 0.48, -15, WHITE, ORANGE, 0.13);
+  paintCard(0.765, 0.52, 12, ORANGE, null, 0);
 }
 
 export function buildLabelTexture(o: LabelText): THREE.CanvasTexture {
