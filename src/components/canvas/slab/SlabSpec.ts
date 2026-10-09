@@ -14,21 +14,26 @@
  *   y    : world units, measured DOWN from the slab's top edge. Multiply the
  *          photo's y fraction by h (1.677) to get it.
  *
- * Measured feature table (photo px → slab fractions / world units):
+ * Measured feature table (photo px → slab fractions / world units), re-measured
+ * for the card-parity pass (docs/card-parity-plan.md) with row/col runs and band
+ * projections over public/reference.jpg:
  *
  *   case             665 x 1116 px                     1 x 1.677
  *   corner radius    76.5 px                           R 0.115 (of min(w,h))
  *   corner profile   superellipse, exponent ~5.2       cornerPower 5.2
  *   outer chamfer    10 px (a dark band inside the edge) stepInset 0.015
  *   label plate      x 452..1036, y 227..379           x +-0.4391, top 0.0600, h 0.2284
- *   ridge rail       y 418..427, x 435..1055 (inner frame) top 0.3472, h 0.0134
- *   ridge tabs       x 459..512, 719..771, 982..1036   w 0.080, the only bright parts of the rail
- *   window lip       x 515..976, y 474..484 (bright)   one bar, w 0.6933, h 0.0150
- *   window opening   x 465..1030, y 470..1295          w 0.8496, top 0.4253, h 1.2396
- *   card             x 500..991,  y 508..1240          w 0.7384, top 0.4823, h 1.1000
- *   card ring        paper 0..8 px, ink band 10..25 px  ringInset 0.0203, stroke 0.0305 card-w
- *   art window       ink x 532..536 / 957..961,        inset 0.0630 card-w,
- *                        y 535..541 / 964..970          top 0.0365, bottom 0.3680 card-h
+ *   ridge rail       y 418..427, x 435..1055 (inner frame) top 0.3471, h 0.0135
+ *   ridge tabs       x 459..512, 719..771, 982..1036,  w 0.080, y 421..427 only —
+ *                    graded brightness L125 / L173 / L199 left to right
+ *   side wall tabs   x 438..446 / 1043..1051, y 647..697  one muted tab per wall
+ *   window top wall  y 476..483, face tone (L124)      a lit band, NOT a bright bar
+ *   window opening   x 465..1030, y 470..1292          w 0.8496, top 0.4253, h 1.2352
+ *   card             x 500..991,  y 508..1205          w 0.7383, top 0.4824, h 1.0475
+ *   card keyline     stroke 501..507 (7 px), radius 24 px, flush with the card edge
+ *   art frame        square stroke 528..534 / 535..541  inset 0.0570 card-w, stroke 0.0143
+ *   art window       inner 536..956 / 542..963 (421x422) — the 460x413 source art
+ *                    sits in it CONTAIN-fit, letterboxed ~21 px top and bottom
  *
  * The z stack is the real thing, front to back (all world units, slab 1 wide).
  * The case is deliberately slim — a touch over half the original depth — so
@@ -103,9 +108,23 @@ export interface SlabSpec {
   /**
    * Centres (world x) of the three bright tabs on the rail, and their width.
    * Only the tabs catch the light; between them the rail reads as the face.
+   * Their brightness is graded left to right (L125 / L173 / L199 in the photo),
+   * so each tab carries its own tone — see `ridgeTabTones`.
    */
   ridgeTabs: number[];
   ridgeTabW: number;
+  /** the tabs occupy y 421..427 of the rail's 418..427, not its full height */
+  ridgeTabH: number;
+  ridgeTabTones: string[];
+  /**
+   * The one moulded tab on each side wall (photo x 438..446 and 1043..1051,
+   * y 647..697): muted, not the bright slivers an earlier revision carried.
+   * `x` is the tab centre, `y` its centre measured down from the slab top.
+   */
+  sideTabX: number;
+  sideTabY: number;
+  sideTabW: number;
+  sideTabH: number;
 
   /* ---- window ---- */
   windowW: number;
@@ -136,9 +155,10 @@ export interface SlabSpec {
 
   /* ---- furniture ---- */
   /**
-   * The window's top lip: one bright bar along the top of the opening, x 515..976
-   * and y 474..484 in the photo. It was modelled as four 60 px ledges, which left
-   * dark gaps where the photo's lip is continuous, so it is now one bar.
+   * The window's top edge carries NO bright bar: the photo shows an 8 px band at
+   * face tone (L124) where the opening's top wall turns, and the cavity floor
+   * below it. The lip is therefore painted into the tray texture's top edge and
+   * `slots` is 0 — the old extruded ledge read as a flat white mesh strip.
    */
   slotTop: number;
   slotH: number;
@@ -148,22 +168,20 @@ export interface SlabSpec {
 
 export const SLAB_SPEC: SlabSpec = {
   w: 1,
-  /* The case is deliberately taller than the reference photo's 1.677: the
-   * bottom is extended so the margin between the card's bottom edge and the
-   * slab's bottom edge equals the sideways margin between the card and the
-   * slab's side edges ((1 - cardW) / 2 = 0.1308). Card bottom sits 1.5824
-   * down from the top, so h = 1.5824 + 0.1308. Every feature above is
-   * anchored from the top edge and is unchanged; only the bottom grows. */
-  h: 1.7132,
+  /* The photo's case is 665 x 1116 px = 1 x 1.677 world. The earlier +0.0362
+   * "bottom extension" assumed the card reached y 1240; it stops at 1205, and
+   * with that box the photo's bottom margin (window bottom 1292 - card bottom
+   * 1205 = 87 px) already equals the side margin (87 px), so nothing extends. */
+  h: 1.677,
 
-  radius: 0.055,
-  cornerPower: 8.0,
+  radius: 0.115,
+  cornerPower: 5.2,
   bevel: 0.004,
   stepInset: 0.015,
-  faceLift: 0.005,
+  faceLift: 0.007,
 
   zFront: 0.026,
-  zShellFront: 0.021,
+  zShellFront: 0.019,
   zPlateBack: 0.010,
   cardD: 0.011,
   zCardBack: -0.016,
@@ -180,47 +198,55 @@ export const SLAB_SPEC: SlabSpec = {
   labelBorder: 0.0115,
 
   ridgeInset: 0.034,
-  ridgeH: 0.0137,
-  ridgeTop: 0.3472,
+  ridgeH: 0.0135,
+  ridgeTop: 0.3471,
   ridgeLift: 0.003,
   // tab centres 459..512, 719..771, 982..1036 px of the 665 px case, as
   // (px centre - 744.5) / 665; the three tabs are 52..54 px wide
-  ridgeTabs: [-0.3895, 0.0008, 0.3963],
+  ridgeTabs: [-0.3895, 0.0008, 0.3977],
   ridgeTabW: 0.08,
+  // y 421..427 of the rail's 418..427: six px, not the rail's full nine
+  ridgeTabH: 0.009,
+  // measured tab luma L125 / L173 / L199 (the key light is off to the right)
+  ridgeTabTones: ['#7d6c7a', '#ad9cab', '#c7b6c4'],
+  // one muted moulded tab per side wall: x 438..446 and 1043..1051, y 647..697
+  sideTabX: 0.4549,
+  sideTabY: 0.7288,
+  sideTabW: 0.012,
+  sideTabH: 0.0766,
 
-  windowW: 0.9400,
-  windowH: 1.2396,
+  windowW: 0.8496,
+  windowH: 1.2352,
   windowTop: 0.4253,
   windowRadius: 0.012,
 
-  cardW: 0.7900,
-  cardH: 1.1200,
-  // centre y, measured down from the top: (0.2876 + 0.9435) / 2 * 1.677 = 1.0324
-  cardY: 1.7132 / 2 - 1.0324,
-  cardRadius: 0.018,
+  cardW: 0.7383,
+  cardH: 1.0475,
+  // top edge 508 px = 0.2876 of the case = 0.4824 world, down from the top
+  cardY: 1.677 / 2 - 0.4824 - 1.0475 / 2,
+  // the keyline's 24 px corner, shared by the body and the painted frame
+  cardRadius: 0.0361,
   cardGap: 0.012,
 
-  // the reference card at mid-height: paper 500..508 (outer 8 px), ink 510..526,
-  // paper 528..534, art from 536. 10 px of 492 = 0.0203; the ink band is 15-16 px = 0.0305
-  ringInset: 0.018,
-  ringWidth: 0.034,
+  // the white rounded keyline sits flush with the card's edge: stroke
+  // 501..507 (7 px of 491), then 20 px of dark gutter to the art frame
+  ringInset: 0.002,
+  ringWidth: 0.0143,
   /**
-   * The art frame's *outer* edge, as a fraction of the card width. Measured
-   * from the frame's ink: x 532..536 (left) and 957..961 (right) of a card
-   * spanning 500..991, so the outer edges average 0.0630 of the card width in.
+   * The art frame's *outer* edge, as a fraction of the card width: the square
+   * stroke runs 528..534 / 535..541 on a card spanning 500..991 / 508..1205.
    */
-  artInset: 0.060,
-  /** the frame's ink line: 4 px on a 492 px card */
-  artStroke: 0.007,
-  artTop: 0.040,
-  artBottom: 0.355,
+  artInset: 0.057,
+  artStroke: 0.0143,
+  artTop: 0.0387,
+  artBottom: 0.3372,
 
-  // 4 px below the window's top edge (474 px), 10 px tall, in world units
-  slotTop: 0.006,
-  slotH: 0.015,
-  // x 515..976 px of the 665 px case: 461 / 665, in world x
-  slotW: 0.6933,
-  slots: 1,
+  // no extruded ledge at the window's top: the photo's 8 px lit wall band is
+  // painted into the tray texture instead (see drawTray)
+  slotTop: 0,
+  slotH: 0,
+  slotW: 0,
+  slots: 0,
 };
 
 export interface SlabLayers {
@@ -357,26 +383,35 @@ export function trayLayout(spec: SlabSpec = SLAB_SPEC, layers: SlabLayers = slab
  * ------------------------------------------------------------------ */
 
 export const REF_TONE = {
-  /** the case's front face, top strip (catches the overhead light) */
-  faceTop: '#b9a9b5',
-  /** the case's front face, mid (beside the window) */
-  faceMid: '#826f7e',
+  /** the case's topmost strip (y 199..225): the overhead light's body reflection */
+  faceTop: '#b3a2af',
+  /** the apron between ridge and window (y 428..473), and the strip at y 390..415 */
+  faceMid: '#8c7b87',
+  /** the left wall at mid-height, in shadow */
+  faceLeft: '#40303c',
+  /** the right wall at mid-height, on the key-light side */
+  faceRight: '#907f8b',
+  /** the bottom web under the window */
+  faceBottom: '#423440',
   /** the case's chamfered rim, left edge (in shadow) */
-  rimDark: '#332433',
+  rimDark: '#3b2a37',
   /** the case's chamfered rim, right edge (lit) */
-  rimLit: '#9c8798',
-  /** the ridge's highlight */
-  ridge: '#d8cbd6',
-  /** the tray / window floor — mauve smoke, and remarkably flat */
-  tray: '#3c2d3c',
+  rimLit: '#907e8b',
+  /** the window's top wall band (y 476..483): face tone, a shade darker */
+  windowWall: '#8a7986',
+  /** the cavity floor: apron and below-card margins, remarkably flat */
+  tray: '#473844',
+  /** cavity side rails: shadow side and lit side */
+  trayRailL: '#43333f',
+  trayRailR: '#685864',
+  /** the moulded side-wall tab */
+  sideTab: '#b6a9b6',
   /** the label plate */
-  plate: '#332333',
+  plate: '#3d2e3a',
   /** the card's printed body, as it reads *through* the acrylic */
-  cardInk: '#3b2838',
+  cardInk: '#473844',
   /** the card's body before the case's veil: cardInk minus the transmission lift */
   cardBodyInk: '#352334',
   /** the card's frame ink */
   cardPaper: '#fbf9fb',
-  /** the window's top lip: mean luma 122 across x 540..950, rows 476..482 */
-  lip: '#b5a5b3',
 } as const;

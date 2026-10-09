@@ -8,6 +8,8 @@ import {
   drawCardFace,
   drawLabel,
   drawTray,
+  innerArtBox,
+  buildFaceMapTexture,
   mixHex,
   type CardFaceText,
   type LabelText,
@@ -38,16 +40,6 @@ export function loadImage(src: string): Promise<HTMLImageElement | null> {
   return imageCache.get(src)!;
 }
 
-/** Pixel box of the art panel inside the drawn face. */
-function artBox(o: CardFaceText) {
-  return {
-    x: o.width * o.artInset,
-    y: o.height * o.artTop,
-    w: o.width * o.artWidth,
-    h: o.height * o.artHeight,
-  };
-}
-
 function canvasTexture(draw: (ctx: CanvasRenderingContext2D) => void, w: number, h: number): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = w;
@@ -70,7 +62,7 @@ function canvasTexture(draw: (ctx: CanvasRenderingContext2D) => void, w: number,
 
 const faceCache = new Map<string, THREE.CanvasTexture>();
 
-export const FACE_TIERS = { hero: 2048, cheap: 768 } as const;
+export const FACE_TIERS = { hero: 2048, cheap: 1024 } as const;
 export const LABEL_TIERS = { hero: 2048, cheap: 1024 } as const;
 /** canvas aspects follow the slab spec, or the drawn text comes out stretched */
 const FACE_ASPECT = SLAB_SPEC.cardH / SLAB_SPEC.cardW;
@@ -116,6 +108,7 @@ export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): C
     artInset: SLAB_SPEC.artInset,
     artWidth: 1 - SLAB_SPEC.artInset * 2,
     artTop: SLAB_SPEC.artTop,
+    artBottom: SLAB_SPEC.artBottom,
     artHeight: 1 - SLAB_SPEC.artTop - SLAB_SPEC.artBottom,
     artStroke: SLAB_SPEC.artStroke,
   };
@@ -153,7 +146,7 @@ export function getCardFaceTexture(
   if (hit) return hit;
   const o = cardFaceText(card, FACE_TIERS[tier]);
   const tex = canvasTexture((ctx) => {
-    drawCardFace(ctx, o, art, artBox(o));
+    drawCardFace(ctx, o, art, innerArtBox(o));
   }, o.width, o.height);
   faceCache.set(key, tex);
   return tex;
@@ -288,6 +281,14 @@ export async function ensureBackTexture(style: BackStyle): Promise<THREE.CanvasT
   backCache.set(key, tex);
   backChannel.fire(style);
   return tex;
+}
+
+let faceMapTex: THREE.CanvasTexture | null = null;
+
+/** The case-UV sheen/moulding map for the face plate (one for all slabs). */
+export function getFaceMapTexture(): THREE.CanvasTexture {
+  if (!faceMapTex) faceMapTex = buildFaceMapTexture(1024);
+  return faceMapTex;
 }
 
 let trayTex: THREE.CanvasTexture | null = null;

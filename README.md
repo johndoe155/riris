@@ -32,12 +32,12 @@ Open http://localhost:3000. Same dependency versions as the main project, so the
 
 ## Reference-parity pass (this branch)
 
-`reference-image.jpg` is the target. The numbers to build against were recovered
+`public/reference.jpg` is the target. The numbers to build against were recovered
 from it first, with the scripts in `scripts/analysis/` (silhouette tracking,
 scan lines, corner arcs, a software rasteriser for the repo's own geometry), and
 the whole audit — measured table, layer-by-layer diagnostic, gap list and the
 exact math for the two changes that are easy to get wrong — is in
-**`docs/reference-parity.md`**. In short:
+**`docs/card-parity-plan.md`**. In short:
 
 - **Geometry.** The case was 7 px too tall (0.602 vs the measured 0.5959) and the
   window sat 71 px high, which dragged the tray, card and apron down with it. The
@@ -75,7 +75,7 @@ ported.
 
 ```bash
 npm run verify          # geometry + textures + shaders + parity
-npm run verify:parity   # 20 measured features against reference-image.jpg
+npm run verify:parity   # 26 measured features against public/reference.jpg
 ```
 
 `verify:parity` re-derives every feature from `SLAB_SPEC` and fails past 3.5 px

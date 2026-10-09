@@ -11,6 +11,7 @@ import { getWearMaps } from './textures';
 import {
   ensureCardTexture,
   getCardFaceTexture,
+  getFaceMapTexture,
   getLabelTexture,
   getTrayTexture,
   loadImage,
@@ -25,14 +26,16 @@ import {
 interface SlabMaterials {
   glass: THREE.MeshPhysicalMaterial;
   glassCheap: THREE.MeshPhysicalMaterial;
-  /** the front face plate: the layer the reference's moulded step exposes */
+  /** the front face plate: measured sheen + moulding lines from the face map */
   face: THREE.MeshPhysicalMaterial;
   label: THREE.MeshStandardMaterial;
   ridge: THREE.MeshStandardMaterial;
-  ridgeTab: THREE.MeshStandardMaterial;
+  /** one per rail tab: the photo's tabs are graded L125 / L173 / L199 */
+  ridgeTabs: THREE.MeshStandardMaterial[];
+  /** the one muted moulded tab on each side wall */
+  sideTab: THREE.MeshStandardMaterial;
   tray: THREE.MeshStandardMaterial;
   cardBody: THREE.MeshPhysicalMaterial;
-  slot: THREE.MeshStandardMaterial;
   wear: ReturnType<typeof getWearMaps>;
 }
 
@@ -53,7 +56,7 @@ function getMaterials(): SlabMaterials {
       // (#42333f) and lit on the right (#8a7685).
       transmission: 0.82,
       thickness: 0.16,
-      roughness: 0.045,
+      roughness: 0.06,
       metalness: 0,
       ior: 1.49,
       // a hint of dispersion: the refraction fringes separate at the chamfer the
@@ -62,37 +65,46 @@ function getMaterials(): SlabMaterials {
       clearcoat: 1,
       clearcoatRoughness: 0.06,
       specularIntensity: 1,
-      color: new THREE.Color('#8f778b'),
+      // smoky, not blue-white: the photo's walls read as lit plastic
+      // (#907f8b on the key side), so the shell carries a lighter body tone
+      color: new THREE.Color('#a493a2'),
       attenuationColor: new THREE.Color('#b7a2b4'),
       attenuationDistance: 2.4,
-      envMapIntensity: 1.8,
+      envMapIntensity: 2.0,
       roughnessMap: wear.roughness,
       bumpMap: wear.bump,
       bumpScale: 0.002,
       side: THREE.DoubleSide,
     }),
     /**
-     * The front face plate: opaque mauve, #91808c in the reference. It was a
-     * 92%-transmissive pass, so the dark tray and label behind it showed through
-     * and the whole apron read as the interior (#322c31) instead of the face
-     * (#91808c). The reference's apron is solid face tone, so the plate is solid
-     * here too, with a light clearcoat for its sheen. The label and window are
-     * still holes in it, so their own plates show through as before.
+     * The front face plate. The reference's smoky diagonal sheen (lit top and
+     * right wall, deep purple bottom-left) and every moulded tone step — the
+     * 10 px chamfer band, the step hairline, the ridge hairline and shadow,
+     * the window-top wall band, the side tabs — live in the measured face map
+     * (drawFaceMap), applied through the extrusion's shape-space UVs. The
+     * clearcoat layer still takes the strip lights for the live sheen.
      */
     face: new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(REF_TONE.faceMid),
+      color: new THREE.Color('#ffffff'),
+      map: (() => {
+        const t = getFaceMapTexture();
+        // extrude cap UVs are shape-space world units centred on the plate, so
+        // normalise them onto the map: one repeat across the plate's own box
+        const fw = SLAB_SPEC.w - SLAB_SPEC.stepInset * 2;
+        const fh = SLAB_SPEC.h - SLAB_SPEC.stepInset * 2;
+        t.repeat.set(1 / fw, 1 / fh);
+        t.offset.set(0.5, 0.5);
+        t.needsUpdate = true;
+        return t;
+      })(),
       // polished enough that the strip lights drag a long soft highlight down
-      // the apron (the reference's #baa9b5 top strip is exactly that sheen),
-      // rough enough that the body keeps its measured #91808c
-      roughness: 0.22,
+      // the apron, rough enough that the body keeps its measured tones
+      roughness: 0.28,
       metalness: 0,
       clearcoat: 0.8,
       clearcoatRoughness: 0.06,
       specularIntensity: 0.9,
       envMapIntensity: 1.2,
-      roughnessMap: wear.roughness,
-      bumpMap: wear.bump,
-      bumpScale: 0.0015,
     }),
     // pit fake: low opacity + env map, no transmission pass — but the same
     // optical vocabulary as the hero glass, so the cheap case still shows a
@@ -117,8 +129,13 @@ function getMaterials(): SlabMaterials {
     // tone; only its three tabs catch the light (below), so the body is not lit
     // any brighter than the face it sits on.
     ridge: new THREE.MeshStandardMaterial({ color: REF_TONE.faceMid, roughness: 0.42, metalness: 0 }),
-    // the bright tabs on the rail: #afa6af, the reference's measured highlight
-    ridgeTab: new THREE.MeshStandardMaterial({ color: REF_TONE.ridge, roughness: 0.3, metalness: 0 }),
+    // the tabs on the rail, each at its measured tone: the key light is off to
+    // the right, so the photo's tabs grade L125 / L173 / L199 left to right
+    ridgeTabs: SLAB_SPEC.ridgeTabTones.map(
+      (tone) => new THREE.MeshStandardMaterial({ color: tone, roughness: 0.34, metalness: 0 })
+    ),
+    // the one moulded tab per side wall: muted, like the photo's
+    sideTab: new THREE.MeshStandardMaterial({ color: REF_TONE.sideTab, roughness: 0.5, metalness: 0 }),
     // the tray underneath the window texture: the measured floor tone
     tray: new THREE.MeshStandardMaterial({ color: REF_TONE.tray, roughness: 0.62, metalness: 0.02 }),
     cardBody: new THREE.MeshPhysicalMaterial({
@@ -129,9 +146,6 @@ function getMaterials(): SlabMaterials {
       clearcoatRoughness: 0.3,
       envMapIntensity: 0.7,
     }),
-    // the window's top lip. The reference's lip is bright (luma ~122 across
-    // x 515..976), not a dark pocket, so the ledges take its measured tone.
-    slot: new THREE.MeshStandardMaterial({ color: REF_TONE.lip, roughness: 0.35, metalness: 0 }),
     wear,
   };
   return materials;
@@ -173,6 +187,19 @@ export interface SlabProps {
 }
 
 const FLIP_SPEED = Math.PI / 0.55;
+
+/*
+ * The foil overlay stops on the art window's INNER edge (the square frame's
+ * ink line): card UV, v from the bottom. Measured inner box 536..956 /
+ * 542..963 on the 491 x 697 card.
+ */
+const ART_STROKE_Y = (SLAB_SPEC.artStroke * SLAB_SPEC.cardW) / SLAB_SPEC.cardH;
+const FOIL_MASK: [number, number, number, number] = [
+  SLAB_SPEC.artInset + SLAB_SPEC.artStroke,
+  SLAB_SPEC.artBottom + ART_STROKE_Y,
+  1 - SLAB_SPEC.artInset - SLAB_SPEC.artStroke,
+  1 - SLAB_SPEC.artTop - ART_STROKE_Y,
+];
 
 export function Slab({
   card,
@@ -227,7 +254,7 @@ export function Slab({
 
   useEffect(() => {
     const max = gl.capabilities.getMaxAnisotropy();
-    for (const t of [labelTex, trayTex, face]) {
+    for (const t of [labelTex, trayTex, face, getFaceMapTexture()]) {
       if (t) t.anisotropy = Math.min(16, max);
     }
   }, [gl, labelTex, trayTex, face]);
@@ -291,14 +318,10 @@ export function Slab({
             frame x 435..1055), then its three bright tabs */}
         <mesh geometry={geo.ridge} material={mat.ridge} position={geo.place.ridge} />
         {geo.place.ridgeTabs.map((p, i) => (
-          <mesh key={i} geometry={geo.ridgeTab} material={mat.ridgeTab} position={p} />
+          <mesh key={i} geometry={geo.ridgeTab} material={mat.ridgeTabs[i % mat.ridgeTabs.length]} position={p} />
         ))}
         {geo.edgeTabs.map((tab, i) => (
-          <mesh key={`edge-${i}`} geometry={tab.geometry} material={mat.ridgeTab} position={tab.position} />
-        ))}
-        {/* the window's top lip: one bar */}
-        {geo.slots.map((g, i) => (
-          <mesh key={i} geometry={g} material={mat.slot} position={[0, 0, geo.at.slot]} />
+          <mesh key={`edge-${i}`} geometry={tab.geometry} material={mat.sideTab} position={tab.position} />
         ))}
         {/* the card */}
         <mesh
@@ -312,13 +335,10 @@ export function Slab({
           {/* front face: drawn furniture + the art panel, cut to the card's
               own silhouette so no square corners show past the rounded body */}
           <mesh geometry={geo.cardFace} position={[0, 0, cardFaceZ - geo.at.card]}>
-            <meshStandardMaterial
-              map={face ?? undefined}
-              color={face ? '#ffffff' : card.color}
-              roughness={0.46}
-              metalness={0.05}
-              toneMapped={false}
-            />
+            {/* unlit: the printed face must read exactly as painted — the
+                photo's inks are albedo, and a lit standard material under the
+                studio rig multiplied them past their texture values */}
+            <meshBasicMaterial map={face ?? undefined} color={face ? '#ffffff' : card.color} toneMapped={false} />
           </mesh>
           {/* foil overlay, masked to the card plane */}
           <mesh geometry={geo.cardFace} position={[0, 0, foilZ - geo.at.card]}>
@@ -333,7 +353,7 @@ export function Slab({
               // UV space: v runs from the bottom, so the art window is
               // [artBottom, 1 - artTop] vertically. The art frame is a hard
               // 0.0163-wide ink line, so the foil stops on it.
-              mask={[SLAB_SPEC.artInset, SLAB_SPEC.artBottom, 1 - SLAB_SPEC.artInset, 1 - SLAB_SPEC.artTop]}
+              mask={FOIL_MASK}
               maskFeather={0.012}
               outside={0.015}
               timeOffset={timeOffset}
@@ -343,13 +363,10 @@ export function Slab({
               reads as its mirror when the card is spun — same furniture, same
               art window, flipped left-to-right like a reflection */}
           <mesh geometry={geo.cardFace} position={[0, 0, -SLAB_SPEC.cardD / 2 - 0.0008]} rotation={[0, Math.PI, 0]}>
-            <meshStandardMaterial
-              map={face ?? undefined}
-              color={face ? '#ffffff' : card.color}
-              roughness={0.46}
-              metalness={0.05}
-              toneMapped={false}
-            />
+            {/* unlit: the printed face must read exactly as painted — the
+                photo's inks are albedo, and a lit standard material under the
+                studio rig multiplied them past their texture values */}
+            <meshBasicMaterial map={face ?? undefined} color={face ? '#ffffff' : card.color} toneMapped={false} />
           </mesh>
           {/* foil on the back too, so the flipped card carries the same finish */}
           <mesh geometry={geo.cardFace} position={[0, 0, -SLAB_SPEC.cardD / 2 - 0.0024]} rotation={[0, Math.PI, 0]}>
@@ -361,7 +378,7 @@ export function Slab({
               intensity={intensity}
               hoverBoost={1.5}
               cardAspect={SLAB_SPEC.cardW / SLAB_SPEC.cardH}
-              mask={[SLAB_SPEC.artInset, SLAB_SPEC.artBottom, 1 - SLAB_SPEC.artInset, 1 - SLAB_SPEC.artTop]}
+              mask={FOIL_MASK}
               maskFeather={0.012}
               outside={0.015}
               timeOffset={timeOffset}

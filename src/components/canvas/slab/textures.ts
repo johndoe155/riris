@@ -213,11 +213,30 @@ export interface CardFaceText {
   artInset: number;
   artWidth: number;
   artTop: number;
+  /** inset of the art frame's outer edge from the card's bottom, fraction of card-h */
+  artBottom: number;
   artHeight: number;
   /** stroke width of the art frame, as a fraction of the card width */
   artStroke?: number;
 }
 
+/**
+ * The reference card face, laid out from the re-measured table in
+ * docs/card-parity-plan.md §1 (card box 491 x 697 photo px at 500,508):
+ *
+ *   keyline   stroke 7 px flush with the card edge, radius 24 px
+ *   gutter    20 px of body ink
+ *   art frame square 7 px stroke at 28 px inset; inner window 421 x 422 px,
+ *             the 460 x 413 source art CONTAIN-fitted into it
+ *   title     cap 16 px, baseline y 1001, left 527
+ *   traits    left-rules 3 px at x 528/659/812, y 1010..1110; columns [3,2,2];
+ *             label cap 9 px at 1015 + n*37; value cap 8 px, +14 under label
+ *   meta      rule 3 px at y 1122 and 1165, x 527..964; caps 9 px at 1130/1149
+ *   footer    cap 10 px at 1175; left 528, middle centred 770, right 964
+ *
+ * Everything is expressed as a fraction of the card so the 2048 px hero tier
+ * and the pit tier draw the identical face.
+ */
 export function drawCardFace(
   ctx: CanvasRenderingContext2D,
   o: CardFaceText,
@@ -227,7 +246,31 @@ export function drawCardFace(
   const { width: W, height: H } = o;
   const ink = '#fbf9fb';
   const paper = '#352334';
-  const bodyRadius = Math.max(2, (o.bodyRadius ?? 0.03) * W);
+  const bodyRadius = Math.max(2, (o.bodyRadius ?? 0.0489) * W);
+
+  /* measured layout, as fractions of the card (x of W, y of H) */
+  const keyInset = o.ringInset ?? 0.002;
+  const keyStroke = o.ringWidth ?? 0.0143;
+  const keyRadius = o.ringRadius ?? 0.0489;
+  const artStroke = o.artStroke ?? 0.0143;
+  const left = 0.057; // title / footer / first rule all start on the art frame
+  const cap = (px: number) => (px / 697) * H; // photo px of cap height → canvas
+  const em = (px: number) => cap(px) / 0.72; // cap → em for these families
+  const heavy = (px: number) => `900 ${px}px Impact, "Arial Narrow", "Arial Black", sans-serif`;
+  // the reference's small text is a condensed sans: plain Arial runs ~20%
+  // wider and collides the meta/footer groups at these caps
+  const narrow = (wt: number, px: number) =>
+    `${wt} ${px}px "Arial Narrow", "Liberation Sans Narrow", "Roboto Condensed", Arial, sans-serif`;
+  // condensed stacks are not installed everywhere; shrink-to-fit keeps the
+  // measured group boundaries (528 / 770 / 964) collision-free on any host
+  const fitFont = (text: string, maxW: number, mk: (px: number) => string, px0: number) => {
+    let px = px0;
+    ctx.font = mk(px);
+    while (ctx.measureText(text).width > maxW && px > px0 * 0.62) {
+      px *= 0.94;
+      ctx.font = mk(px);
+    }
+  };
 
   ctx.clearRect(0, 0, W, H);
   ctx.save();
@@ -235,113 +278,192 @@ export function drawCardFace(
   ctx.fillStyle = paper;
   ctx.fillRect(0, 0, W, H);
 
-  // Thick rounded white keyline around the dark plum backing card.
-  const frameInset = Math.max(5, W * 0.035);
-  const frameW = Math.max(5, W * 0.018);
+  // The rounded white keyline sits flush with the card's own edge: its outer
+  // boundary IS the silhouette, which is what opens the 20 px gutter to the
+  // square art frame (the reference's double-border read).
   ctx.strokeStyle = ink;
-  ctx.lineWidth = frameW;
-  roundRect(ctx, frameInset + frameW / 2, frameInset + frameW / 2,
-    W - (frameInset + frameW / 2) * 2, H - (frameInset + frameW / 2) * 2,
-    Math.max(8, bodyRadius * 0.72));
+  ctx.lineWidth = Math.max(3, keyStroke * W);
+  roundRect(
+    ctx,
+    (keyInset + keyStroke / 2) * W,
+    (keyInset + keyStroke / 2) * W,
+    W - (keyInset + keyStroke) * W,
+    H - (keyInset + keyStroke) * W,
+    Math.max(6, (keyRadius - keyStroke / 2) * W)
+  );
   ctx.stroke();
 
-  // Nearly full-width art window with a thin square white keyline.
+  // Art window: contain-fit, letterboxed with the source's own edge tones so
+  // the background gradient runs on through the bars; nearest-neighbour
+  // whenever the window upsamples the source (pixel art stays razor sharp).
   const { x: ax, y: ay, w: aw, h: ah } = artBox;
-  ctx.fillStyle = '#392638';
+  const edgeTone = (row: number) => {
+    if (!art) return '#392638';
+    const c = document.createElement('canvas');
+    c.width = 1; c.height = 1;
+    const cc = c.getContext('2d')!;
+    cc.drawImage(art, 0, row, art.width, 1, 0, 0, 1, 1);
+    const d = cc.getImageData(0, 0, 1, 1).data;
+    return `rgb(${d[0]},${d[1]},${d[2]})`;
+  };
+  const topTone = edgeTone(0);
+  const bottomTone = edgeTone(art ? art.height - 1 : 0);
+  const bg = ctx.createLinearGradient(0, ay, 0, ay + ah);
+  bg.addColorStop(0, topTone);
+  bg.addColorStop(1, bottomTone);
+  ctx.fillStyle = bg;
   ctx.fillRect(ax, ay, aw, ah);
   if (art) {
-    const ir = art.width / art.height;
-    const wr = aw / ah;
-    let sx = 0, sy = 0, sw = art.width, sh = art.height;
-    if (ir > wr) { sw = art.height * wr; sx = (art.width - sw) / 2; }
-    else { sh = art.width / wr; sy = (art.height - sh) / 2; }
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(art, sx, sy, sw, sh, ax, ay, aw, ah);
+    /*
+     * Measured fit (docs/card-parity-plan.md §1.3): the reference panel shows
+     * the source art at 0.829 of its own px (k matched on the ghost body in
+     * both axes), i.e. drawn at 0.905 of the window width with its top edge
+     * 0.1487 of the window height down — NOT a cover crop (which clipped the
+     * corner sparkles) and not a centred contain either. The surrounding
+     * bars are the source's own edge rows/columns stretched, so the art's
+     * background gradient runs out of the crop seamlessly.
+     */
+    const dw = aw * 0.905;
+    const dh = dw * (art.height / art.width);
+    const dx = ax + aw * 0.0464;
+    const dy = ay + ah * 0.1487;
+    /*
+     * The supplied file is a tight crop of the original panel (its corner
+     * sparkles and the leaf tip touch its edges), so the drawn art sits on an
+     * offscreen layer whose own edges fade out over a few px: the crop's cut
+     * features melt into the window's background gradient instead of seaming
+     * against the bars. Nearest-neighbour whenever the window upsamples the
+     * source, so pixel art keeps the reference's razor-sharp blocks.
+     */
+    const lw = Math.max(2, Math.ceil(dw));
+    const lh = Math.max(2, Math.ceil(dh));
+    const layer = makeCanvas(lw, lh);
+    const lctx = layer.ctx;
+    lctx.imageSmoothingEnabled = dw / art.width < 2;
+    lctx.drawImage(art, 0, 0, art.width, art.height, 0, 0, dw, dh);
+    lctx.imageSmoothingEnabled = true;
+    const fade = Math.max(4, lw * 0.022);
+    lctx.globalCompositeOperation = 'destination-out';
+    const edge = (x: number, y: number, w: number, h: number, g: CanvasGradient) => {
+      lctx.fillStyle = g;
+      lctx.fillRect(x, y, w, h);
+    };
+    let g = lctx.createLinearGradient(0, 0, 0, fade);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    edge(0, 0, lw, fade, g);
+    g = lctx.createLinearGradient(0, lh, 0, lh - fade);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    edge(0, lh - fade, lw, fade, g);
+    g = lctx.createLinearGradient(0, 0, fade, 0);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    edge(0, 0, fade, lh, g);
+    g = lctx.createLinearGradient(lw, 0, lw - fade, 0);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    edge(lw - fade, 0, fade, lh, g);
+    lctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(layer.canvas, dx, dy, lw, lh);
   }
   ctx.strokeStyle = ink;
-  ctx.lineWidth = Math.max(2, (o.artStroke ?? 0.007) * W);
-  ctx.strokeRect(ax + ctx.lineWidth / 2, ay + ctx.lineWidth / 2, aw - ctx.lineWidth, ah - ctx.lineWidth);
+  ctx.lineWidth = Math.max(2, artStroke * W);
+  ctx.strokeRect(ax - ctx.lineWidth / 2, ay - ctx.lineWidth / 2, aw + ctx.lineWidth, ah + ctx.lineWidth);
 
-  const bandTop = ay + ah;
-  const band = H - bandTop;
-  const heavy = (px: number) => `900 ${px}px Impact, "Arial Narrow", "Arial Black", sans-serif`;
   ctx.fillStyle = ink;
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  const titleSize = Math.max(18, Math.min(W * 0.052, band * 0.105));
-  ctx.font = heavy(titleSize);
-  ctx.fillText(o.title.toUpperCase(), ax, bandTop + band * 0.035);
+  ctx.textBaseline = 'alphabetic';
 
-  const labelSize = Math.max(12, W * 0.019);
-  const valueSize = Math.max(11, W * 0.016);
+  // title: cap 16 px, baseline y 1001 of the 697 px card
+  ctx.font = heavy(em(16));
+  ctx.fillText(o.title.toUpperCase(), left * W, 0.707318 * H);
+
+  /* traits: one rule at the LEFT of every column, all three spanning exactly
+   * y 1010..1110 no matter how many entries the column carries; the reference's
+   * occupancy is [3, 2, 2] down the columns. */
   const traits = o.traits ?? [];
-  const gridTop = bandTop + band * 0.19;
-  const colW = aw / 3;
-  const rows = traits.length >= 7 ? 3 : 2;
-  const rowH = band * (rows === 3 ? 0.13 : 0.19);
-  // Reference order is vertical by column: BACKGROUNDS/EYES/MOUTHS,
-  // BASES/HANDS, BODYWEAR/HATS. No decorative horizontal strokes appear here.
-  for (let i = 0; i < traits.length; i++) {
-    const col = Math.floor(i / rows);
-    const row = i % rows;
-    const cx = ax + col * colW + W * 0.014;
-    const cy = gridTop + row * rowH;
-    const [label, value] = traits[i] ?? ['—', '—'];
-    ctx.font = heavy(labelSize);
-    ctx.fillText(label.toUpperCase(), cx, cy);
-    ctx.font = `500 ${valueSize}px Arial, sans-serif`;
-    ctx.globalAlpha = 0.9;
-    ctx.fillText(value, cx, cy + labelSize * 1.35);
-    ctx.globalAlpha = 1;
-  }
+  const counts = [3, 2, 2];
+  const ruleX = [0.05703, 0.32383, 0.63544];
+  const ruleW = 0.00611;
+  const ruleTop = 0.72023;
+  const ruleH = 0.14491;
+  const indent = 0.009;
+  const rowPitch = 0.053085;
+  const valueDrop = 0.020086;
   ctx.fillStyle = ink;
-  for (let col = 1; col < 3; col++) {
-    ctx.fillRect(ax + col * colW - W * 0.006, gridTop, Math.max(2, W * 0.004), rowH * rows * 0.92);
+  for (let c = 0; c < 3; c++) {
+    ctx.fillRect(ruleX[c] * W, ruleTop * H, Math.max(2, ruleW * W), ruleH * H);
+  }
+  let idx = 0;
+  for (let c = 0; c < 3; c++) {
+    for (let r = 0; r < counts[c]; r++) {
+      const [label, value] = traits[idx++] ?? ['—', '—'];
+      const cx = (ruleX[c] + indent) * W;
+      const labelTop = 0.7274 + r * rowPitch;
+      ctx.font = heavy(em(9));
+      ctx.fillStyle = ink;
+      ctx.fillText(label.toUpperCase(), cx, (labelTop * H) + cap(9));
+      const colRight = c < 2 ? ruleX[c + 1] : 0.945;
+      fitFont(value, (colRight - ruleX[c] - indent - 0.012) * W, (px) => narrow(400, px), em(8));
+      ctx.globalAlpha = 0.92;
+      ctx.fillText(value, cx, (labelTop + valueDrop) * H + cap(8));
+      ctx.globalAlpha = 1;
+    }
   }
 
-  // All reference dividers stop inside the card's white frame. The previous
-  // footer rule used the art-box width directly and could bleed past the card
-  // when the texture was sampled at the rounded edge.
-  const ruleLeft = Math.max(ax, frameInset + frameW * 1.35);
-  const ruleRight = Math.min(ax + aw, W - frameInset - frameW * 1.35);
-  const ruleWidth = Math.max(0, ruleRight - ruleLeft);
-  const metaY = gridTop + rowH * rows + band * 0.035;
-  const metaSize = Math.max(10, W * 0.014);
-  ctx.font = `600 ${metaSize}px Arial, sans-serif`;
+  // meta block: two 3 px rules across x 527..964, caps 9 px, right group flush
+  const ruleLeft = 0.05499 * W;
+  const ruleRight = 0.94501 * W;
+  const ruleT = Math.max(2, cap(3));
   ctx.fillStyle = ink;
-  ctx.fillRect(ruleLeft, metaY - W * 0.010, ruleWidth, Math.max(2, W * 0.003));
+  ctx.fillRect(ruleLeft, 0.880918 * H, ruleRight - ruleLeft, ruleT);
   ctx.textAlign = 'left';
-  ctx.fillText(`CONTRACT ADDRESS: 0x375d...e306`, ax, metaY);
-  ctx.fillText(`TOKEN ID: ${String(o.serial).split('/')[0]}`, ax, metaY + metaSize * 1.55);
+  fitFont('CONTRACT ADDRESS: 0x375d...e306', 0.44 * W, (px) => narrow(700, px), em(9));
+  ctx.fillText('CONTRACT ADDRESS: 0x375d...e306', ruleLeft, 0.892396 * H + cap(9));
+  ctx.fillText(`TOKEN ID: ${String(o.serial).split('/')[0]}`, ruleLeft, 0.919656 * H + cap(9));
   ctx.textAlign = 'right';
-  ctx.fillText(`TOKEN STANDARD: ERC-721`, ax + aw, metaY);
-  ctx.fillText(`CHAIN: Ethereum`, ax + aw, metaY + metaSize * 1.55);
+  fitFont('TOKEN STANDARD: ERC-721', 0.44 * W, (px) => narrow(700, px), em(9));
+  ctx.fillText('TOKEN STANDARD: ERC-721', 0.940937 * W, 0.892396 * H + cap(9));
+  ctx.fillText('CHAIN: Ethereum', 0.940937 * W, 0.919656 * H + cap(9));
 
-  const footerRuleY = metaY + metaSize * 3.15;
-  ctx.fillRect(ruleLeft, footerRuleY, ruleWidth, Math.max(2, W * 0.003));
-  const footerY = footerRuleY + metaSize * 1.25;
-  ctx.font = heavy(Math.max(11, W * 0.016));
+  // footer: left / centred-at-0.55 / right, cap 10 px
+  ctx.fillRect(ruleLeft, 0.942611 * H, ruleRight - ruleLeft, ruleT);
+  const footerBase = 0.956958 * H + cap(10);
   ctx.textAlign = 'left';
-  ctx.fillText(`OWNED BY: ${o.handle}`, ax, footerY);
+  fitFont(`OWNED BY: ${o.handle}`, 0.335 * W, (px) => narrow(700, px), em(10));
+  ctx.fillText(`OWNED BY: ${o.handle}`, ruleLeft, footerBase);
   ctx.textAlign = 'center';
-  ctx.fillText('@NEMOSCARDSHOP', ax + aw / 2, footerY);
+  fitFont('@NEMOSCARDSHOP', 0.25 * W, (px) => narrow(800, px), em(10));
+  ctx.fillText('@NEMOSCARDSHOP', 0.549898 * W, footerBase);
   ctx.textAlign = 'right';
-  ctx.fillText(o.serial, ax + aw, footerY);
+  fitFont(o.serial, 0.2 * W, (px) => narrow(800, px), em(10));
+  ctx.fillText(o.serial, ruleRight, footerBase);
   ctx.restore();
 }
 
 /** Canvas facing the card's front: face text + art. */
 export function buildCardFace(o: CardFaceText, art: HTMLImageElement | null): THREE.CanvasTexture {
   const { canvas, ctx } = makeCanvas(o.width, o.height);
-  const M = o.width; // face pixel width
-  drawCardFace(
-    ctx,
-    o,
-    art,
-    { x: M * o.artInset, y: o.height * o.artTop, w: M * o.artWidth, h: o.height * o.artHeight }
-  );
+  drawCardFace(ctx, o, art, innerArtBox(o));
   return toTexture(canvas, { srgb: true });
+}
+
+/**
+ * The art window's INNER box (inside the square frame stroke): the source art
+ * is contain-fitted here, and the stroke is drawn centred on its outer edge.
+ */
+export function innerArtBox(o: CardFaceText) {
+  const artStroke = o.artStroke ?? 0.0143;
+  const strokeY = artStroke * (o.width / o.height);
+  const x = o.artInset + artStroke;
+  const y = o.artTop + strokeY;
+  return {
+    x: o.width * x,
+    y: o.height * y,
+    w: o.width * (1 - x * 2),
+    h: o.height * (1 - y - (o.artBottom + strokeY)),
+  };
 }
 
 /** Card back: real branded backs where available, else a drawn spine. */
@@ -457,12 +579,21 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
     return;
   }
 
-  // Square-cornered inset keyline, approximately 8px at the hero tier.
-  ctx.strokeStyle = white;
-  ctx.lineWidth = Math.max(2, W * 0.006);
+  /*
+   * The photo carries no white keyline inside the plate: what reads as an
+   * "inset border" is a thin lavender hairline (L~74 against the plate's L50)
+   * plus the lit bevel on the plate's right edge. Both, at plate scale.
+   */
+  ctx.strokeStyle = 'rgba(122,105,120,0.85)';
+  ctx.lineWidth = Math.max(1.5, W * 0.0025);
   ctx.strokeRect(W * 0.025, H * 0.085, W * 0.95, H * 0.83);
+  const bevel = ctx.createLinearGradient(W * 0.975, 0, W, 0);
+  bevel.addColorStop(0, 'rgba(199,182,196,0)');
+  bevel.addColorStop(1, 'rgba(199,182,196,0.55)');
+  ctx.fillStyle = bevel;
+  ctx.fillRect(W * 0.975, 0, W * 0.025, H);
 
-  const pad = W * 0.085;
+  const pad = W * 0.0702;
   const lines = o.title.split('\n').map((line) => line.toUpperCase()).slice(0, 2);
   let size = H * 0.31;
   const maxWidth = W * 0.63;
@@ -475,21 +606,58 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   }
   ctx.font = heavy(size);
   ctx.fillStyle = white;
-  const leading = size * 0.82;
-  const startY = H / 2 - leading * (lines.length - 1) / 2;
+  // measured: caps 34 px on a 152 px plate, line tops 263 / 306 (pitch 43 px)
+  const leading = size * 0.915;
+  const startY = H * 0.49013 - leading * (lines.length - 1) / 2;
   lines.forEach((line, i) => ctx.fillText(line, pad, startY + i * leading));
 
-  // Use the uploaded mark itself; drawing a substitute silhouette was the
-  // source of the previous logo mismatch. Preserve its aspect ratio and
-  // transparent cutout while fitting it into the reference header slot.
-  if (o.logo) {
-    const maxW = W * 0.19;
-    const maxH = H * 0.72;
-    const scale = Math.min(maxW / o.logo.width, maxH / o.logo.height);
-    const lw = o.logo.width * scale;
-    const lh = o.logo.height * scale;
-    ctx.drawImage(o.logo, W * 0.84 - lw / 2, H / 2 - lh / 2, lw, lh);
-  }
+  // The mark is drawn as vectors at plate resolution: the supplied PNG is
+  // 150 x 126 and upscaled ~2.4x into the hero plate, which is exactly the
+  // blur + fringe tint the reference does not have.
+  drawLogoMark(ctx, W * 0.84161, H * 0.49671, W * 0.17637, H * 0.5329);
+}
+
+/**
+ * The collection mark: three fanned cards — white bodies with orange panels
+ * and a black outer stroke, the middle card orange-bodied with a white border
+ * — in the measured header slot (photo x 892..995, y 262..343 of the plate).
+ */
+export function drawLogoMark(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number
+) {
+  const card = (
+    dx: number,
+    dy: number,
+    rot: number,
+    body: string,
+    panel: string | null,
+    inset: number
+  ) => {
+    ctx.save();
+    ctx.translate(cx + dx * w, cy + dy * h);
+    ctx.rotate(rot);
+    const cw = w * 0.44;
+    const ch = h * 0.62;
+    ctx.lineWidth = w * 0.045;
+    ctx.strokeStyle = '#141416';
+    ctx.fillStyle = body;
+    roundRect(ctx, -cw / 2, -ch / 2, cw, ch, w * 0.05);
+    ctx.fill();
+    ctx.stroke();
+    if (panel) {
+      ctx.fillStyle = panel;
+      roundRect(ctx, -cw / 2 + cw * inset, -ch / 2 + ch * inset, cw * (1 - inset * 2), ch * (1 - inset * 2), w * 0.03);
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+  card(-0.3, 0.02, (-12 * Math.PI) / 180, '#fdfdfd', '#e2622a', 0.16);
+  card(0.32, 0.06, (10 * Math.PI) / 180, '#fdfdfd', '#ef7f35', 0.16);
+  card(-0.02, -0.04, (-3 * Math.PI) / 180, '#fdfdfd', '#e2622a', 0.1);
 }
 
 export function buildLabelTexture(o: LabelText): THREE.CanvasTexture {
@@ -518,34 +686,28 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
   // darkened the last 25% toward #41323e, which made the strip under the card
   // read as a continuation of the dark inner frame instead of the margin it
   // is — the bottom now falls off no more than the middle does
+  // the floor is flat #473844 top to bottom (apron and below-card margins
+  // measure the same tone), so no vertical ramp beyond a luma of noise
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#4a3c46');
-  g.addColorStop(0.37, '#483a45');
-  g.addColorStop(0.75, '#473944');
-  g.addColorStop(1, '#463843');
+  g.addColorStop(0, '#483944');
+  g.addColorStop(0.5, '#473843');
+  g.addColorStop(1, '#473844');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
-  // the window's top lip: a moulded bar that catches the light (the reference
-  // reads it *brighter* than the floor, not darker)
-  for (const slot of layout.slots) {
-    const sw = Math.max(2, slot.w * w);
-    const sh = Math.max(2, slot.h * h);
-    const sx = slot.x * w;
-    const sy = slot.y * h;
-    const lip = ctx.createLinearGradient(0, sy, 0, sy + sh);
-    lip.addColorStop(0, 'rgba(232,238,248,0.62)');
-    lip.addColorStop(0.55, 'rgba(196,206,222,0.34)');
-    lip.addColorStop(1, 'rgba(150,160,180,0.10)');
-    ctx.fillStyle = lip;
-    ctx.fillRect(sx, sy, sw, sh);
-    // the shaded under-edge that makes the tab read as a moulding
-    const under = ctx.createLinearGradient(0, sy + sh, 0, sy + sh + h * 0.006);
-    under.addColorStop(0, 'rgba(0,0,0,0.34)');
-    under.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = under;
-    ctx.fillRect(sx, sy + sh, sw, h * 0.006);
-  }
+  /*
+   * The window's top edge: the photo shows an 8 px band at face tone (L124,
+   * #8a7986) where the opening's top wall turns, then a dark seam into the
+   * cavity — NOT the bright extruded bar an earlier revision carried. 8 photo
+   * px of the 818 px window.
+   */
+  ctx.fillStyle = '#8a7986';
+  ctx.fillRect(0, 0, w, h * 0.0098);
+  const seam = ctx.createLinearGradient(0, h * 0.0098, 0, h * 0.016);
+  seam.addColorStop(0, 'rgba(0,0,0,0.35)');
+  seam.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = seam;
+  ctx.fillRect(0, h * 0.0098, w, h * 0.0062);
 
   // baked contact shadow around the card cutout — narrow, because the card sits
   // in a shallow tray and the reference's shadow is a tight line, not a well
@@ -576,48 +738,166 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
   roundRect(ctx, cx + pad * 0.12, cy + pad * 0.12, cw - pad * 0.24, ch - pad * 0.24, w * 0.045);
   ctx.stroke();
 
-  // the ridge's shadow on the top of the window: the reference shows the floor
-  // about 3 luma darker for the first 40 px under the ridge
-  const top = ctx.createLinearGradient(0, 0, 0, h * 0.045);
-  top.addColorStop(0, 'rgba(0,0,0,0.30)');
-  top.addColorStop(0.45, 'rgba(0,0,0,0.10)');
-  top.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = top;
-  ctx.fillRect(0, 0, w, h * 0.045);
-
-  // side rails: a shade lighter than the plate on the key-light side (right),
-  // and a hair darker on the left — measured 0.04 luma either way, no more
-  const lightL = ctx.createLinearGradient(0, 0, w * 0.06, 0);
-  lightL.addColorStop(0, 'rgba(0,0,0,0.14)');
-  lightL.addColorStop(0.55, 'rgba(198,208,226,0.05)');
-  lightL.addColorStop(1, 'rgba(0,0,0,0)');
+  // cavity side rails, measured: shadow side #43333f, key-light side #685864 —
+  // mauve plastic, not the blue-white washes an earlier revision painted
+  const lightL = ctx.createLinearGradient(0, 0, w * 0.065, 0);
+  lightL.addColorStop(0, 'rgba(67,51,63,0.9)');
+  lightL.addColorStop(0.6, 'rgba(67,51,63,0.35)');
+  lightL.addColorStop(1, 'rgba(67,51,63,0)');
   ctx.fillStyle = lightL;
-  ctx.fillRect(0, 0, w * 0.06, h);
-  const lightR = ctx.createLinearGradient(w, 0, w * 0.94, 0);
-  lightR.addColorStop(0, 'rgba(198,208,226,0.16)');
-  lightR.addColorStop(0.5, 'rgba(198,208,226,0.05)');
-  lightR.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillRect(0, 0, w * 0.065, h);
+  const lightR = ctx.createLinearGradient(w, 0, w * 0.935, 0);
+  lightR.addColorStop(0, 'rgba(104,88,100,0.85)');
+  lightR.addColorStop(0.5, 'rgba(104,88,100,0.3)');
+  lightR.addColorStop(1, 'rgba(104,88,100,0)');
   ctx.fillStyle = lightR;
-  ctx.fillRect(w * 0.94, 0, w * 0.06, h);
+  ctx.fillRect(w * 0.935, 0, w * 0.065, h);
 
-  // and the bottom ledge the card leans on: barely shaded, with a strong pale
-  // lip where the moulding turns — the lit line that separates the floor
-  // margin from the cavity wall, the same way the top lip separates the apron
-  const bottom = ctx.createLinearGradient(0, h, 0, h * 0.95);
-  bottom.addColorStop(0, 'rgba(0,0,0,0.06)');
-  bottom.addColorStop(1, 'rgba(0,0,0,0)');
+  // the bottom wall turns a shade darker than the floor (L55 against L60);
+  // there is no pale lip down there in the photo
+  const bottom = ctx.createLinearGradient(0, h, 0, h * 0.93);
+  bottom.addColorStop(0, 'rgba(20,12,20,0.22)');
+  bottom.addColorStop(1, 'rgba(20,12,20,0)');
   ctx.fillStyle = bottom;
-  ctx.fillRect(0, h * 0.95, w, h * 0.05);
-  const bottomLip = ctx.createLinearGradient(0, h, 0, h * 0.94);
-  bottomLip.addColorStop(0, 'rgba(196,206,224,0.28)');
-  bottomLip.addColorStop(1, 'rgba(196,206,224,0)');
-  ctx.fillStyle = bottomLip;
-  ctx.fillRect(0, h * 0.94, w, h * 0.06);
+  ctx.fillRect(0, h * 0.93, w, h * 0.07);
 }
 
 export function buildTrayTexture(w = 512, h = 768, layout: TrayLayout = trayLayout()): THREE.CanvasTexture {
   const { canvas, ctx } = makeCanvas(w, h);
   drawTray(ctx, w, h, layout);
+  return toTexture(canvas, { srgb: true });
+}
+
+/* ------------------------------------------------------------------ *
+ * Face plate map
+ *
+ * The reference case is smoky translucent plastic with a diagonal sheen:
+ * lit along the top strip and the right wall, deep purple into the bottom
+ * left. A single MeshPhysicalMaterial colour cannot carry that, so the
+ * measured sheen is painted once into a case-UV map and applied to the face
+ * plate through the extrusion's shape-space UVs. The moulded furniture that
+ * is only a tone step in the photo — chamfer band, step hairline, ridge
+ * hairline and shadow, window-top wall band, side tabs — is painted here
+ * too, at photo scale, so the 3-D bevels only add parallax.
+ * ------------------------------------------------------------------ */
+
+const FACE_PHOTO = { x0: 422, y0: 197, w: 645, h: 1096 };
+
+/** measured tone grid over the face plate, photo px (docs/card-parity-plan.md §3) */
+const FACE_GRID_X = [422, 440, 465, 600, 744, 900, 1030, 1050, 1067];
+const FACE_GRID_Y = [197, 300, 400, 430, 700, 900, 1100, 1240, 1293];
+const FACE_GRID: string[][] = [
+  ['#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af'],
+  ['#6f5c6b', '#7a6776', '#82707e', '#8c7b87', '#8c7b87', '#8c7b87', '#907f8b', '#96859a', '#9b8a98'],
+  ['#55424f', '#5d4a58', '#6a5765', '#8c7b87', '#8c7b87', '#8c7b87', '#907f8b', '#96859a', '#9b8a98'],
+  ['#4a3844', '#40303c', '#55424f', '#8c7b87', '#8c7b87', '#8c7b87', '#8a7986', '#7e6d79', '#907f8b'],
+  ['#3b2b37', '#40303c', '#43333f', '#473844', '#473844', '#473844', '#99889a', '#907f8b', '#907e8b'],
+  ['#392935', '#40303c', '#43333f', '#473844', '#473844', '#473844', '#9c8b9d', '#93828f', '#8f7e8b'],
+  ['#372733', '#3d2d39', '#40303c', '#473844', '#473844', '#473844', '#8f7e8b', '#877683', '#847380'],
+  ['#352531', '#352531', '#3a2a36', '#423440', '#423440', '#423440', '#4a3a46', '#4a3a46', '#4a3a46'],
+  ['#33232f', '#33232f', '#372733', '#3f303c', '#3f303c', '#3f303c', '#3f303c', '#3f303c', '#3f303c'],
+];
+
+function parseHex(hex: string): [number, number, number] {
+  const v = hex.replace('#', '');
+  return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+}
+
+export function drawFaceMap(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const { x0, y0, w: pw, h: ph } = FACE_PHOTO;
+  const gx = FACE_GRID_X;
+  const gy = FACE_GRID_Y;
+  const grid = FACE_GRID.map((row) => row.map(parseHex));
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+  const cell = (arr: number[], t: number): [number, number] => {
+    let i = 0;
+    while (i < arr.length - 2 && t > arr[i + 1]) i++;
+    const a = arr[i];
+    const b = arr[i + 1];
+    return [i, Math.min(1, Math.max(0, (t - a) / (b - a)))];
+  };
+  for (let py = 0; py < h; py++) {
+    const fy = y0 + ((py + 0.5) / h) * ph;
+    const [j, ty] = cell(gy, fy);
+    for (let px = 0; px < w; px++) {
+      const fx = x0 + ((px + 0.5) / w) * pw;
+      const [i, tx] = cell(gx, fx);
+      const c00 = grid[j][i];
+      const c10 = grid[j][i + 1];
+      const c01 = grid[j + 1][i];
+      const c11 = grid[j + 1][i + 1];
+      const o = (py * w + px) * 4;
+      for (let k = 0; k < 3; k++) {
+        const top = c00[k] + (c10[k] - c00[k]) * tx;
+        const bot = c01[k] + (c11[k] - c01[k]) * tx;
+        d[o + k] = top + (bot - top) * ty;
+      }
+      d[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  // photo px -> canvas px
+  const T = (x: number, y: number): [number, number] => [((x - x0) / pw) * w, ((y - y0) / ph) * h];
+  const S = (n: number) => (n / pw) * w; // photo length -> canvas length
+  const rect = (x: number, y: number, rw: number, rh: number) => {
+    const [cx, cy] = T(x, y);
+    ctx.fillRect(cx, cy, S(rw), (rh / ph) * h);
+  };
+
+  // moulded chamfer: the 10 px band inside the silhouette, dark on the shadow
+  // side and lit on the key side, with the bright hairline where the face
+  // plate's bevel turns
+  const chamfer = ctx.createLinearGradient(0, 0, w, 0);
+  chamfer.addColorStop(0, 'rgba(59,42,55,0.85)');
+  chamfer.addColorStop(0.5, 'rgba(59,42,55,0.35)');
+  chamfer.addColorStop(0.8, 'rgba(144,126,139,0.55)');
+  chamfer.addColorStop(1, 'rgba(144,126,139,0.85)');
+  ctx.strokeStyle = chamfer;
+  ctx.lineWidth = S(10);
+  roundRect(ctx, S(5), S(5), w - S(10), h - S(10), S(71));
+  ctx.stroke();
+  const hair = ctx.createLinearGradient(0, 0, w, 0);
+  hair.addColorStop(0, 'rgba(255,247,255,0.10)');
+  hair.addColorStop(0.55, 'rgba(255,247,255,0.22)');
+  hair.addColorStop(1, 'rgba(255,247,255,0.55)');
+  ctx.strokeStyle = hair;
+  ctx.lineWidth = Math.max(1.5, S(2.5));
+  roundRect(ctx, S(12), S(12), w - S(24), h - S(24), S(64));
+  ctx.stroke();
+
+  // shoulder step: 1 px hairline above the rail, 1 px shadow under it
+  ctx.fillStyle = 'rgba(255,247,255,0.35)';
+  rect(435, 417, 620, 2);
+  ctx.fillStyle = 'rgba(18,10,18,0.5)';
+  rect(435, 427, 620, 2);
+
+  // window-top wall band + its seam into the cavity
+  ctx.fillStyle = 'rgba(138,121,134,0.9)';
+  rect(465, 476, 565, 8);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  rect(465, 484, 565, 2);
+
+  // the two muted moulded side tabs
+  ctx.fillStyle = 'rgba(182,169,182,0.85)';
+  const [lx, ly] = T(438, 647);
+  roundRect(ctx, lx, ly, S(8), (50 / ph) * h, S(3));
+  ctx.fill();
+  ctx.fillStyle = 'rgba(195,182,194,0.85)';
+  const [rx, ry] = T(1043, 647);
+  roundRect(ctx, rx, ry, S(8), (50 / ph) * h, S(3));
+  ctx.fill();
+
+  // bottom weld hairline
+  ctx.fillStyle = 'rgba(255,247,255,0.08)';
+  rect(430, 1289, 630, 2);
+}
+
+export function buildFaceMapTexture(w = 1024): THREE.CanvasTexture {
+  const h = Math.round((w * FACE_PHOTO.h) / FACE_PHOTO.w);
+  const { canvas, ctx } = makeCanvas(w, h);
+  drawFaceMap(ctx, w, h);
   return toTexture(canvas, { srgb: true });
 }
 

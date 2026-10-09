@@ -1,5 +1,5 @@
 /**
- * Anatomical parity check: the model's slab spec against `reference-image.jpg`.
+ * Anatomical parity check: the model's slab spec against `public/reference.jpg`.
  *
  * `scripts/analysis/` is how the reference numbers were recovered (silhouette
  * tracking, scan lines, corner arcs — see docs/reference-parity.md). Those
@@ -25,11 +25,11 @@ const jiti = createJiti(import.meta.url, { moduleCache: false });
 const { SLAB_SPEC } = await jiti.import(root + 'src/components/canvas/slab/SlabSpec.ts');
 const { buildSlabGeometry } = await jiti.import(root + 'src/components/canvas/slab/geometry.ts');
 
-/** the case box in reference-image.jpg, px — background-deviation tracked */
-/* the design extends the case 0.0362 world (~24 px) past the photo's bottom
- * weld zone so the card's bottom margin equals its sideways margin; every
- * feature above is top-anchored, so the px scale (CASE.h / S.h) is unchanged */
-const CASE = { w: 665, h: 1140, x0: 412, y0: 187, x1: 1077, y1: 1327 };
+/** the case box in public/reference.jpg, px — background-deviation tracked */
+/* re-confirmed for the card-parity pass: the card stops at y 1205 and the
+ * photo's own bottom margin (window bottom 1292 - card bottom 1205 = 87 px)
+ * already equals the side margin, so nothing extends past the weld zone */
+const CASE = { w: 665, h: 1116, x0: 412, y0: 187, x1: 1077, y1: 1303 };
 /** tolerance: how far a feature may sit from the photo before this fails */
 const TOL = 3.5;
 
@@ -52,7 +52,7 @@ const placedBox = (g, at) => {
 };
 
 const MODEL = {
-  'case aspect (w/h)': [S.w / S.h, 665 / 1140],
+  'case aspect (w/h)': [S.w / S.h, 665 / 1116],
   'case corner radius (of min(w,h))': [S.radius, 76.5 / 665],
 
   'label left': [fxc(-S.labelW / 2), 452 - CASE.x0, 'px'],
@@ -73,17 +73,17 @@ const MODEL = {
   'window left': [fxc(-S.windowW / 2), 465 - CASE.x0, 'px'],
   'window right': [fxc(S.windowW / 2), 1030 - CASE.x0, 'px'],
   'window top': [fy(S.windowTop), 470 - CASE.y0],
-  'window bottom': [fy(S.windowTop + S.windowH), 1295 - CASE.y0],
+  'window bottom': [fy(S.windowTop + S.windowH), 1292 - CASE.y0],
 
   'card left': [fxc(-S.cardW / 2), 500 - CASE.x0, 'px'],
   'card right': [fxc(S.cardW / 2), 991 - CASE.x0, 'px'],
   'card top': [fy(fromTop(cardTop)), 508 - CASE.y0],
-  'card bottom': [fy(fromTop(S.cardY - S.cardH / 2)), 1240 - CASE.y0],
+  'card bottom': [fy(fromTop(S.cardY - S.cardH / 2)), 1205 - CASE.y0],
 
-  // the art frame's *outer* edges: its 4 px ink line runs 532..536 and
-  // 957..961 horizontally, 535..541 and 964..970 vertically
-  'art frame left': [fxc(-S.cardW / 2 + S.artInset * S.cardW), 532 - CASE.x0, 'px'],
-  'art frame right': [fxc(S.cardW / 2 - S.artInset * S.cardW), 961 - CASE.x0, 'px'],
+  // the art frame's *outer* edges: its 7 px square stroke runs 528..534 and
+  // 957..963 horizontally, 535..541 and 964..970 vertically
+  'art frame left': [fxc(-S.cardW / 2 + S.artInset * S.cardW), 528 - CASE.x0, 'px'],
+  'art frame right': [fxc(S.cardW / 2 - S.artInset * S.cardW), 963 - CASE.x0, 'px'],
   'art frame top': [fy(fromTop(cardTop - S.artTop * S.cardH)), 535 - CASE.y0],
   'art frame bottom': [fy(fromTop(cardTop - (1 - S.artBottom) * S.cardH)), 970 - CASE.y0],
 };
@@ -133,4 +133,4 @@ if (failures) {
   console.log(`\n${failures} FEATURE(S) OUT OF TOLERANCE`);
   process.exit(1);
 }
-console.log('\nOK - every measured feature of the slab matches reference-image.jpg');
+console.log('\nOK - every measured feature of the slab matches public/reference.jpg');

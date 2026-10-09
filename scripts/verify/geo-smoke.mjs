@@ -38,7 +38,9 @@ for (const q of ['hero', 'cheap']) {
       const s = stats(k, v);
       bad += s.nan;
     } else if (Array.isArray(v)) {
-      console.log(`${k.padEnd(12)} = ${v.length} x BufferGeometry (${v.map((g) => g.attributes.position.count).join(',')} verts)`);
+      // arrays may hold geometries (slots) or placements (edgeTabs)
+      const geos = v.map((g) => (g && g.isBufferGeometry ? g : g?.geometry)).filter(Boolean);
+      console.log(`${k.padEnd(12)} = ${v.length} x BufferGeometry (${geos.map((g) => g.attributes.position.count).join(',')} verts)`);
     } else {
       console.log(`${k.padEnd(12)} = ${v}`);
     }

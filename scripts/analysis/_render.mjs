@@ -149,6 +149,7 @@ draw(geo.trayPlate, 'trayplate', 0, 0, L.trayFront + 0.0012);
 draw(geo.labelPlate, 'label', 0, L.labelY, geo.at.labelPlate);
 draw(geo.ridge, 'ridge', ...geo.place.ridge);
 for (const p of geo.place.ridgeTabs) draw(geo.ridgeTab, 'ridge', ...p);
+for (const t of geo.edgeTabs) draw(t.geometry, 'ridge', ...t.position);
 for (const g of geo.slots) draw(g, 'slot', 0, 0, geo.at.slot);
 draw(geo.card, 'card', 0, SLAB_SPEC.cardY, geo.at.card);
 draw(geo.cardFace, 'card', 0, SLAB_SPEC.cardY, L.cardFace + 0.0012);

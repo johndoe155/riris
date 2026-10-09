@@ -404,7 +404,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   const faceShape = notchedFaceOutline(L.faceW, L.faceH, L.faceRadius, windowRect, P, 0.006, q.corner);
   addHole(faceShape, fit(labelHole, 0.006, -1), P, q.corner);
   const face = extrudedLayer(faceShape, {
-    depth: zFront - L.shellFront + 0.004,
+    depth: zFront - L.shellFront + spec.faceLift,
     bevel: 0.006,
     bevelSegments: q.bevel,
     curveSegments: q.curve,
@@ -455,16 +455,23 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
       bevelSegments: q.bevel,
       curveSegments: q.curve,
     });
-    // the three bright tabs on the rail: one geometry, placed at `place.ridgeTabs`
-    // and set proud of the rail (`L.ridge + 0.003`)
-    const ridgeTab = extrudedLayer(plain({ w: spec.ridgeTabW, h: spec.ridgeH, r: spec.ridgeH / 2 }, 0.002), {
+    // the three bright tabs on the rail: one geometry, placed at `place.ridgeTabs`.
+    // They occupy y 421..427 — six of the rail's nine px — because the rail's own
+    // top hairline and under-shadow are what read as the shoulder step.
+    const ridgeTab = extrudedLayer(plain({ w: spec.ridgeTabW, h: spec.ridgeTabH, r: spec.ridgeTabH / 2 }, 0.002), {
       depth: 0.005,
       bevel: 0.002,
       bevelSegments: q.bevel,
       curveSegments: q.curve,
     });
-    const edgeTabTop = new THREE.BoxGeometry(0.16, 0.008, 0.004);
-    const edgeTabSide = new THREE.BoxGeometry(0.008, 0.16, 0.004);
+    /*
+     * One muted moulded tab per side wall (photo x 438..446 / 1043..1051,
+     * y 647..697). The earlier set — three full-width bars above the label and
+     * below the card plus four 107 px slivers per wall, all at the rail's bright
+     * tone — is what painted the stray white lines across the footer, the
+     * "underline" under COLLECTION and the slivers on the walls.
+     */
+    const sideTab = new THREE.BoxGeometry(spec.sideTabW, spec.sideTabH, 0.004);
 
   // --- the card
   const card = extrudedLayer(plain({ w: cardW, h: cardH, r: cardRadius }, 0.005), {
@@ -502,18 +509,12 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
   });
 
   const tri = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
-    const edgeTabs = [
-      [-0.34, h / 2 - 0.24, L.ridge + 0.003], [0, h / 2 - 0.24, L.ridge + 0.003], [0.34, h / 2 - 0.24, L.ridge + 0.003],
-      [-0.34, -h / 2 + 0.24, L.ridge + 0.003], [0, -h / 2 + 0.24, L.ridge + 0.003], [0.34, -h / 2 + 0.24, L.ridge + 0.003],
-    ].map(([x, y, z]): { geometry: THREE.BufferGeometry; position: Vec3 } => ({
-      geometry: edgeTabTop,
-      position: [x, y, z],
-    })).concat([
-      { geometry: edgeTabSide, position: [-w / 2 + 0.018, 0.34, L.ridge + 0.003] as Vec3 },
-      { geometry: edgeTabSide, position: [-w / 2 + 0.018, -0.34, L.ridge + 0.003] as Vec3 },
-      { geometry: edgeTabSide, position: [w / 2 - 0.018, 0.34, L.ridge + 0.003] as Vec3 },
-      { geometry: edgeTabSide, position: [w / 2 - 0.018, -0.34, L.ridge + 0.003] as Vec3 },
-    ]);
+    const sideTabY = h / 2 - spec.sideTabY;
+    const sideTabZ = zFront + 0.0015;
+    const edgeTabs: { geometry: THREE.BufferGeometry; position: Vec3 }[] = [
+      { geometry: sideTab, position: [-spec.sideTabX, sideTabY, sideTabZ] },
+      { geometry: sideTab, position: [spec.sideTabX, sideTabY, sideTabZ] },
+    ];
     const triangles =
       tri(trayPlate) + tri(shell) + tri(face) + tri(backPlate) + tri(tray) + tri(labelPlate) + tri(ridge) +
       tri(ridgeTab) * L.ridgeTabX.length + tri(card) + tri(cardFace) + slots.reduce((a, s) => a + tri(s), 0) +
@@ -521,7 +522,7 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
 
     const at = {
       shell: (L.shellFront + zBack) / 2,
-      face: (zFront + L.shellFront - 0.004) / 2,
+      face: zFront - (zFront - L.shellFront + spec.faceLift) / 2,
       backPlate: (zBackPlateFront + zBack) / 2,
       tray: (zTrayFront + zCardBack) / 2,
       labelPlate: zFront - spec.labelD / 2 - 0.002,
@@ -555,7 +556,11 @@ export function buildSlabGeometry(quality: SlabQuality = 'hero', spec: SlabSpec 
       place: {
         tray: [0, L.windowY, at.tray],
         ridge: [0, L.ridgeY, at.ridge],
-        ridgeTabs: L.ridgeTabX.map((x): Vec3 => [x, L.ridgeY, L.ridge + 0.003]),
+        ridgeTabs: L.ridgeTabX.map((x): Vec3 => [
+          x,
+          L.ridgeY - (spec.ridgeH - spec.ridgeTabH) / 2,
+          L.ridge + 0.003,
+        ]),
         // the plate is built centred on its own bounds; the window it closes
         // sits `windowY` below the slab centre, so it must be placed there —
         // at y=0 its bottom edge stopped mid-cavity and the case showed

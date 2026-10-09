@@ -24,8 +24,8 @@ import * as THREE from 'three';
 let gradientCache: THREE.CanvasTexture | null = null;
 let gradientKey = '';
 
-function gradientTexture(top: string, glow: string, bottom: string, angle: number) {
-  const key = `${top}|${glow}|${bottom}|${angle}`;
+function gradientTexture(top: string, glow: string, bottom: string, angle: number, cover = 1) {
+  const key = `${top}|${glow}|${bottom}|${angle}|${cover}`;
   if (gradientCache && gradientKey === key) return gradientCache;
   const size = 1024;
   const canvas = document.createElement('canvas');
@@ -33,9 +33,12 @@ function gradientTexture(top: string, glow: string, bottom: string, angle: numbe
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
   // direction: 0 = pure horizontal (light on the right), positive tilts the
-  // light end up toward the top-right, in radians
-  const dx = Math.cos(angle) * size * 0.5;
-  const dy = Math.sin(angle) * size * 0.5;
+  // light end up toward the top-right, in radians. `cover` is the fraction of
+  // the wall the calibrated photo frame occupies: the gradient line spans only
+  // that middle band and the canvas gradient clamps past its ends, so a wall
+  // bigger than the photo frame shows no edge of its own.
+  const dx = Math.cos(angle) * size * 0.5 * cover;
+  const dy = Math.sin(angle) * size * 0.5 * cover;
   const g = ctx.createLinearGradient(size / 2 - dx, size / 2 + dy, size / 2 + dx, size / 2 - dy);
   g.addColorStop(0, bottom);
   g.addColorStop(0.5, glow);
@@ -87,6 +90,8 @@ export interface BackdropProps {
   bottom?: string;
   /** tilt of the gradient in radians; 0 = light straight to the right */
   angle?: number;
+  /** fraction of the wall the calibrated photo frame occupies (gradient span) */
+  cover?: number;
   shadow?: number;
   /** shadow centre and size, relative to the slab */
   shadowOffset?: [number, number];
@@ -100,11 +105,12 @@ export function Backdrop({
   glow = '#4a3a45',
   bottom = '#0d0a0d',
   angle = 0.28,
+  cover = 1,
   shadow = 0.72,
   shadowOffset = [0.02, -0.95],
   shadowScale = [1.55, 0.30],
 }: BackdropProps) {
-  const gradient = useMemo(() => gradientTexture(top, glow, bottom, angle), [top, glow, bottom, angle]);
+  const gradient = useMemo(() => gradientTexture(top, glow, bottom, angle, cover), [top, glow, bottom, angle, cover]);
   const soft = useMemo(() => shadowTexture(), []);
   const wallZ = -6;
 
@@ -156,9 +162,18 @@ export const REF_BACKDROP = {
  *
  * The contact shadow moves to the case's bottom edge at wall depth (y -1.56).
  */
-export const HERO_WALL_HEIGHT = 4.07;
+/*
+ * The hero camera (fov 38, 3:4 canvas) sees 6.34 x 4.76 world units at the
+ * wall's depth; the photo frame is only 4.07 square there, so a 4.07 wall put
+ * its own hard edges inside the shot — the pale rectangle and dark strip
+ * beside the case. The wall now covers the view, and `cover` keeps the
+ * gradient calibrated to the photo frame (the canvas gradient clamps beyond
+ * it, so the extra wall is a smooth continuation, not a new edge).
+ */
+export const HERO_WALL_HEIGHT = 7.0;
 export const HERO_BACKDROP = {
   ...REF_BACKDROP,
+  cover: 4.07 / 7.0,
   // the photo's contact shadow is ~30 px deep and near black (35) under the case
   shadow: 1.0,
   shadowOffset: [0.0, -1.56] as [number, number],

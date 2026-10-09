@@ -39,8 +39,8 @@ const GUIDES: { label: string; points: [number, number][] }[] = [
     points: [
       [nx(0.1323), norm(0.2876)],
       [nx(0.8707), norm(0.2876)],
-      [nx(0.8707), norm(0.9435)],
-      [nx(0.1323), norm(0.9435)],
+      [nx(0.8707), norm(0.9122)],
+      [nx(0.1323), norm(0.9122)],
       [nx(0.1323), norm(0.2876)],
     ],
   },
@@ -67,10 +67,10 @@ const GUIDES: { label: string; points: [number, number][] }[] = [
   {
     label: 'window',
     points: [
-      [nx(0.0797), norm(0.2543)],
-      [nx(0.9293), norm(0.2543)],
-      [nx(0.9293), norm(0.9933)],
-      [nx(0.0797), norm(0.9933)],
+      [nx(0.0797), norm(0.2536)],
+      [nx(0.9293), norm(0.2536)],
+      [nx(0.9293), norm(0.9901)],
+      [nx(0.0797), norm(0.9901)],
       [nx(0.0797), norm(0.2543)],
     ],
   },
@@ -196,7 +196,7 @@ export default function ReferenceCompare() {
         </ul>
         <p className="text-[10px] leading-relaxed text-[#F5F3EF]/35">
           Reference: 665 × 1116 px case in a 1488 × 1484 photo. Plate 0.878 w, card 0.738 w
-          (y 0.288..0.944), window 0.850 w, ridge y 0.3472 h 0.0134, ring line 0.0163 card-w.
+          (y 0.288..0.912), window 0.850 w, ridge y 0.3471 h 0.0135, keyline flush 0.0143 card-w.
         </p>
       </div>
     </div>
