@@ -300,11 +300,17 @@ export function drawCardFace(
     ctx.fillRect(ax + col * colW - W * 0.006, gridTop, Math.max(2, W * 0.004), rowH * rows * 0.92);
   }
 
+  // All reference dividers stop inside the card's white frame. The previous
+  // footer rule used the art-box width directly and could bleed past the card
+  // when the texture was sampled at the rounded edge.
+  const ruleLeft = Math.max(ax, frameInset + frameW * 1.35);
+  const ruleRight = Math.min(ax + aw, W - frameInset - frameW * 1.35);
+  const ruleWidth = Math.max(0, ruleRight - ruleLeft);
   const metaY = gridTop + rowH * rows + band * 0.035;
   const metaSize = Math.max(10, W * 0.014);
   ctx.font = `600 ${metaSize}px Arial, sans-serif`;
   ctx.fillStyle = ink;
-  ctx.fillRect(ax, metaY - W * 0.010, aw, Math.max(2, W * 0.003));
+  ctx.fillRect(ruleLeft, metaY - W * 0.010, ruleWidth, Math.max(2, W * 0.003));
   ctx.textAlign = 'left';
   ctx.fillText(`CONTRACT ADDRESS: 0x375d...e306`, ax, metaY);
   ctx.fillText(`TOKEN ID: ${String(o.serial).split('/')[0]}`, ax, metaY + metaSize * 1.55);
@@ -313,7 +319,7 @@ export function drawCardFace(
   ctx.fillText(`CHAIN: Ethereum`, ax + aw, metaY + metaSize * 1.55);
 
   const footerRuleY = metaY + metaSize * 3.15;
-  ctx.fillRect(ax, footerRuleY, aw, Math.max(2, W * 0.003));
+  ctx.fillRect(ruleLeft, footerRuleY, ruleWidth, Math.max(2, W * 0.003));
   const footerY = footerRuleY + metaSize * 1.25;
   ctx.font = heavy(Math.max(11, W * 0.016));
   ctx.textAlign = 'left';
