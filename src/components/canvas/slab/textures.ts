@@ -315,18 +315,20 @@ export function drawCardFace(
   ctx.fillRect(ax, ay, aw, ah);
   if (art) {
     /*
-     * Measured fit (docs/card-parity-plan.md §1.3): the reference panel shows
-     * the source art at 0.829 of its own px (k matched on the ghost body in
-     * both axes), i.e. drawn at 0.905 of the window width with its top edge
-     * 0.1487 of the window height down — NOT a cover crop (which clipped the
-     * corner sparkles) and not a centred contain either. The surrounding
-     * bars are the source's own edge rows/columns stretched, so the art's
-     * background gradient runs out of the crop seamlessly.
+     * Contain-fit, centred: the source's own aspect decides the placement, so
+     * any replacement art lands inside the window with no offset math tuned
+     * to one crop. (The old fixed fit — 0.905 of the window width with its
+     * top edge 0.1487 of the window height down — was measured for the
+     * original panel's 460x413 crop; a square source drew 95 px past the
+     * window's bottom edge, spilling over the gutter and title.) The
+     * letterbox bars, where the aspect leaves any, are the source's own edge
+     * rows/columns stretched, so its background gradient runs on through.
      */
-    const dw = aw * 0.905;
-    const dh = dw * (art.height / art.width);
-    const dx = ax + aw * 0.0464;
-    const dy = ay + ah * 0.1487;
+    const k = Math.min(aw / art.width, ah / art.height);
+    const dw = art.width * k;
+    const dh = art.height * k;
+    const dx = ax + (aw - dw) / 2;
+    const dy = ay + (ah - dh) / 2;
     /*
      * The supplied file is a tight crop of the original panel (its corner
      * sparkles and the leaf tip touch its edges), so the drawn art sits on an
@@ -611,10 +613,24 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   const startY = H * 0.49013 - leading * (lines.length - 1) / 2;
   lines.forEach((line, i) => ctx.fillText(line, pad, startY + i * leading));
 
-  // The mark is drawn as vectors at plate resolution: the supplied PNG is
-  // 150 x 126 and upscaled ~2.4x into the hero plate, which is exactly the
-  // blur + fringe tint the reference does not have.
-  drawLogoMark(ctx, W * 0.84161, H * 0.49671, W * 0.17637, H * 0.5329);
+  // The mark: the brand PNG itself (1191x970, transparent) contain-fitted,
+  // centred into the measured header slot (photo x 892..995, y 262..343 of
+  // the plate). The vector mark below is only the fallback for a plate drawn
+  // before/without the logo image.
+  if (o.logo) {
+    const lw = W * 0.17637;
+    const lh = H * 0.5329;
+    const lcx = W * 0.84161;
+    const lcy = H * 0.49671;
+    const k = Math.min(lw / o.logo.width, lh / o.logo.height);
+    const dw = o.logo.width * k;
+    const dh = o.logo.height * k;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(o.logo, lcx - dw / 2, lcy - dh / 2, dw, dh);
+  } else {
+    drawLogoMark(ctx, W * 0.84161, H * 0.49671, W * 0.17637, H * 0.5329);
+  }
 }
 
 /**
