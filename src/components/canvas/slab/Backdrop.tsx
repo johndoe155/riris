@@ -27,7 +27,7 @@ let gradientKey = '';
 function gradientTexture(top: string, glow: string, bottom: string, angle: number) {
   const key = `${top}|${glow}|${bottom}|${angle}`;
   if (gradientCache && gradientKey === key) return gradientCache;
-  const size = 256;
+  const size = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -54,7 +54,7 @@ let shadowCache: THREE.CanvasTexture | null = null;
 
 function shadowTexture() {
   if (shadowCache) return shadowCache;
-  const size = 256;
+  const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -100,9 +100,9 @@ export function Backdrop({
   glow = '#4a3a45',
   bottom = '#0d0a0d',
   angle = 0.28,
-  shadow = 0.85,
+  shadow = 0.72,
   shadowOffset = [0.02, -0.95],
-  shadowScale = [1.25, 0.34],
+  shadowScale = [1.55, 0.30],
 }: BackdropProps) {
   const gradient = useMemo(() => gradientTexture(top, glow, bottom, angle), [top, glow, bottom, angle]);
   const soft = useMemo(() => shadowTexture(), []);

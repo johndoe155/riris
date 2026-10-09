@@ -3,7 +3,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, applyProps } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
-import { OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@react-three/drei';
+import { OrbitControls, OrthographicCamera, Environment, Lightformer } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useVaultStore } from '@/store/useVaultStore';
 import { Slab } from '@/components/canvas/slab/Slab';
@@ -113,7 +113,7 @@ export function ForgePreviewCanvas() {
   const handlers = useMemo(() => ({ onDoubleClick: () => toggleFlip() }), [toggleFlip]);
 
   return (
-    <div className="w-full h-full min-h-[500px] relative bg-[#050505] overflow-hidden">
+    <div className="w-full h-full min-h-[500px] relative bg-transparent overflow-hidden">
       {/*
         A long lens. The reference is effectively orthographic — its cone is
         under two degrees wide — and at fov 32 the near edge of the case
@@ -123,9 +123,9 @@ export function ForgePreviewCanvas() {
       <Canvas
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
-        camera={{ position: [0, 0, 7.4], fov: 16 }}
+        camera={{ position: [0, 0, 5], zoom: 1.8 }}
       >
-        <PerspectiveCamera makeDefault position={[0, 0, 7.4]} fov={16} />
+        <OrthographicCamera makeDefault position={[0, 0, 5]} zoom={1.8} near={0.1} far={60} />
         {/* scaled ~2.7x from the first rig so front-facing surfaces return their measured tones (scripts/analysis/_tones.mjs) */}
         <ambientLight intensity={1.5} />
         <directionalLight position={[4, 5, 6]} intensity={2.1} />
@@ -141,7 +141,7 @@ export function ForgePreviewCanvas() {
           <Slab
             card={card}
             quality="hero"
-            intensity={1.15}
+            intensity={0.82}
             flipped={flipped}
             active={hovered}
             cardHandlers={handlers}

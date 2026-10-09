@@ -68,7 +68,10 @@ function canvasTexture(draw: (ctx: CanvasRenderingContext2D) => void, w: number,
   draw(ctx);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 16;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
   return tex;
 }
@@ -79,8 +82,8 @@ function canvasTexture(draw: (ctx: CanvasRenderingContext2D) => void, w: number,
 
 const faceCache = new Map<string, THREE.CanvasTexture>();
 
-export const FACE_TIERS = { hero: 640, cheap: 320 } as const;
-export const LABEL_TIERS = { hero: 1024, cheap: 512 } as const;
+export const FACE_TIERS = { hero: 2048, cheap: 768 } as const;
+export const LABEL_TIERS = { hero: 2048, cheap: 1024 } as const;
 /** canvas aspects follow the slab spec, or the drawn text comes out stretched */
 const FACE_ASPECT = SLAB_SPEC.cardH / SLAB_SPEC.cardW;
 const LABEL_ASPECT = SLAB_SPEC.labelH / SLAB_SPEC.labelW;
@@ -152,7 +155,7 @@ export function getCardFaceTexture(
   if (hit) return hit;
   const o = cardFaceText(card, FACE_TIERS[tier]);
   const tex = canvasTexture((ctx) => {
-    drawCardFace(ctx, o, art, artBox(o), { inset: o.ringInset, width: o.ringWidth, radius: o.ringRadius });
+    drawCardFace(ctx, o, art, artBox(o));
   }, o.width, o.height);
   faceCache.set(key, tex);
   return tex;

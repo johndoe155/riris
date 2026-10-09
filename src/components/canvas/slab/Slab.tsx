@@ -50,24 +50,24 @@ function getMaterials(): SlabMaterials {
       // them (the card edge shifts where the chamfer turns), while the clearcoat
       // layer still takes the key light: the reference's rim is dark on the left
       // (#42333f) and lit on the right (#8a7685).
-      transmission: 0.55,
-      thickness: 0.3,
-      roughness: 0.08,
+      transmission: 0.82,
+      thickness: 0.16,
+      roughness: 0.045,
       metalness: 0,
       ior: 1.49,
       // a hint of dispersion: the refraction fringes separate at the chamfer the
       // way a real cast-acrylic edge does, without turning into a prism
-      dispersion: 0.12,
+      dispersion: 0.035,
       clearcoat: 1,
       clearcoatRoughness: 0.06,
       specularIntensity: 1,
-      color: new THREE.Color(REF_TONE.rimLit),
+      color: new THREE.Color('#8f778b'),
       attenuationColor: new THREE.Color('#b7a2b4'),
-      attenuationDistance: 1.35,
-      envMapIntensity: 1.35,
+      attenuationDistance: 2.4,
+      envMapIntensity: 1.8,
       roughnessMap: wear.roughness,
       bumpMap: wear.bump,
-      bumpScale: 0.01,
+      bumpScale: 0.002,
       side: THREE.DoubleSide,
     }),
     /**
@@ -83,15 +83,15 @@ function getMaterials(): SlabMaterials {
       // polished enough that the strip lights drag a long soft highlight down
       // the apron (the reference's #baa9b5 top strip is exactly that sheen),
       // rough enough that the body keeps its measured #91808c
-      roughness: 0.32,
+      roughness: 0.22,
       metalness: 0,
       clearcoat: 0.8,
-      clearcoatRoughness: 0.12,
+      clearcoatRoughness: 0.06,
       specularIntensity: 0.9,
       envMapIntensity: 1.2,
       roughnessMap: wear.roughness,
       bumpMap: wear.bump,
-      bumpScale: 0.006,
+      bumpScale: 0.0015,
     }),
     // pit fake: low opacity + env map, no transmission pass — but the same
     // optical vocabulary as the hero glass, so the cheap case still shows a
@@ -103,7 +103,7 @@ function getMaterials(): SlabMaterials {
       clearcoat: 1,
       clearcoatRoughness: 0.06,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.22,
       envMapIntensity: 1.4,
       ior: 1.49,
       specularIntensity: 1,
@@ -111,7 +111,7 @@ function getMaterials(): SlabMaterials {
       side: THREE.DoubleSide,
     }),
     // measured off the reference's plate: #3b2a36, not the near-black it was
-    label: new THREE.MeshStandardMaterial({ color: REF_TONE.plate, roughness: 0.62, metalness: 0.05 }),
+    label: new THREE.MeshStandardMaterial({ color: REF_TONE.plate, roughness: 0.42, metalness: 0.02 }),
     // the rail between label and window. In the reference its body is the face
     // tone; only its three tabs catch the light (below), so the body is not lit
     // any brighter than the face it sits on.
@@ -119,7 +119,7 @@ function getMaterials(): SlabMaterials {
     // the bright tabs on the rail: #afa6af, the reference's measured highlight
     ridgeTab: new THREE.MeshStandardMaterial({ color: REF_TONE.ridge, roughness: 0.3, metalness: 0 }),
     // the tray underneath the window texture: the measured floor tone
-    tray: new THREE.MeshStandardMaterial({ color: REF_TONE.tray, roughness: 0.86, metalness: 0.04 }),
+    tray: new THREE.MeshStandardMaterial({ color: REF_TONE.tray, roughness: 0.62, metalness: 0.02 }),
     cardBody: new THREE.MeshPhysicalMaterial({
       color: REF_TONE.cardBodyInk,
       roughness: 0.48,
@@ -217,7 +217,7 @@ export function Slab({
   useEffect(() => {
     const max = gl.capabilities.getMaxAnisotropy();
     for (const t of [labelTex, trayTex, face]) {
-      if (t) t.anisotropy = Math.min(8, max);
+      if (t) t.anisotropy = Math.min(16, max);
     }
   }, [gl, labelTex, trayTex, face]);
 

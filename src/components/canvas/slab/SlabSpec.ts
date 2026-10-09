@@ -156,9 +156,9 @@ export const SLAB_SPEC: SlabSpec = {
    * anchored from the top edge and is unchanged; only the bottom grows. */
   h: 1.7132,
 
-  radius: 0.115,
-  cornerPower: 5.2,
-  bevel: 0.009,
+  radius: 0.055,
+  cornerPower: 8.0,
+  bevel: 0.004,
   stepInset: 0.015,
   faceLift: 0.005,
 
@@ -175,7 +175,7 @@ export const SLAB_SPEC: SlabSpec = {
   labelW: 0.8781,
   labelH: 0.2284,
   labelTop: 0.0600,
-  labelRadius: 0.034,
+  labelRadius: 0.006,
   labelD: 0.015,
   labelBorder: 0.0115,
 
@@ -188,32 +188,32 @@ export const SLAB_SPEC: SlabSpec = {
   ridgeTabs: [-0.3895, 0.0008, 0.3963],
   ridgeTabW: 0.08,
 
-  windowW: 0.8496,
+  windowW: 0.9400,
   windowH: 1.2396,
   windowTop: 0.4253,
-  windowRadius: 0.05,
+  windowRadius: 0.012,
 
-  cardW: 0.7384,
-  cardH: 1.1000,
+  cardW: 0.7900,
+  cardH: 1.1200,
   // centre y, measured down from the top: (0.2876 + 0.9435) / 2 * 1.677 = 1.0324
   cardY: 1.7132 / 2 - 1.0324,
-  cardRadius: 0.042,
+  cardRadius: 0.018,
   cardGap: 0.012,
 
   // the reference card at mid-height: paper 500..508 (outer 8 px), ink 510..526,
   // paper 528..534, art from 536. 10 px of 492 = 0.0203; the ink band is 15-16 px = 0.0305
-  ringInset: 0.0203,
-  ringWidth: 0.0305,
+  ringInset: 0.018,
+  ringWidth: 0.034,
   /**
    * The art frame's *outer* edge, as a fraction of the card width. Measured
    * from the frame's ink: x 532..536 (left) and 957..961 (right) of a card
    * spanning 500..991, so the outer edges average 0.0630 of the card width in.
    */
-  artInset: 0.063,
+  artInset: 0.060,
   /** the frame's ink line: 4 px on a 492 px card */
-  artStroke: 0.0081,
-  artTop: 0.0365,
-  artBottom: 0.368,
+  artStroke: 0.007,
+  artTop: 0.040,
+  artBottom: 0.355,
 
   // 4 px below the window's top edge (474 px), 10 px tall, in world units
   slotTop: 0.006,
@@ -358,25 +358,25 @@ export function trayLayout(spec: SlabSpec = SLAB_SPEC, layers: SlabLayers = slab
 
 export const REF_TONE = {
   /** the case's front face, top strip (catches the overhead light) */
-  faceTop: '#baa9b5',
+  faceTop: '#b9a9b5',
   /** the case's front face, mid (beside the window) */
-  faceMid: '#91808c',
+  faceMid: '#826f7e',
   /** the case's chamfered rim, left edge (in shadow) */
-  rimDark: '#42333f',
+  rimDark: '#332433',
   /** the case's chamfered rim, right edge (lit) */
-  rimLit: '#8a7685',
+  rimLit: '#9c8798',
   /** the ridge's highlight */
-  ridge: '#afa6af',
+  ridge: '#d8cbd6',
   /** the tray / window floor — mauve smoke, and remarkably flat */
-  tray: '#483a45',
+  tray: '#3c2d3c',
   /** the label plate */
-  plate: '#3b2a36',
+  plate: '#332333',
   /** the card's printed body, as it reads *through* the acrylic */
-  cardInk: '#473642',
+  cardInk: '#3b2838',
   /** the card's body before the case's veil: cardInk minus the transmission lift */
-  cardBodyInk: '#3a2b35',
+  cardBodyInk: '#352334',
   /** the card's frame ink */
   cardPaper: '#fbf9fb',
   /** the window's top lip: mean luma 122 across x 540..950, rows 476..482 */
-  lip: '#857683',
+  lip: '#b5a5b3',
 } as const;

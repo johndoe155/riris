@@ -110,10 +110,10 @@ const HoloShaderMaterial = shaderMaterial(
      * the pure-hue stops are pulled toward their own luma by uFoilSat.
      */
     vec3 holoGradient(float t) {
-      vec3 c1 = vec3(1.0, 0.42, 0.12); // orange
-      vec3 c2 = vec3(0.22, 0.88, 1.0); // cyan
-      vec3 c3 = vec3(1.0, 0.92, 0.36); // yellow
-      vec3 c4 = vec3(1.0, 0.24, 0.82); // magenta
+      vec3 c1 = vec3(1.0, 0.48, 0.22); // orange
+      vec3 c2 = vec3(0.32, 0.78, 0.92); // cyan
+      vec3 c3 = vec3(1.0, 0.82, 0.34); // yellow
+      vec3 c4 = vec3(0.92, 0.35, 0.72); // magenta
       float t2 = fract(t);
       vec3 c = (t2 < 0.33) ? mix(c1, c2, t2 / 0.33)
              : (t2 < 0.66) ? mix(c2, c3, (t2 - 0.33) / 0.33)
@@ -121,7 +121,7 @@ const HoloShaderMaterial = shaderMaterial(
       // the foil's own orders arrive with roughly equal energy, so the ramp is
       // desaturated toward its luma before it multiplies the base
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      return mix(c, vec3(l), 0.22);
+      return mix(c, vec3(l), 0.42);
     }
 
     // Cover-fit: crop the source rather than squashing it into the card face.
@@ -159,9 +159,9 @@ const HoloShaderMaterial = shaderMaterial(
       // lines whose spacing sets the colour banding. Kept on a fixed axis plus a
       // view-angle term (rather than the old polar spiral around the pointer) —
       // a grating is anisotropic, and the radial version read as a lens flare.
-      float grating = (vUv.x * 0.72 + vUv.y * 0.28) * 34.0
-                    + viewShift * 5.5
-                    + dist * 3.2
+      float grating = (vUv.x * 0.72 + vUv.y * 0.28) * 18.0
+                    + viewShift * 3.0
+                    + dist * 1.2
                     + uTime * 0.06;
       float bands = sin(grating) * 0.5 + 0.5;
       // a second, coarser order so the ramp is not a single clean sine
@@ -178,8 +178,8 @@ const HoloShaderMaterial = shaderMaterial(
       // the foil is only lit where the view angle has moved it off the
       // specular axis, plus where the pointer sits: much tighter than before,
       // so the card's frame and inks stay flat ink at rest
-      float foilMask = clamp(fresnel * 0.72 + pointerGlow * 0.45 + 0.06, 0.0, 1.0);
-      foilMask *= 0.62 + noise(vUv * 8.0 + uTime * 0.08) * 0.38;
+      float foilMask = clamp(fresnel * 0.42 + pointerGlow * 0.22 + 0.025, 0.0, 0.58);
+      foilMask *= 0.78 + noise(vUv * 8.0 + uTime * 0.08) * 0.22;
 
       float n1 = noise(vUv * 12.0 + 3.1);
       float n2 = noise(vUv * 27.0 + 11.0);
@@ -194,7 +194,7 @@ const HoloShaderMaterial = shaderMaterial(
       float baseAmt = 0.02 + fresnel * 0.04;
 
       vec3 holoTint = foil;
-      float holoAmt = clamp(foilMask * 0.7 + spec * 0.35 + fresnel * 0.2, 0.0, 0.7);
+      float holoAmt = clamp(foilMask * 0.48 + spec * 0.18 + fresnel * 0.10, 0.0, 0.34);
 
       vec3 iceTint = ice * (0.6 + crack * 0.4) + vec3(crack * 0.35);
       float iceAmt = clamp(0.24 + fresnel * 0.3 + crack * 0.45 + spec * 0.3, 0.0, 0.8);
@@ -217,8 +217,8 @@ const HoloShaderMaterial = shaderMaterial(
       } else {
         /* ---- base: the art itself, with the finish mixed in ---- */
         vec3 baseTier = img * (0.97 + fresnel * 0.1);
-        vec3 holoTier = mix(img, foil, clamp(foilMask * 0.75, 0.0, 1.0));
-        holoTier += foil * (fresnel * 0.35 + spec * 0.45);
+        vec3 holoTier = mix(img, foil, clamp(foilMask * 0.34, 0.0, 0.52));
+        holoTier += foil * (fresnel * 0.12 + spec * 0.18);
         vec3 iceTier = mix(img, ice, clamp(0.18 + n1 * 0.22 + fresnel * 0.45, 0.0, 1.0));
         iceTier += ice * crack * (0.35 + pointerGlow * 0.5 + spec * 0.6);
         iceTier += ice * fresnel * 0.25;
@@ -229,7 +229,7 @@ const HoloShaderMaterial = shaderMaterial(
         vec3 col = mix(img, tinted, uIntensity);
 
         float vignette = 1.0 - smoothstep(0.5, 1.2, length(vUv - 0.5) * 1.5);
-        col *= 0.88 + vignette * 0.12;
+        col *= 0.98 + vignette * 0.08;
         col *= sin(vUv.y * 420.0) * 0.015 + 0.985;
 
         gl_FragColor = vec4(col, 1.0);

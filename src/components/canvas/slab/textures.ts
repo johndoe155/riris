@@ -1,7 +1,7 @@
 'use client';
 
 import * as THREE from 'three';
-import { REF_TONE, trayLayout, type TrayLayout } from './SlabSpec';
+import { trayLayout, type TrayLayout } from './SlabSpec';
 import { squircle } from './geometry';
 
 /* ------------------------------------------------------------------ *
@@ -222,52 +222,34 @@ export function drawCardFace(
   ctx: CanvasRenderingContext2D,
   o: CardFaceText,
   art: HTMLImageElement | null,
-  artBox: { x: number; y: number; w: number; h: number },
-  ring: { inset: number; width: number; radius: number }
+  artBox: { x: number; y: number; w: number; h: number }
 ) {
   const { width: W, height: H } = o;
-  const bodyRadius = (o.bodyRadius ?? 0.0568) * W;
-  const power = o.cornerPower ?? 5.2;
-  const ink = o.dark ? REF_TONE.cardPaper : '#141414';
-  // measured on the reference's graded card: the body behind the acrylic reads
-  // #473642, a mauve that is nothing like the near-black the old painter used.
-  // The case's own transmission adds a veil on top of this, so the ink starts a
-  // little under the measured value.
-  const paper = o.dark ? REF_TONE.cardBodyInk : '#F4F2EE';
+  const ink = '#fbf9fb';
+  const paper = '#352334';
+  const bodyRadius = Math.max(2, (o.bodyRadius ?? 0.03) * W);
 
   ctx.clearRect(0, 0, W, H);
   ctx.save();
-  clipSquircle(ctx, W, H, bodyRadius, power);
-
-  // ---- card body (the dark/light panel inside the frame)
+  clipSquircle(ctx, W, H, bodyRadius, Math.max(6, o.cornerPower ?? 8));
   ctx.fillStyle = paper;
   ctx.fillRect(0, 0, W, H);
 
-  /* ---- ring frame ----
-   * Measured: the ring hugs the card's own edge (card x 0.0000..0.0163 and
-   * 0.9837..1.0000), so it is stroked on a path inset by half its width rather
-   * than being drawn as a separate frame a few percent inside the card. The
-   * road path radius uses the body radius minus the inset, so the stroke stays
-   * concentric with the card's silhouette at the corners. */
-  const ringW = Math.max(1.5, ring.width * W);
-  const ringInset = ring.inset * W + ringW / 2;
-  const rw = W - ringInset * 2;
-  const rh = H - ringInset * 2;
-  const rRad = Math.max(2, bodyRadius - ringInset);
-  ctx.lineWidth = ringW;
+  // Thick rounded white keyline around the dark plum backing card.
+  const frameInset = Math.max(5, W * 0.035);
+  const frameW = Math.max(5, W * 0.018);
   ctx.strokeStyle = ink;
-  roundRect(ctx, ringInset, ringInset, rw, rh, rRad);
+  ctx.lineWidth = frameW;
+  roundRect(ctx, frameInset + frameW / 2, frameInset + frameW / 2,
+    W - (frameInset + frameW / 2) * 2, H - (frameInset + frameW / 2) * 2,
+    Math.max(8, bodyRadius * 0.72));
   ctx.stroke();
 
-  // ---- art window with a thin border
+  // Nearly full-width art window with a thin square white keyline.
   const { x: ax, y: ay, w: aw, h: ah } = artBox;
-  // the art frame is a stroke centred on the window's edge: measured 4 px on a
-  // 492 px-wide card, i.e. half the ring's weight
-  const artW = Math.max(1, (o.artStroke ?? o.ringWidth * 0.5) * W);
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillStyle = '#392638';
   ctx.fillRect(ax, ay, aw, ah);
   if (art) {
-    // cover-fit into the window
     const ir = art.width / art.height;
     const wr = aw / ah;
     let sx = 0, sy = 0, sw = art.width, sh = art.height;
@@ -277,68 +259,59 @@ export function drawCardFace(
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(art, sx, sy, sw, sh, ax, ay, aw, ah);
   }
-  ctx.lineWidth = artW;
   ctx.strokeStyle = ink;
-  ctx.strokeRect(ax + artW / 2, ay + artW / 2, aw - artW, ah - artW);
+  ctx.lineWidth = Math.max(2, (o.artStroke ?? 0.007) * W);
+  ctx.strokeRect(ax + ctx.lineWidth / 2, ay + ctx.lineWidth / 2, aw - ctx.lineWidth, ah - ctx.lineWidth);
 
-  /* ---- furniture below the art window -----------------------------------
-   * The art takes 0.036..0.664 of the card height, so everything else has to
-   * live in the bottom third. The positions below are walked down from the art
-   * in fractions of that band, which is why nothing can overlap. */
   const bandTop = ay + ah;
+  const pad = W * 0.06;
   const band = H - bandTop;
-
-  // ---- title under the art
-  const titleSize = Math.max(11, Math.min(W * 0.048, band * 0.11));
+  const heavy = (px: number) => `900 ${px}px Impact, "Arial Narrow", "Arial Black", sans-serif`;
   ctx.fillStyle = ink;
-  ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  ctx.font = `700 ${titleSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.title, ax, bandTop + band * 0.05);
+  ctx.textBaseline = 'top';
+  const titleSize = Math.max(18, Math.min(W * 0.052, band * 0.105));
+  ctx.font = heavy(titleSize);
+  ctx.fillText(o.title.toUpperCase(), ax, bandTop + band * 0.035);
 
-  // ---- attribute grid (2 columns x 3 rows), hairline rules like the photo
-  const gridTop = bandTop + band * 0.2;
-  const rowH = (band * 0.44) / 3;
-  const colW = (aw - W * 0.03) / 2;
-  const attrSize = Math.max(7, W * 0.021);
-  const valSize = Math.max(7, W * 0.0195);
+  const gridTop = bandTop + band * 0.22;
+  const colW = (aw - pad * 0.5) / 3;
+  const rowH = band * 0.22;
+  const labelSize = Math.max(12, W * 0.019);
+  const valueSize = Math.max(11, W * 0.016);
   const traits = o.traits ?? [];
   for (let i = 0; i < 6; i++) {
-    const cx = ax + (i % 2) * (colW + W * 0.03);
-    const cy = gridTop + Math.floor(i / 2) * rowH;
+    const cx = ax + (i % 3) * colW;
+    const cy = gridTop + Math.floor(i / 3) * rowH;
     const [label, value] = traits[i] ?? ['—', '—'];
-    // rule
     ctx.fillStyle = ink;
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(cx, cy, Math.max(1, W * 0.002), valSize * 3.1);
-    ctx.globalAlpha = 1;
-    ctx.font = `700 ${attrSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-    ctx.fillText(label.toUpperCase(), cx + W * 0.012, cy);
-    ctx.font = `400 ${valSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-    ctx.globalAlpha = 0.78;
-    ctx.fillText(value, cx + W * 0.012, cy + attrSize * 1.5);
+    ctx.fillRect(cx, cy, Math.max(2, W * 0.004), rowH * 0.8);
+    ctx.font = heavy(labelSize);
+    ctx.fillText(label.toUpperCase(), cx + W * 0.014, cy);
+    ctx.font = `500 ${valueSize}px Arial, sans-serif`;
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(value, cx + W * 0.014, cy + labelSize * 1.35);
     ctx.globalAlpha = 1;
   }
 
-  // ---- bottom rows: contract / token id / standard / chain + owner bar
-  const footTop = gridTop + rowH * 3 + band * 0.04;
-  const footSize = Math.max(7, W * 0.0195);
-  ctx.font = `400 ${footSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.globalAlpha = 0.72;
-  ctx.fillText(`COLLECTION: ${o.collection}`, ax, footTop);
-  ctx.fillText(`TOKEN ID: ${String(o.serial).split('/')[0]}`, ax, footTop + footSize * 1.5);
-  ctx.fillText(`STANDARD: ERC-721`, ax + colW + W * 0.03, footTop);
-  ctx.fillText(`CHAIN: Ethereum`, ax + colW + W * 0.03, footTop + footSize * 1.5);
-  ctx.globalAlpha = 1;
-
-  // owner strip along the bottom edge
-  const barY = H - band * 0.13;
-  ctx.font = `700 ${Math.max(8, W * 0.022)}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(`OWNED BY: ${o.handle}`, ax, barY);
+  const metaY = gridTop + rowH * 2.25;
+  const metaSize = Math.max(10, W * 0.015);
+  ctx.font = `600 ${metaSize}px Arial, sans-serif`;
+  ctx.fillStyle = ink;
+  ctx.fillRect(ax, metaY - W * 0.012, aw, Math.max(2, W * 0.004));
+  ctx.fillText(`CONTRACT ADDRESS: 0x375d...e306`, ax, metaY);
+  ctx.fillText(`TOKEN ID: ${String(o.serial).split('/')[0]}`, ax, metaY + metaSize * 1.55);
   ctx.textAlign = 'right';
-  ctx.fillText(o.serial, ax + aw, barY);
-  ctx.textAlign = 'left';
+  ctx.fillText(`TOKEN STANDARD: ERC-721`, ax + aw, metaY);
+  ctx.fillText(`CHAIN: Ethereum`, ax + aw, metaY + metaSize * 1.55);
 
+  const footerY = H - pad * 0.82;
+  ctx.font = heavy(Math.max(11, W * 0.017));
+  ctx.textAlign = 'left';
+  ctx.fillText(`OWNED BY: ${o.handle}`, ax, footerY);
+  ctx.textAlign = 'right';
+  ctx.fillText(o.serial, ax + aw, footerY);
+  ctx.restore();
 }
 
 /** Canvas facing the card's front: face text + art. */
@@ -349,8 +322,7 @@ export function buildCardFace(o: CardFaceText, art: HTMLImageElement | null): TH
     ctx,
     o,
     art,
-    { x: M * o.artInset, y: o.height * o.artTop, w: M * o.artWidth, h: o.height * o.artHeight },
-    { inset: o.ringInset, width: o.ringWidth, radius: o.ringRadius }
+    { x: M * o.artInset, y: o.height * o.artTop, w: M * o.artWidth, h: o.height * o.artHeight }
   );
   return toTexture(canvas, { srgb: true });
 }
@@ -454,141 +426,61 @@ export interface LabelText {
 
 export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   const { width: W, height: H } = o;
-  ctx.fillStyle = o.blank ? '#FFFFFF' : o.plate;
+  const plum = o.blank ? '#ffffff' : '#332333';
+  const white = o.blank ? '#141414' : '#fbf9fb';
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = plum;
   ctx.fillRect(0, 0, W, H);
-
   if (o.blank) {
-    // blank variant: just the recessed frame, ready for the upload path
-    ctx.strokeStyle = '#D8D5D0';
-    ctx.lineWidth = W * 0.012;
-    roundRect(ctx, W * 0.03, H * 0.09, W * 0.94, H * 0.82, H * 0.12);
-    ctx.stroke();
+    ctx.strokeStyle = '#d8cbd6';
+    ctx.lineWidth = Math.max(2, W * 0.006);
+    ctx.strokeRect(W * 0.028, H * 0.09, W * 0.944, H * 0.82);
     return;
   }
 
-  // the plate is moulded, so it is a shade lighter along the top than the
-  // bottom. Measured on the reference: #3d2e3a at the top of the plate and
-  // #3b2a36 at the bottom — a 0.02 luma tilt, not a gradient
-  const plateGrad = ctx.createLinearGradient(0, 0, 0, H);
-  plateGrad.addColorStop(0, 'rgba(255,255,255,0.03)');
-  plateGrad.addColorStop(1, 'rgba(0,0,0,0.06)');
-  ctx.fillStyle = plateGrad;
-  ctx.fillRect(0, 0, W, H);
+  // Square-cornered inset keyline, approximately 8px at the hero tier.
+  ctx.strokeStyle = white;
+  ctx.lineWidth = Math.max(2, W * 0.006);
+  ctx.strokeRect(W * 0.025, H * 0.085, W * 0.95, H * 0.83);
 
-  // thin inner border, mirroring the moulded ridge: a pale line, not a
-  // coloured one — the reference's frame is white/neutral and the colour in
-  // the header comes from the mark at the right
-  // the line hugs the plate, the way the reference's highlight does, and its
-  // radius has to be the plate's own (SLAB_SPEC.labelRadius is a fraction of
-  // min(w, h), i.e. H*0.055 in this texture)
-  // the lip the reference shows inside the plate: a pale line 9 px in from the
-  // plate's edge (measured y 263..267 and 428..433 of a 153 px plate)
-  const inset = W * 0.016;
-  ctx.strokeStyle = 'rgba(238,244,252,0.62)';
-  ctx.lineWidth = Math.max(1, W * 0.003);
-  roundRect(ctx, inset, inset, W - inset * 2, H - inset * 2, Math.max(2, H * 0.16));
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-
-  const pad = W * 0.065;
-  const centreY = H / 2;
-
-  /* ---- right: the QR block, with the grade and serial stacked to its left */
-  const q = H * 0.56;
-  const qx = W - pad - q;
-  const qy = centreY - q / 2;
-  // the mark: a QR-style tile whose three finder squares carry the card's own
-  // colour, which is where the label's accent lives (the reference puts its
-  // coloured logo glyph in exactly this corner of the plate)
-  ctx.fillStyle = mixHex(o.plate, '#000000', 0.42);
-  ctx.fillRect(qx, qy, q, q);
-  ctx.strokeStyle = 'rgba(233,239,247,0.22)';
-  ctx.lineWidth = Math.max(1, W * 0.0018);
-  ctx.strokeRect(qx, qy, q, q);
-  const n = 9;
-  const cell = q / n;
-  const r = rng(0x9e37);
-  ctx.fillStyle = o.ink;
-  for (let y = 0; y < n; y++) {
-    for (let x = 0; x < n; x++) {
-      const finder = (x < 3 && y < 3) || (x > n - 4 && y < 3) || (x < 3 && y > n - 4);
-      if (finder) continue;
-      if (r() > 0.58) {
-        ctx.globalAlpha = 0.62;
-        ctx.fillRect(qx + x * cell, qy + y * cell, cell * 0.84, cell * 0.84);
-      }
-    }
-  }
-  ctx.globalAlpha = 1;
-  const finderAt = (fx: number, fy: number) => {
-    ctx.fillStyle = o.accent;
-    ctx.globalAlpha = 0.92;
-    ctx.fillRect(qx + fx * cell, qy + fy * cell, cell * 3, cell * 3);
-    ctx.fillStyle = mixHex(o.plate, '#000000', 0.42);
-    ctx.fillRect(qx + (fx + 1) * cell, qy + (fy + 1) * cell, cell, cell);
-    ctx.globalAlpha = 1;
-  };
-  finderAt(0, 0);
-  finderAt(n - 3, 0);
-  finderAt(0, n - 3);
-
-  /* ---- zones: title | grade + serial | mark, so nothing can collide ---- */
-  // the reference's widest title line runs to 0.55 of the plate; our titles are
-  // longer words, so the zone ends just short of the divider and the fit loop
-  // scales the type down when it has to
-  const titleZone = W * 0.52;
-  const markRight = W * 0.79;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = o.ink;
-  ctx.globalAlpha = 0.92;
-  ctx.font = `800 ${H * 0.26}px "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.grade, markRight, centreY - H * 0.1);
-  ctx.globalAlpha = 0.55;
-  ctx.font = `600 ${H * 0.14}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillText(o.serial, markRight, centreY + H * 0.2);
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'left';
-
-  // hairline divider between the title and the marks — neutral, like the inner
-  // border, so the plate stays dark and only the mark carries colour
-  ctx.globalAlpha = 0.16;
-  ctx.fillStyle = o.ink;
-  ctx.fillRect(W * 0.53, H * 0.22, Math.max(1, W * 0.0014), H * 0.56);
-  ctx.globalAlpha = 1;
-
-  /* ---- left: a two-line heavy title, shrunk and then trimmed to fit ---- */
-  const heavy = (px: number) =>
-    `800 ${px}px "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  const lines = o.title
-    .split('\n')
-    .slice(0, 2)
-    .map((l) => l.toUpperCase());
-  const avail = titleZone - pad;
+  const pad = W * 0.085;
+  const lines = o.title.split('\n').map((line) => line.toUpperCase()).slice(0, 2);
   let size = H * 0.31;
-  for (; size > H * 0.12; size -= 2) {
+  const maxWidth = W * 0.63;
+  const heavy = (px: number) => `900 ${px}px Impact, "Arial Narrow", "Arial Black", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  for (; size > H * 0.12; size -= 1) {
     ctx.font = heavy(size);
-    if (Math.max(...lines.map((l) => ctx.measureText(l).width)) <= avail) break;
+    if (Math.max(...lines.map((line) => ctx.measureText(line).width)) <= maxWidth) break;
   }
   ctx.font = heavy(size);
-  const fitted = lines.map((l) => {
-    if (ctx.measureText(l).width <= avail) return l;
-    let cut = l;
-    while (cut.length > 1 && ctx.measureText(`${cut}…`).width > avail) cut = cut.slice(0, -1);
-    return `${cut}…`;
-  });
+  ctx.fillStyle = white;
+  const leading = size * 0.82;
+  const startY = H / 2 - leading * (lines.length - 1) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, pad, startY + i * leading));
 
-  // the reference stacks its two lines tight: cap 0.224 of the plate, 1.26 caps
-  // of leading, so the block spans half the plate and sits centred
-  const lead = size * 0.92;
-  const blockTop = centreY - ((fitted.length - 1) * lead) / 2;
-  ctx.fillStyle = o.ink;
-  fitted.forEach((line, i) => {
-    ctx.globalAlpha = i === 0 ? 1 : 0.9;
-    ctx.fillText(line, pad, blockTop + i * lead);
-  });
-  ctx.globalAlpha = 1;
-  ctx.textBaseline = 'top';
+  // Two tilted outlined cards with orange fills: the clean reference mark.
+  const cx = W * 0.84;
+  const cy = H * 0.5;
+  const cardW = H * 0.30;
+  const cardH = H * 0.48;
+  const drawMarkCard = (x: number, y: number, angle: number, fill: string) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillStyle = '#332333';
+    ctx.strokeStyle = white;
+    ctx.lineWidth = Math.max(3, H * 0.025);
+    roundRect(ctx, -cardW / 2, -cardH / 2, cardW, cardH, H * 0.035);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = fill;
+    ctx.fillRect(-cardW * 0.27, -cardH * 0.36, cardW * 0.54, cardH * 0.72);
+    ctx.restore();
+  };
+  drawMarkCard(cx - H * 0.08, cy + H * 0.02, -0.13, '#ff6a2a');
+  drawMarkCard(cx + H * 0.08, cy + H * 0.04, 0.08, '#ff6a2a');
 }
 
 export function buildLabelTexture(o: LabelText): THREE.CanvasTexture {
