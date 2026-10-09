@@ -110,23 +110,57 @@ export function notchedFaceOutline(
   };
   const line = (x: number, y: number) => pts.push(new THREE.Vector2(x, y));
 
+  /* The window is wider than the straight part of the outline's bottom edge:
+   * the outer corner arcs (radius ~0.1) sweep inboard of the notch walls, so a
+   * full bottom edge would cross the walls and the self-intersecting outline
+   * triangulated into a slanting fill — the case sides visibly pinched inward
+   * toward the base. Instead, each bottom corner arc is trimmed where it
+   * reaches the notch wall and drops vertically from there, keeping the
+   * contour simple (no crossings) and the walls perfectly parallel. */
+  const BR: [number, number][] = [
+    [hw, -hh + rr], [hw, -hh + rr - c], [hw - rr + c, -hh], [hw - rr, -hh],
+  ];
+  bez.v0.set(BR[0][0], BR[0][1]); bez.v1.set(BR[1][0], BR[1][1]); bez.v2.set(BR[2][0], BR[2][1]); bez.v3.set(BR[3][0], BR[3][1]);
+  // x falls monotonically along the arc: bisect the parameter where x == xr
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (bez.getPoint(mid).x > xr) lo = mid; else hi = mid;
+  }
+  const tCut = (lo + hi) / 2;
+  const yCut = bez.getPoint(tCut).y;
+
   // top edge, left → right, then down the right side (same rotation the
   // squircle outlines use, so holes keep their reversed winding)
   line(-hw + rr, hh);
   corner([hw - rr, hh], [hw - rr + c, hh], [hw, hh - rr + c], [hw, hh - rr]);
   line(hw, -hh + rr);
-  corner([hw, -hh + rr], [hw, -hh + rr - c], [hw - rr + c, -hh], [hw - rr, -hh]);
-  // bottom edge in to the notch's right wall
+  // right bottom corner, trimmed at the notch wall, then drop to the bottom
+  bez.v0.set(BR[0][0], BR[0][1]); bez.v1.set(BR[1][0], BR[1][1]); bez.v2.set(BR[2][0], BR[2][1]); bez.v3.set(BR[3][0], BR[3][1]);
+  bez.getPoints(segs).forEach((p, i) => {
+    if (i > 0 && p.x > xr + 1e-6) pts.push(p.clone());
+  });
+  line(xr, yCut);
   line(xr, -hh);
   line(xr, yt - rc);
   // notch's top-right corner (concave in the material, rounded like the window)
   corner([xr, yt - rc], [xr, yt - rc + ck], [xr - rc + ck, yt], [xr - rc, yt], Math.max(6, segs));
   line(-xr + rc, yt);
   corner([-xr + rc, yt], [-xr + rc - ck, yt], [-xr, yt - rc + ck], [-xr, yt - rc], Math.max(6, segs));
-  // down the notch's left wall and out the bottom edge
+  // down the notch's left wall, rise to the trimmed left bottom corner
   line(-xr, -hh);
-  line(-hw + rr, -hh);
-  corner([-hw + rr, -hh], [-hw + rr - c, -hh], [-hw, -hh + rr - c], [-hw, -hh + rr]);
+  line(-xr, yCut);
+  {
+    const b = bez;
+    b.v0.set(-hw + rr, -hh); b.v1.set(-hw + rr - c, -hh); b.v2.set(-hw, -hh + rr - c); b.v3.set(-hw, -hh + rr);
+    const arc = b.getPoints(segs);
+    // walk from the cut (x == -xr) outboard and up the left side
+    let started = false;
+    for (const p of arc) {
+      if (!started && p.x <= -xr) started = true;
+      if (started) pts.push(p.clone());
+    }
+  }
   line(-hw, hh - rr);
   corner([-hw, hh - rr], [-hw, hh - rr + c], [-hw + rr - c, hh], [-hw + rr, hh]);
 
