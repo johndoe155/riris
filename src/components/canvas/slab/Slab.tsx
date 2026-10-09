@@ -314,6 +314,18 @@ export function Slab({
           <planeGeometry args={[SLAB_SPEC.labelW, SLAB_SPEC.labelH]} />
           <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />
         </mesh>
+        {/* label print on the back: the same texture object (duplication by
+            alias, it cannot drift) on a PI-rotated plane just outside the
+            case's back plane - the outermost rear surface in the label hole,
+            the exact mirror of the front's stack. The rigid rotation is the
+            back-specific UV adjustment: it mirrors nothing, so the 'GHOST LAB
+            COLLECTION' header reads normally from the rear, exactly as on the
+            front. Without this the rear top slot showed only the dark plate's
+            blank rear cap. */}
+        <mesh position={[0, L.labelY, SLAB_SPEC.zBack - 0.0008]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[SLAB_SPEC.labelW, SLAB_SPEC.labelH]} />
+          <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />
+        </mesh>
         {/* the rail between the label and the window (measured y 418..427, inner
             frame x 435..1055), then its three bright tabs */}
         <mesh geometry={geo.ridge} material={mat.ridge} position={geo.place.ridge} />

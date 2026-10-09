@@ -195,14 +195,18 @@ export const HERO_BACKDROP = {
  *
  * Colour accuracy: the gradient is the SAME three-stop ramp the canvas
  * gradientTexture() lays out (same stops #35202f / #5b4153 / #b5a3b0,
- * same 50-degree line, same transition points), re-expressed from wall
- * coordinates onto ray directions by a perspective-correct projection
- * onto the anchored plane (p = dir.xy * depth / -dir.z): every ray the
- * camera can see lands on the exact wall layout the calibrated quad
- * painted, so the resting frame is the calibrated frame — now without
- * edges. The depth-only terms — nadir falloff, behind-the-viewer
- * darkness, the halo and the dither — evaluate to zero (or a whisper at
- * the pale corner) across the resting view.
+ * same 50-degree line, same transition points). Each fragment builds the
+ * true camera ray (vWorldPos - cameraPosition), intersects it with the
+ * anchored plane (world z = -WALL_DEPTH) and evaluates that exact wall
+ * layout — so the resting frame is the calibrated frame, verified delta
+ * 0/255. The layout extends infinitely along the rays, so there are no
+ * edges. Rays that leave the front hemisphere (a full 180-degree orbit)
+ * fade to a bounded direction-space ramp over the same axis — the old
+ * epsilon-clamped projection used to shatter there into a diagonal line
+ * of absolute dark against absolute pale. The depth-only terms — nadir
+ * falloff, behind-the-viewer darkness, the halo and the dither —
+ * evaluate to zero (or a whisper at the pale corner) across the resting
+ * view.
  * ------------------------------------------------------------------ */
 
 /** the old wall plane's depth; the ramp's coordinates are anchored there */
@@ -213,13 +217,17 @@ const DOME_RADIUS = 30;
 const GRAD_CANVAS = 1024;
 
 const VOID_VERTEX = /* glsl */ `
-  varying vec3 vDir;
+  varying vec3 vWorldPos;
 
   void main() {
-    // dome is centred on the scene origin: the local position IS the ray
-    // direction (times the radius), fixed in world space
-    vDir = position;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    // world position of the dome fragment; the fragment shader builds the
+    // CAMERA RAY from this (vWorldPos - cameraPosition) - the dome is centred
+    // on the scene but the camera is not, and the calibrated wall layout is
+    // defined along camera rays, so an origin-based direction would shift
+    // the whole gradient by the camera's 3.2-unit offset
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
   }
 `;
 
@@ -232,10 +240,12 @@ const VOID_FRAGMENT = /* glsl */ `
   uniform vec2 uGrad;
   uniform float uGradDD;
   // the anchored plane's depth: ray direction -> wall-plane coordinates
-  uniform float uDepth;
+  uniform float uPlaneZ;
+  // unit axis of the ramp line, for the direction-space rear ramp
+  uniform vec2 uAxis;
   // direction of the distant key light, deeper than the frame
   uniform vec3 uLight;
-  varying vec3 vDir;
+  varying vec3 vWorldPos;
 
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -252,19 +262,29 @@ const VOID_FRAGMENT = /* glsl */ `
 
   void main() {
     // fixed world ray direction: independent of camera, drag and model
-    vec3 dir = normalize(vDir);
+    // the true camera ray through this fragment: world-anchored (the field
+    // of directions is fixed in the scene, so no drag or model motion can
+    // shift it), and exact against the wall layout the calibrated quad
+    // painted, because the wall's coordinates were measured along these rays
+    vec3 dir = normalize(vWorldPos - cameraPosition);
 
-    // the wall-plane gradient coordinates, carried on rays with a
-    // perspective-correct projection onto the anchored plane: every ray the
-    // camera can see lands on the exact wall layout the calibrated quad
-    // painted. The epsilon keeps glancing rays (|dir.z| -> 0) finite; they
-    // run out past the ramp's ends and clamp to its end stops, exactly as
-    // the old canvas gradient clamped past its span.
-    vec2 p = dir.xy * (uDepth / max(-dir.z, 0.02));
-
-    // the exact three-stop ramp of the calibrated wall: same stops, same
-    // transition points, mixed in linear light like the sampled texture was
-    float s = clamp(dot(p - uP0, uGrad) / uGradDD, 0.0, 1.0);
+    /* The ramp coordinate. The front (resting) view uses the perspective-
+     * correct projection onto the anchored plane: every ray the resting
+     * camera can see lands on the exact wall layout the calibrated quad
+     * painted. But that projection diverges as |dir.z| -> 0: the epsilon
+     * clamp shatters everything beyond it onto the ramp's END STOPS, and
+     * the boundary between them — a diagonal line of absolute dark against
+     * absolute pale — is exactly what a full 180-degree orbit used to
+     * reveal. The rear hemisphere therefore fades to a bounded direction-
+     * space ramp over the SAME axis (sweeps the full stop range smoothly
+     * as the ray swings, no threshold anywhere), with the blend weight
+     * itself a smoothstep: the resting frame sits deep in the zero-weight
+     * region, so its colours are untouched bit for bit. */
+    float sgn = dir.z >= 0.0 ? 1.0 : -1.0;
+    float t = (uPlaneZ - cameraPosition.z) / (sgn * max(abs(dir.z), 1e-4));
+    vec2 p = cameraPosition.xy + t * dir.xy;    float sPlane = clamp(dot(p - uP0, uGrad) / uGradDD, 0.0, 1.0);
+    float sRear = clamp(0.5 + dot(dir.xy, uAxis) * 0.6, 0.0, 1.0);
+    float s = mix(sPlane, sRear, smoothstep(-0.30, -0.02, dir.z));
     vec3 lin = s < 0.5
       ? mix(srgbToLinear(uDark), srgbToLinear(uGlow), s * 2.0)
       : mix(srgbToLinear(uGlow), srgbToLinear(uPale), (s - 0.5) * 2.0);
@@ -335,9 +355,6 @@ export function VoidBackdrop({
     const wy = (cy: number) => (0.5 - cy / GRAD_CANVAS) * height; // canvas y is down
     const p0 = new THREE.Vector2(wx(half - gx), wy(half + gy));
     const grad = new THREE.Vector2(wx(half + gx) - p0.x, wy(half - gy) - p0.y);
-    // the ramp's coordinates live on the anchored plane z = -WALL_DEPTH,
-    // extended infinitely: the exact wall layout, now edgeless
-    const depth = WALL_DEPTH;
     // the key light sits just outside the visible top-right corner, deeper
     // along -z: the halo's shoulder grazes the frame corner, its core never
     const light = new THREE.Vector3(0.55, 0.55, -0.55).normalize();
@@ -348,7 +365,10 @@ export function VoidBackdrop({
       uP0: { value: p0 },
       uGrad: { value: grad },
       uGradDD: { value: grad.lengthSq() },
-      uDepth: { value: depth },
+      uPlaneZ: { value: -WALL_DEPTH },
+      // unit axis of the ramp line (the 50-degree direction), for the
+      // bounded rear-hemisphere ramp
+      uAxis: { value: grad.clone().normalize() },
       uLight: { value: light },
     };
   }, [height, top, glow, bottom, angle, cover]);

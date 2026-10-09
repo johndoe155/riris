@@ -35,6 +35,16 @@ function StudioEnvironment() {
       {/* faint counter-strip on the left so the dark chamfer still carries a
           hairline of reflected light instead of reading flat */}
       <Lightformer form="rect" intensity={0.8} color="#f6eef6" position={[-3.4, 0, 3]} rotation={[0, Math.PI * 0.2, 0]} scale={[0.5, 7, 1]} />
+      {/* rear-side fill: every front-hemisphere former above left the case's
+          BACK-facing normals an almost empty environment to sample, which is
+          why the casing read flat and darker under the 180-degree orbit. A
+          soft key and a narrow strip mirrored behind give the rear the same
+          specular vocabulary (a long body streak plus a hard hairline) at
+          about a third of the front's intensity. Lightformers aim at the
+          scene origin by default, so these face the case; they live wholly
+          in the rear hemisphere, so the front look is untouched. */}
+      <Lightformer form="rect" intensity={0.7} color="#efe5ee" position={[-4.5, 4.5, -4]} scale={[9, 2.2, 1]} />
+      <Lightformer form="rect" intensity={0.65} color="#ffffff" position={[-3.2, 0, -3.2]} scale={[0.6, 7, 1]} />
     </Environment>
   );
 }
