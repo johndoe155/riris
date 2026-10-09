@@ -174,10 +174,12 @@ export const HERO_WALL_HEIGHT = 7.0;
 export const HERO_BACKDROP = {
   ...REF_BACKDROP,
   cover: 4.07 / 7.0,
-  // the photo's contact shadow is ~30 px deep and near black (35) under the case
-  shadow: 1.0,
-  shadowOffset: [0.0, -1.56] as [number, number],
-  shadowScale: [2.1, 0.28] as [number, number],
+  // The void renders NO contact shadow: its key light reads as sitting
+  // behind the case (the pale zone it radiates from is deeper than the
+  // frame), so there is nothing behind the slab for a cast shadow to land
+  // on. REF_BACKDROP's shadow / shadowOffset / shadowScale keys are
+  // intentionally not overridden here — <VoidBackdrop> has no shadow to
+  // configure and ignores the inherited keys.
 };
 
 /* ------------------------------------------------------------------ *
@@ -233,10 +235,6 @@ const VOID_FRAGMENT = /* glsl */ `
   uniform float uDepth;
   // direction of the distant key light, deeper than the frame
   uniform vec3 uLight;
-  // grounding shadow: centre xy and radii zw, in wall units
-  uniform vec4 uShadow;
-  uniform float uShadowGain;
-
   varying vec3 vDir;
 
   float hash(vec2 p) {
@@ -278,14 +276,11 @@ const VOID_FRAGMENT = /* glsl */ `
     // and it stays dark through and behind the viewer: no lit wall out there
     col *= 1.0 - 0.55 * smoothstep(0.15, 0.75, dir.z);
 
-    // the case's grounding shadow: the old quad's ellipse and falloff exactly
-    // (canvas radial stops 0.5 / 0.26 @ 0.4 / 0.07 @ 0.72 / 0 @ 1), blended in
-    // encoded space like the old transparent quad's framebuffer blend
-    float r = length((p - uShadow.xy) / uShadow.zw);
-    float a = r < 0.4 ? mix(0.50, 0.26, r * 2.5)
-            : r < 0.72 ? mix(0.26, 0.07, (r - 0.4) * 3.125)
-            : mix(0.07, 0.0, clamp((r - 0.72) * 3.5714, 0.0, 1.0));
-    col *= 1.0 - a * uShadowGain;
+    // No contact shadow: the void's key light reads as sitting behind the
+    // case (the pale zone it radiates from is deeper than the frame), so a
+    // shadow cast on the surface behind the slab has nothing to land on —
+    // the old wall's grounding ellipse was a property of the wall, not of
+    // the void, and it is gone with the wall.
 
     // the pale zone radiates from deeper than the frame: a whisper of bloom
     // with an inverse-angle fall-off, effectively zero across the dark half
@@ -310,12 +305,6 @@ export interface VoidBackdropProps {
   angle?: number;
   /** fraction of the wall the calibrated gradient line spans */
   cover?: number;
-  /** grounding shadow strength (0 disables) */
-  shadow?: number;
-  /** shadow centre, in wall units relative to the case */
-  shadowOffset?: [number, number];
-  /** shadow ellipse full width / height, in wall units */
-  shadowScale?: [number, number];
 }
 
 /**
@@ -335,9 +324,6 @@ export function VoidBackdrop({
   bottom = '#35202f',
   angle = 0.873,
   cover = 1,
-  shadow = 1,
-  shadowOffset = [0.0, -1.56],
-  shadowScale = [2.1, 0.28],
 }: VoidBackdropProps) {
   const uniforms = useMemo(() => {
     // the ramp's endpoints in wall units — the same layout gradientTexture()
@@ -364,10 +350,8 @@ export function VoidBackdrop({
       uGradDD: { value: grad.lengthSq() },
       uDepth: { value: depth },
       uLight: { value: light },
-      uShadow: { value: new THREE.Vector4(shadowOffset[0], shadowOffset[1], shadowScale[0] / 2, shadowScale[1] / 2) },
-      uShadowGain: { value: shadow },
     };
-  }, [height, top, glow, bottom, angle, cover, shadow, shadowOffset, shadowScale]);
+  }, [height, top, glow, bottom, angle, cover]);
 
   return (
     <mesh frustumCulled={false} renderOrder={-20} raycast={() => null}>
