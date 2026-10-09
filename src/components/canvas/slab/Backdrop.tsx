@@ -179,3 +179,207 @@ export const HERO_BACKDROP = {
   shadowOffset: [0.0, -1.56] as [number, number],
   shadowScale: [2.1, 0.28] as [number, number],
 };
+
+/* ------------------------------------------------------------------ *
+ * VoidBackdrop — the Forge's backdrop as a deep, stationary void
+ *
+ * The flat <Backdrop> wall is a finite quad at z = -6: when the Forge
+ * camera orbits, its gradient pans and its edges swing into frame, which
+ * reads as a painted wall rather than a world. This replaces the quad
+ * with an enclosing dome whose colour is computed from the *fixed world
+ * ray direction* of each fragment — the void is anchored to the scene,
+ * not to the drag, the camera or any surface, so no orbit can ever
+ * reveal an edge of it.
+ *
+ * Colour accuracy: the gradient is the SAME three-stop ramp the canvas
+ * gradientTexture() lays out (same stops #35202f / #5b4153 / #b5a3b0,
+ * same 50-degree line, same transition points), re-expressed from wall
+ * coordinates onto ray directions by a perspective-correct projection
+ * onto the anchored plane (p = dir.xy * depth / -dir.z): every ray the
+ * camera can see lands on the exact wall layout the calibrated quad
+ * painted, so the resting frame is the calibrated frame — now without
+ * edges. The depth-only terms — nadir falloff, behind-the-viewer
+ * darkness, the halo and the dither — evaluate to zero (or a whisper at
+ * the pale corner) across the resting view.
+ * ------------------------------------------------------------------ */
+
+/** the old wall plane's depth; the ramp's coordinates are anchored there */
+const WALL_DEPTH = 6;
+/** dome radius: the Forge camera orbits at 3.2 with far = 60, so 30 encloses */
+const DOME_RADIUS = 30;
+/** canvas the gradientTexture maths is expressed in (its 1024 canvas) */
+const GRAD_CANVAS = 1024;
+
+const VOID_VERTEX = /* glsl */ `
+  varying vec3 vDir;
+
+  void main() {
+    // dome is centred on the scene origin: the local position IS the ray
+    // direction (times the radius), fixed in world space
+    vDir = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const VOID_FRAGMENT = /* glsl */ `
+  uniform vec3 uDark;
+  uniform vec3 uGlow;
+  uniform vec3 uPale;
+  // the ramp's line in wall units: start point and (P1 - P0)
+  uniform vec2 uP0;
+  uniform vec2 uGrad;
+  uniform float uGradDD;
+  // the anchored plane's depth: ray direction -> wall-plane coordinates
+  uniform float uDepth;
+  // direction of the distant key light, deeper than the frame
+  uniform vec3 uLight;
+  // grounding shadow: centre xy and radii zw, in wall units
+  uniform vec4 uShadow;
+  uniform float uShadowGain;
+
+  varying vec3 vDir;
+
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123);
+  }
+
+  // exact sRGB transfer curves, so the three stops mix exactly as the old
+  // canvas texture did once the GPU decoded it on sampling
+  vec3 srgbToLinear(vec3 c) {
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+  }
+  vec3 linearToSrgb(vec3 c) {
+    return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+  }
+
+  void main() {
+    // fixed world ray direction: independent of camera, drag and model
+    vec3 dir = normalize(vDir);
+
+    // the wall-plane gradient coordinates, carried on rays with a
+    // perspective-correct projection onto the anchored plane: every ray the
+    // camera can see lands on the exact wall layout the calibrated quad
+    // painted. The epsilon keeps glancing rays (|dir.z| -> 0) finite; they
+    // run out past the ramp's ends and clamp to its end stops, exactly as
+    // the old canvas gradient clamped past its span.
+    vec2 p = dir.xy * (uDepth / max(-dir.z, 0.02));
+
+    // the exact three-stop ramp of the calibrated wall: same stops, same
+    // transition points, mixed in linear light like the sampled texture was
+    float s = clamp(dot(p - uP0, uGrad) / uGradDD, 0.0, 1.0);
+    vec3 lin = s < 0.5
+      ? mix(srgbToLinear(uDark), srgbToLinear(uGlow), s * 2.0)
+      : mix(srgbToLinear(uGlow), srgbToLinear(uPale), (s - 0.5) * 2.0);
+    vec3 col = linearToSrgb(lin);
+
+    /* ---- the void: depth terms, all of which vanish inside the frame ---- */
+    // below the frame the gradient falls away into near-black: no floor
+    col *= 1.0 - 0.72 * smoothstep(0.62, 0.98, -dir.y);
+    // and it stays dark through and behind the viewer: no lit wall out there
+    col *= 1.0 - 0.55 * smoothstep(0.15, 0.75, dir.z);
+
+    // the case's grounding shadow: the old quad's ellipse and falloff exactly
+    // (canvas radial stops 0.5 / 0.26 @ 0.4 / 0.07 @ 0.72 / 0 @ 1), blended in
+    // encoded space like the old transparent quad's framebuffer blend
+    float r = length((p - uShadow.xy) / uShadow.zw);
+    float a = r < 0.4 ? mix(0.50, 0.26, r * 2.5)
+            : r < 0.72 ? mix(0.26, 0.07, (r - 0.4) * 3.125)
+            : mix(0.07, 0.0, clamp((r - 0.72) * 3.5714, 0.0, 1.0));
+    col *= 1.0 - a * uShadowGain;
+
+    // the pale zone radiates from deeper than the frame: a whisper of bloom
+    // with an inverse-angle fall-off, effectively zero across the dark half
+    col += uPale * 0.055 * pow(max(dot(dir, uLight), 0.0), 8.0);
+
+    // dither: kills 8-bit banding on the long smooth ramps, which is what
+    // makes a gradient read as paint instead of depth
+    col += (hash(gl_FragCoord.xy) - 0.5) * (1.5 / 255.0);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+export interface VoidBackdropProps {
+  /** wall size the gradient anchors were calibrated against */
+  height?: number;
+  /** the dark / glow / pale stops of the calibrated ramp */
+  top?: string;
+  glow?: string;
+  bottom?: string;
+  /** tilt of the gradient line, radians from +x (0 = horizontal) */
+  angle?: number;
+  /** fraction of the wall the calibrated gradient line spans */
+  cover?: number;
+  /** grounding shadow strength (0 disables) */
+  shadow?: number;
+  /** shadow centre, in wall units relative to the case */
+  shadowOffset?: [number, number];
+  /** shadow ellipse full width / height, in wall units */
+  shadowScale?: [number, number];
+}
+
+/**
+ * Parse a #rrggbb into RAW sRGB components. THREE.Color's setters convert to
+ * linear working space; this shader writes straight to the canvas exactly as
+ * the old `toneMapped={false}` quad did, so the hex values must stay raw.
+ */
+function rawSrgb(hex: string): THREE.Color {
+  const v = parseInt(hex.replace('#', ''), 16);
+  return new THREE.Color(((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255);
+}
+
+export function VoidBackdrop({
+  height = HERO_WALL_HEIGHT,
+  top = '#b5a3b0',
+  glow = '#5b4153',
+  bottom = '#35202f',
+  angle = 0.873,
+  cover = 1,
+  shadow = 1,
+  shadowOffset = [0.0, -1.56],
+  shadowScale = [2.1, 0.28],
+}: VoidBackdropProps) {
+  const uniforms = useMemo(() => {
+    // the ramp's endpoints in wall units — the same layout gradientTexture()
+    // paints (gradient line centred, span = cover of the wall, angle tilt)
+    const half = GRAD_CANVAS / 2;
+    const gx = Math.cos(angle) * half * cover;
+    const gy = Math.sin(angle) * half * cover;
+    const wx = (cx: number) => (cx / GRAD_CANVAS - 0.5) * height;
+    const wy = (cy: number) => (0.5 - cy / GRAD_CANVAS) * height; // canvas y is down
+    const p0 = new THREE.Vector2(wx(half - gx), wy(half + gy));
+    const grad = new THREE.Vector2(wx(half + gx) - p0.x, wy(half - gy) - p0.y);
+    // the ramp's coordinates live on the anchored plane z = -WALL_DEPTH,
+    // extended infinitely: the exact wall layout, now edgeless
+    const depth = WALL_DEPTH;
+    // the key light sits just outside the visible top-right corner, deeper
+    // along -z: the halo's shoulder grazes the frame corner, its core never
+    const light = new THREE.Vector3(0.55, 0.55, -0.55).normalize();
+    return {
+      uDark: { value: rawSrgb(bottom) },
+      uGlow: { value: rawSrgb(glow) },
+      uPale: { value: rawSrgb(top) },
+      uP0: { value: p0 },
+      uGrad: { value: grad },
+      uGradDD: { value: grad.lengthSq() },
+      uDepth: { value: depth },
+      uLight: { value: light },
+      uShadow: { value: new THREE.Vector4(shadowOffset[0], shadowOffset[1], shadowScale[0] / 2, shadowScale[1] / 2) },
+      uShadowGain: { value: shadow },
+    };
+  }, [height, top, glow, bottom, angle, cover, shadow, shadowOffset, shadowScale]);
+
+  return (
+    <mesh frustumCulled={false} renderOrder={-20} raycast={() => null}>
+      <sphereGeometry args={[DOME_RADIUS, 48, 32]} />
+      <shaderMaterial
+        uniforms={uniforms}
+        vertexShader={VOID_VERTEX}
+        fragmentShader={VOID_FRAGMENT}
+        side={THREE.BackSide}
+        depthWrite={false}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+};

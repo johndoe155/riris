@@ -6,7 +6,7 @@ import { OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@rea
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useVaultStore } from '@/store/useVaultStore';
 import { Slab } from '@/components/canvas/slab/Slab';
-import { Backdrop, HERO_BACKDROP, HERO_WALL_HEIGHT } from '@/components/canvas/slab/Backdrop';
+import { VoidBackdrop, HERO_BACKDROP, HERO_WALL_HEIGHT } from '@/components/canvas/slab/Backdrop';
 import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
 
 /**
@@ -133,7 +133,8 @@ export function ForgePreviewCanvas() {
 
         <StudioEnvironment />
         <MovingHighlights />
-        <Backdrop height={HERO_WALL_HEIGHT} aspect={1} {...HERO_BACKDROP} />
+        {/* deep stationary void: fixed ray directions, no edges to reveal */}
+        <VoidBackdrop height={HERO_WALL_HEIGHT} {...HERO_BACKDROP} />
 
         <group
           onPointerOver={() => setHovered(true)}
