@@ -13,6 +13,7 @@ import {
   getCardFaceTexture,
   getLabelTexture,
   getTrayTexture,
+  loadImage,
   latestCardTexture,
   onCardTextureReady,
 } from './useSlabTextures';
@@ -195,6 +196,16 @@ export function Slab({
   /* --- card textures: cheap face first, art swapped in when it lands --- */
   const tier = quality === 'hero' ? 'hero' : 'cheap';
   const [face, setFace] = useState<THREE.CanvasTexture | null>(() => getCardFaceTexture(card, null, tier));
+  const [logo, setLogo] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadImage('/logo-reference.png').then((image) => {
+      if (live) setLogo(image);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   useEffect(() => {
     let live = true;
     ensureCardTexture(card, tier).then((tex) => {
@@ -211,7 +222,7 @@ export function Slab({
     };
   }, [card, tier]);
 
-  const labelTex = useMemo(() => getLabelTexture(card, false, tier), [card, tier]);
+  const labelTex = useMemo(() => getLabelTexture(card, false, tier, logo), [card, tier, logo]);
   const trayTex = useMemo(() => getTrayTexture(), []);
 
   useEffect(() => {

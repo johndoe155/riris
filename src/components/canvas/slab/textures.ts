@@ -264,7 +264,6 @@ export function drawCardFace(
   ctx.strokeRect(ax + ctx.lineWidth / 2, ay + ctx.lineWidth / 2, aw - ctx.lineWidth, ah - ctx.lineWidth);
 
   const bandTop = ay + ah;
-  const pad = W * 0.06;
   const band = H - bandTop;
   const heavy = (px: number) => `900 ${px}px Impact, "Arial Narrow", "Arial Black", sans-serif`;
   ctx.fillStyle = ink;
@@ -274,41 +273,53 @@ export function drawCardFace(
   ctx.font = heavy(titleSize);
   ctx.fillText(o.title.toUpperCase(), ax, bandTop + band * 0.035);
 
-  const gridTop = bandTop + band * 0.22;
-  const colW = (aw - pad * 0.5) / 3;
-  const rowH = band * 0.22;
   const labelSize = Math.max(12, W * 0.019);
   const valueSize = Math.max(11, W * 0.016);
   const traits = o.traits ?? [];
-  for (let i = 0; i < 6; i++) {
-    const cx = ax + (i % 3) * colW;
-    const cy = gridTop + Math.floor(i / 3) * rowH;
+  const gridTop = bandTop + band * 0.19;
+  const colW = aw / 3;
+  const rows = traits.length >= 7 ? 3 : 2;
+  const rowH = band * (rows === 3 ? 0.13 : 0.19);
+  // Reference order is vertical by column: BACKGROUNDS/EYES/MOUTHS,
+  // BASES/HANDS, BODYWEAR/HATS. No decorative horizontal strokes appear here.
+  for (let i = 0; i < traits.length; i++) {
+    const col = Math.floor(i / rows);
+    const row = i % rows;
+    const cx = ax + col * colW + W * 0.014;
+    const cy = gridTop + row * rowH;
     const [label, value] = traits[i] ?? ['—', '—'];
-    ctx.fillStyle = ink;
-    ctx.fillRect(cx, cy, Math.max(2, W * 0.004), rowH * 0.8);
     ctx.font = heavy(labelSize);
-    ctx.fillText(label.toUpperCase(), cx + W * 0.014, cy);
+    ctx.fillText(label.toUpperCase(), cx, cy);
     ctx.font = `500 ${valueSize}px Arial, sans-serif`;
     ctx.globalAlpha = 0.9;
-    ctx.fillText(value, cx + W * 0.014, cy + labelSize * 1.35);
+    ctx.fillText(value, cx, cy + labelSize * 1.35);
     ctx.globalAlpha = 1;
   }
+  ctx.fillStyle = ink;
+  for (let col = 1; col < 3; col++) {
+    ctx.fillRect(ax + col * colW - W * 0.006, gridTop, Math.max(2, W * 0.004), rowH * rows * 0.92);
+  }
 
-  const metaY = gridTop + rowH * 2.25;
-  const metaSize = Math.max(10, W * 0.015);
+  const metaY = gridTop + rowH * rows + band * 0.035;
+  const metaSize = Math.max(10, W * 0.014);
   ctx.font = `600 ${metaSize}px Arial, sans-serif`;
   ctx.fillStyle = ink;
-  ctx.fillRect(ax, metaY - W * 0.012, aw, Math.max(2, W * 0.004));
+  ctx.fillRect(ax, metaY - W * 0.010, aw, Math.max(2, W * 0.003));
+  ctx.textAlign = 'left';
   ctx.fillText(`CONTRACT ADDRESS: 0x375d...e306`, ax, metaY);
   ctx.fillText(`TOKEN ID: ${String(o.serial).split('/')[0]}`, ax, metaY + metaSize * 1.55);
   ctx.textAlign = 'right';
   ctx.fillText(`TOKEN STANDARD: ERC-721`, ax + aw, metaY);
   ctx.fillText(`CHAIN: Ethereum`, ax + aw, metaY + metaSize * 1.55);
 
-  const footerY = H - pad * 0.82;
-  ctx.font = heavy(Math.max(11, W * 0.017));
+  const footerRuleY = metaY + metaSize * 3.15;
+  ctx.fillRect(ax, footerRuleY, aw, Math.max(2, W * 0.003));
+  const footerY = footerRuleY + metaSize * 1.25;
+  ctx.font = heavy(Math.max(11, W * 0.016));
   ctx.textAlign = 'left';
   ctx.fillText(`OWNED BY: ${o.handle}`, ax, footerY);
+  ctx.textAlign = 'center';
+  ctx.fillText('@NEMOSCARDSHOP', ax + aw / 2, footerY);
   ctx.textAlign = 'right';
   ctx.fillText(o.serial, ax + aw, footerY);
   ctx.restore();
@@ -421,6 +432,8 @@ export interface LabelText {
   ink: string;
   /** draw the QR block on the right (blank variant skips it) */
   qr: boolean;
+  /** extracted transparent version of the uploaded reference logo */
+  logo?: HTMLImageElement | null;
   blank?: boolean;
 }
 
@@ -460,27 +473,17 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   const startY = H / 2 - leading * (lines.length - 1) / 2;
   lines.forEach((line, i) => ctx.fillText(line, pad, startY + i * leading));
 
-  // Two tilted outlined cards with orange fills: the clean reference mark.
-  const cx = W * 0.84;
-  const cy = H * 0.5;
-  const cardW = H * 0.30;
-  const cardH = H * 0.48;
-  const drawMarkCard = (x: number, y: number, angle: number, fill: string) => {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
-    ctx.fillStyle = '#332333';
-    ctx.strokeStyle = white;
-    ctx.lineWidth = Math.max(3, H * 0.025);
-    roundRect(ctx, -cardW / 2, -cardH / 2, cardW, cardH, H * 0.035);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = fill;
-    ctx.fillRect(-cardW * 0.27, -cardH * 0.36, cardW * 0.54, cardH * 0.72);
-    ctx.restore();
-  };
-  drawMarkCard(cx - H * 0.08, cy + H * 0.02, -0.13, '#ff6a2a');
-  drawMarkCard(cx + H * 0.08, cy + H * 0.04, 0.08, '#ff6a2a');
+  // Use the uploaded mark itself; drawing a substitute silhouette was the
+  // source of the previous logo mismatch. Preserve its aspect ratio and
+  // transparent cutout while fitting it into the reference header slot.
+  if (o.logo) {
+    const maxW = W * 0.19;
+    const maxH = H * 0.72;
+    const scale = Math.min(maxW / o.logo.width, maxH / o.logo.height);
+    const lw = o.logo.width * scale;
+    const lh = o.logo.height * scale;
+    ctx.drawImage(o.logo, W * 0.84 - lw / 2, H / 2 - lh / 2, lw, lh);
+  }
 }
 
 export function buildLabelTexture(o: LabelText): THREE.CanvasTexture {
@@ -637,4 +640,3 @@ export function roundRect(
   ctx.arcTo(x, y, x + rr, y, rr);
   ctx.closePath();
 }
-

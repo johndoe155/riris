@@ -80,10 +80,11 @@ export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): C
   const traits: [string, string][] = card.id === 'reference'
     ? [
         ['BACKGROUNDS', 'Pink Starry (5%)'],
-        ['BASES', 'Rainbow (4%)'],
-        ['BODYWEAR', 'Hawaiian (2%)'],
         ['EYES', 'None (36%)'],
+        ['MOUTHS', 'None (62%)'],
+        ['BASES', 'Rainbow (4%)'],
         ['HANDS', 'Plutonium (3%)'],
+        ['BODYWEAR', 'Hawaiian (2%)'],
         ['HATS', 'None (41%)'],
       ]
     : [
@@ -218,9 +219,10 @@ const labelCache = new Map<string, THREE.CanvasTexture>();
 export function getLabelTexture(
   card: SlabCard,
   blank = false,
-  tier: keyof typeof LABEL_TIERS = 'hero'
+  tier: keyof typeof LABEL_TIERS = 'hero',
+  logo: HTMLImageElement | null = null
 ): THREE.CanvasTexture {
-  const key = `${card.id}:${blank ? 'blank' : 'full'}:${tier}`;
+  const key = `${card.id}:${blank ? 'blank' : 'full'}:${tier}:${logo ? 'logo' : 'no-logo'}`;
   const hit = labelCache.get(key);
   if (hit) return hit;
   const accent = blank ? '#D8D5D0' : card.color;
@@ -238,6 +240,7 @@ export function getLabelTexture(
     plate: blank ? '#FFFFFF' : mixHex('#3f343c', card.color2, 0.06),
     ink: blank ? '#141414' : '#F7F5F2',
     qr: !blank,
+    logo,
     blank,
   };
   const tex = canvasTexture((ctx) => drawLabel(ctx, o), o.width, o.height);
