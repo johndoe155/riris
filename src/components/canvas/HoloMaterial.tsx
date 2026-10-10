@@ -123,24 +123,159 @@ const HoloShaderMaterial = shaderMaterial(
       return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
     }
 
+    float hash21(vec2 p) {
+      p = fract(p * vec2(234.34, 435.345));
+      p += dot(p, p + 34.345);
+      return fract(p.x * p.y);
+    }
+
+    vec2 hash22(vec2 p) {
+      float n = hash21(p);
+      return vec2(hash21(p + n + 1.71), hash21(p + n * 2.31 + 5.13));
+    }
+
     /**
-     * Diffraction ramp. A real foil's orders are never fully saturated — they
-     * sit on top of the specular white and wash out toward the highlights — so
-     * the pure-hue stops are pulled toward their own luma by uFoilSat.
+     * Fully saturated spectral ramp — the foil's diffraction orders, shared by
+     * every finish (the holo sweep desaturates it slightly before use).
      */
-    vec3 holoGradient(float t) {
+    vec3 prismRamp(float t) {
       vec3 c1 = vec3(1.0, 0.48, 0.22); // orange: the brand constant
       vec3 c2 = uFoilB; // cool order
       vec3 c3 = uFoilC; // warm order
       vec3 c4 = uFoilD; // magenta order
       float t2 = fract(t);
-      vec3 c = (t2 < 0.33) ? mix(c1, c2, t2 / 0.33)
-             : (t2 < 0.66) ? mix(c2, c3, (t2 - 0.33) / 0.33)
-             :               mix(c3, c4, (t2 - 0.66) / 0.34);
-      // the foil's own orders arrive with roughly equal energy, so the ramp is
-      // desaturated toward its luma before it multiplies the base
+      return (t2 < 0.33) ? mix(c1, c2, t2 / 0.33)
+           : (t2 < 0.66) ? mix(c2, c3, (t2 - 0.33) / 0.33)
+           :               mix(c3, c4, (t2 - 0.66) / 0.34);
+    }
+
+    /** push a linear colour away from its luma so foil orders stay chromatic */
+    vec3 vivid(vec3 c) {
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      return mix(c, vec3(l), 0.42);
+      return max(mix(vec3(l), c, 2.2), 0.0);
+    }
+
+    /**
+     * Discrete iridescent stop colours. A smooth spectral ramp blends through
+     * grey between far-apart orders, but real foil shards and specks pick ONE
+     * order each — so the confetti hues are quantised: aqua, lime, yellow,
+     * golden orange, magenta, pink, blue and a clear/white shard, all derived
+     * from the palette uniforms so the driver still steers them.
+     */
+    vec3 foilStop(float t) {
+      float hs = floor(fract(t) * 8.0);
+      vec3 cLime = vivid(mix(uFoilB, uFoilC, 0.5));
+      vec3 cGold = vivid(mix(vec3(1.0, 0.48, 0.22), uGoldA, 0.5));
+      vec3 cPink = mix(vivid(uFoilD), vec3(1.0), 0.45);
+      vec3 cBlue = vivid(mix(uFoilB, vec3(0.10, 0.25, 1.0), 0.55));
+      return (hs < 1.0) ? vivid(uFoilB)
+           : (hs < 2.0) ? cLime
+           : (hs < 3.0) ? vivid(uFoilC)
+           : (hs < 4.0) ? cGold
+           : (hs < 5.0) ? vivid(uFoilD)
+           : (hs < 6.0) ? cPink
+           : (hs < 7.0) ? cBlue
+           :              vec3(0.90, 0.88, 0.95);
+    }
+
+    /**
+     * The holo band's smooth spectrum, blue at the card's bottom edge through
+     * teal, green, yellow and orange to red at the top — the continuous
+     * rainbow the reference shows, with the palette uniforms anchoring the
+     * cool/warm stops.
+     */
+    vec3 bandRamp(float t) {
+      vec3 cBlue = vivid(mix(uFoilB, vec3(0.10, 0.25, 1.0), 0.55));
+      vec3 cTeal = vivid(uFoilB);
+      vec3 cGreen = vivid(mix(uFoilC, uFoilB, 0.5));
+      vec3 cYellow = vivid(uFoilC);
+      vec3 cOrange = vec3(1.0, 0.48, 0.22);
+      vec3 cRed = mix(vivid(uFoilD), vec3(0.95, 0.08, 0.10), 0.75);
+      vec3 c = mix(cBlue, cTeal, smoothstep(0.00, 0.20, t));
+      c = mix(c, cGreen, smoothstep(0.20, 0.45, t));
+      c = mix(c, cYellow, smoothstep(0.45, 0.65, t));
+      c = mix(c, cOrange, smoothstep(0.65, 0.82, t));
+      c = mix(c, cRed, smoothstep(0.82, 1.00, t));
+      return c;
+    }
+
+    /**
+     * The holo foil's micro-dot grain: a fine grid of round foil dots, each
+     * cell twinkling on its own hash as the view angle slides. Most dots read
+     * silver; a minority carry a spectral tint, exactly like the reference's
+     * occasional warm/cool specks. .rgb = tint, .a = sparkle strength.
+     */
+    vec4 dotSparkle(vec2 uv, float phase) {
+      vec2 g = uv * vec2(120.0, 170.0);
+      vec2 id = floor(g);
+      vec2 f = fract(g) - 0.5;
+      vec2 jr = hash22(id) - 0.5;
+      float d = length(f - jr * 0.35);
+      float shape = 1.0 - smoothstep(0.20, 0.46, d);
+      float h1 = hash21(id);
+      float h2 = hash21(id + 7.31);
+      float tw = 0.5 + 0.5 * sin(phase * 2.0 + h1 * 6.2831);
+      float spark = shape * (0.06 + 0.94 * h2 * h2 * (0.30 + 0.70 * tw));
+      float tinted = step(0.74, h1);
+      vec3 tint = mix(vec3(1.0), foilStop(h2 + phase * 0.05), tinted * 0.85);
+      return vec4(tint, spark);
+    }
+
+    /**
+     * Confetti shards: per grid cell a random convex triangle cut by three
+     * hashed half-planes, present in only some cells, coloured as a single
+     * iridescent stop and lit by the view angle; the soft parameter widens
+     * the edge fade (soft pastel flashes vs hard glass shards).
+     * .rgb = colour, .a = coverage.
+     */
+    vec4 shardField(vec2 uv, float cells, float phase, float density, float soft) {
+      vec2 g = uv * vec2(cells * 0.72, cells);
+      vec2 id = floor(g);
+      vec2 f = fract(g);
+      float r = hash21(id + 1.7);
+      float tri = 1.0;
+      for (int k = 0; k < 3; k++) {
+        float fk = float(k);
+        float a = 6.2831 * hash21(id + fk * 3.71 + 9.2);
+        vec2 nrm = vec2(cos(a), sin(a));
+        float off = mix(-0.15, 0.55, hash21(id + fk * 9.13 + 4.7));
+        tri *= 1.0 - smoothstep(0.0, max(soft, 0.02), dot(f - 0.5, nrm) - off);
+      }
+      float present = step(1.0 - density, hash21(id + 3.3));
+      float lit = 0.75 + 0.25 * sin(phase * 1.6 + r * 6.2831);
+      vec3 col = foilStop(hash21(id + 6.1) + phase * 0.04);
+      return vec4(col * lit, tri * present * (0.65 + 0.30 * lit));
+    }
+
+    /**
+     * Cracked ice: a contiguous mosaic of straight-edged triangular facets —
+     * each grid cell split on a hashed diagonal, plus a coarser octave for the
+     * large sheen planes. .x = per-facet luma hash, .y = thin bright crack
+     * line along the facet boundaries, .z = hash for prismatic tint / glint.
+     */
+    vec4 iceFacets(vec2 uv) {
+      // fine triangular mosaic: each cell split on a hashed diagonal
+      vec2 g = uv * vec2(16.0, 22.0);
+      vec2 id = floor(g);
+      vec2 f = fract(g);
+      float dg = step(0.5, hash21(id + 4.7));
+      float sMain = mix(f.x - f.y, f.x + f.y - 1.0, dg);
+      vec2 fid = id * 2.0 + step(0.0, sMain);
+      // crack lines are rare and faint: facets read as luma steps, not wires
+      float lineA = (1.0 - smoothstep(0.0, 0.04, abs(sMain) * 0.7071))
+                  * 0.35 * step(0.72, hash21(fid + 9.4));
+      // coarser counter-posed mosaic breaks the grid's regularity
+      vec2 g2 = uv.yx * vec2(9.0, 12.5) + 0.31;
+      vec2 id2 = floor(g2);
+      vec2 f2 = fract(g2);
+      float dg2 = step(0.5, hash21(id2 + 8.1));
+      float s2 = mix(f2.x - f2.y, f2.x + f2.y - 1.0, dg2);
+      vec2 fid2 = id2 * 2.0 + step(0.0, s2);
+      float lineB = (1.0 - smoothstep(0.0, 0.035, abs(s2) * 0.7071))
+                  * 0.25 * step(0.70, hash21(fid2 + 5.8));
+      float line = max(lineA, lineB);
+      float lum = mix(hash21(fid), hash21(fid2 + 11.3), 0.45);
+      return vec4(lum, line, hash21(fid + 2.17), 1.0);
     }
 
     // Cover-fit: crop the source rather than squashing it into the card face.
@@ -174,52 +309,88 @@ const HoloShaderMaterial = shaderMaterial(
       float dist = distance(vUv, pointer);
       float pointerGlow = 1.0 - smoothstep(0.0, 0.75, dist);
 
-      // The foil's orders run as a diffraction grating: a family of near-parallel
-      // lines whose spacing sets the colour banding. Kept on a fixed axis plus a
-      // view-angle term (rather than the old polar spiral around the pointer) —
-      // a grating is anisotropic, and the radial version read as a lens flare.
-      float grating = (vUv.x * 0.72 + vUv.y * 0.28) * 18.0
-                    + viewShift * 3.0
-                    + dist * 1.2
-                    + uTime * 0.06;
-      float bands = sin(grating) * 0.5 + 0.5;
-      // a second, coarser order so the ramp is not a single clean sine
-      bands = mix(bands, sin(grating * 0.37 + 1.7) * 0.5 + 0.5, 0.35);
-      vec3 foil = holoGradient(bands + viewShift * 0.5 + pointer.x * 0.25);
+      // Shared view/pointer phase. uPointer is damped on the CPU side, so
+      // every term derived from this glides rather than jumps while dragging.
+      float phase = viewShift * 2.0
+                  + (pointer.x - 0.5) * 1.35
+                  + (pointer.y - 0.5) * 0.55
+                  + uTime * 0.05;
 
-      /* ---- per-finish colour + strength ---- */
+      /* ---- per-finish blend weights ---- */
       float w0 = max(0.0, 1.0 - abs(uFinish - 0.0));
       float w1 = max(0.0, 1.0 - abs(uFinish - 1.0));
       float w2 = max(0.0, 1.0 - abs(uFinish - 2.0));
       float w3 = max(0.0, 1.0 - abs(uFinish - 3.0));
       float wSum = max(w0 + w1 + w2 + w3, 0.0001);
 
-      // the foil is only lit where the view angle has moved it off the
-      // specular axis, plus where the pointer sits: much tighter than before,
-      // so the card's frame and inks stay flat ink at rest
-      float foilMask = clamp(fresnel * 0.42 + pointerGlow * 0.22 + 0.025, 0.0, 0.58);
-      foilMask *= 0.78 + noise(vUv * 8.0 + uTime * 0.08) * 0.22;
+      /* ---- holo: one smooth spectral band on an otherwise matte face ----
+       * The reference shows a continuous vertical rainbow (red top through
+       * yellow/green to blue bottom) hugging one side, with a faint rippled,
+       * water-like edge; the rest of the art stays dark and matte until the
+       * view angle or the pointer slides the band across it. Dot-grain
+       * sparkle lives inside the band. */
+      float ripple = sin(vUv.y * 21.0 + uTime * 0.30) * 0.020
+                   + sin(vUv.y * 47.0 - uTime * 0.22 + 1.7) * 0.012;
+      float bx = 0.74 + (pointer.x - 0.5) * 0.55 + (viewShift - 0.25) * 0.40;
+      float band = smoothstep(bx - 0.20 + ripple, bx - 0.02 + ripple, vUv.x);
+      float water = 0.5 + 0.5 * sin(vUv.x * 90.0
+                    + sin(vUv.y * 60.0 + uTime * 0.30) * 2.0);
+      vec3 bandCol = bandRamp(vUv.y + 0.03 * sin(vUv.x * 30.0 + uTime * 0.15));
+      vec4 sp = dotSparkle(vUv, phase * 3.0 + pointerGlow * 1.2);
+      float sparkIn = sp.a * (0.10 + 0.90 * band);
+      vec3 holoTint = bandCol * (0.80 + 0.30 * band + 0.08 * water)
+                    + sp.rgb * sparkIn * 1.10
+                    + vec3(0.90, 0.95, 1.0) * spec * 0.30;
+      float holoAmt = clamp(band * (0.70 + 0.10 * water) + sparkIn * 0.35
+                          + fresnel * 0.08 + spec * 0.10, 0.0, 0.92);
 
-      float n1 = noise(vUv * 12.0 + 3.1);
-      float n2 = noise(vUv * 27.0 + 11.0);
-      float crack = 1.0 - smoothstep(0.0, 0.16, abs(n1 - n2));
-      vec3 ice = uIce;
-      vec3 goldA = uGoldA;
-      vec3 goldB = uGoldB;
-      vec3 gold = mix(goldB, goldA, sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0) * 0.5 + 0.5);
+      /* ---- cracked ice: fine tone-on-tone facet mosaic ----
+       * The reference is the subtle finish: a fine network of small
+       * translucent facets that read as faint lighter/darker patches over the
+       * art, with only a few pale pink iridescent flashes near the edges.
+       * Text stays fully readable, so alphas stay low. */
+      vec4 fc = iceFacets(vUv);
+      float facetLum = (fc.x - 0.5) * 0.42;
+      float glint = pow(0.5 + 0.5 * sin(phase * 2.2 + fc.z * 43.0), 3.0)
+                  * (0.4 + 0.6 * pointerGlow);
+      vec4 flash = shardField(vUv + 0.13, 13.0, phase * 1.3 + 4.0, 0.10, 0.25);
+      flash.rgb = mix(flash.rgb, vec3(1.0), 0.55);
+      flash.a *= 0.35;
+      vec3 iceTint = mix(uIce, vec3(1.0), 0.60) * (0.45 + facetLum + glint * 0.30)
+                   + flash.rgb * flash.a;
+      float iceAmt = clamp(0.04 + abs(facetLum) * 0.50 + fc.y * 0.06
+                         + glint * 0.12 + flash.a * 0.55
+                         + fresnel * 0.12 + spec * 0.10, 0.0, 0.60);
+
+      /* ---- gold: the loudest finish — dense shattered-glass confetti ----
+       * Three octaves: broad pale lavender washes, mid saturated shards and
+       * small bright slivers, each flashing its own stop colour, scattered
+       * densely enough to wash out ink underneath, plus glowing sparkle dots.
+       * The gold pair stays as a faint warm sheen between the shards. */
+      vec4 gw = shardField(vUv + 0.37, 5.0, phase * 0.7 + 2.1, 0.75, 0.10);
+      gw.rgb = mix(gw.rgb, vec3(0.90, 0.86, 0.95), 0.55);
+      gw.a *= 0.45;
+      vec4 gm = shardField(vUv, 11.0, phase, 0.70, 0.04);
+      gm.rgb *= 1.20;
+      gm.a *= 0.80;
+      vec4 gs = shardField(vUv + 0.11, 20.0, phase * 1.2 + 4.2, 0.50, 0.03);
+      gs.rgb *= 1.25;
+      gs.a *= 0.90;
+      float shardA = 1.0 - (1.0 - gw.a) * (1.0 - gm.a) * (1.0 - gs.a);
+      vec3 shardCol = (gw.rgb * gw.a + gm.rgb * gm.a + gs.rgb * gs.a)
+                    / max(shardA, 0.0001);
+      vec4 gd = dotSparkle(vUv, phase * 3.0);
+      float dotA = gd.a * 0.35;
+      shardCol = (shardCol * shardA + gd.rgb * dotA) / max(shardA + dotA, 0.0001);
+      shardA = clamp(shardA + dotA, 0.0, 1.0);
+      vec3 warm = mix(uGoldB, uGoldA,
+                      0.5 + 0.5 * sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0));
+      vec3 goldTint = shardCol + warm * 0.10;
+      float goldAmt = clamp(shardA * 0.95 + spec * 0.10 + fresnel * 0.05, 0.0, 0.97);
 
       // base finish: the card's own ink, lifted only slightly by the view angle
       vec3 baseTint = vec3(1.0);
       float baseAmt = 0.02 + fresnel * 0.04;
-
-      vec3 holoTint = foil;
-      float holoAmt = clamp(foilMask * 0.48 + spec * 0.18 + fresnel * 0.10, 0.0, 0.34);
-
-      vec3 iceTint = ice * (0.6 + crack * 0.4) + vec3(crack * 0.35);
-      float iceAmt = clamp(0.24 + fresnel * 0.3 + crack * 0.45 + spec * 0.3, 0.0, 0.8);
-
-      vec3 goldTint = gold;
-      float goldAmt = clamp(0.4 + fresnel * 0.3 + spec * 0.5, 0.0, 0.95);
 
       vec3 effectColor = (baseTint * baseAmt * w0 + holoTint * holoAmt * w1 +
                           iceTint * iceAmt * w2 + goldTint * goldAmt * w3) / wSum;
@@ -236,13 +407,23 @@ const HoloShaderMaterial = shaderMaterial(
       } else {
         /* ---- base: the art itself, with the finish mixed in ---- */
         vec3 baseTier = img * (0.97 + fresnel * 0.1);
-        vec3 holoTier = mix(img, foil, clamp(foilMask * 0.34, 0.0, 0.52));
-        holoTier += foil * (fresnel * 0.12 + spec * 0.18);
-        vec3 iceTier = mix(img, ice, clamp(0.18 + n1 * 0.22 + fresnel * 0.45, 0.0, 1.0));
-        iceTier += ice * crack * (0.35 + pointerGlow * 0.5 + spec * 0.6);
-        iceTier += ice * fresnel * 0.25;
-        vec3 goldTier = mix(img, gold, clamp(fresnel * 0.85 + pointerGlow * 0.45 + 0.15, 0.0, 1.0) * 0.6);
-        goldTier += gold * (fresnel * 0.45 + spec * 0.6);
+
+        // matte art; the band replaces it with the spectrum where it sits
+        vec3 holoTier = mix(img, bandCol * 1.15, band * 0.72);
+        holoTier += bandCol * band * 0.22;
+        holoTier += sp.rgb * sparkIn * (0.50 + pointerGlow * 0.30) + vec3(spec) * 0.20;
+
+        // per-facet refraction: the art resampled with a facet-hash offset
+        vec2 refr = (hash22(vec2(fc.z * 91.7, fc.z * 47.3)) - 0.5) * 0.012;
+        vec3 imgR = texture2D(uImage, coverUv(vUv + refr, uImageAspect, uCardAspect)).rgb;
+        vec3 iceTier = mix(img, imgR, 0.35) * (1.0 + facetLum * 0.60 + glint * 0.10);
+        iceTier += uIce * (0.02 + glint * 0.08 + fresnel * 0.05) + fc.y * 0.10;
+        iceTier += flash.rgb * flash.a * 0.45;
+
+        vec3 goldTier = mix(img, gw.rgb, gw.a);
+        goldTier = mix(goldTier, gm.rgb, gm.a);
+        goldTier = mix(goldTier, gs.rgb, gs.a);
+        goldTier += gd.rgb * gd.a * 0.40 + warm * (0.03 + spec * 0.25);
 
         vec3 tinted = (baseTier * w0 + holoTier * w1 + iceTier * w2 + goldTier * w3) / wSum;
         vec3 col = mix(img, tinted, uIntensity);
