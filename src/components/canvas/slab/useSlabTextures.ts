@@ -152,30 +152,6 @@ export function getCardFaceTexture(
   return tex;
 }
 
-/**
- * The fluid card face, split for material tinting: 'base' (transparent
- * paper + the art window's contents) and 'ink' (transparent + white
- * furniture: keyline, frame stroke, title, traits, meta, footer). The
- * combined 'full' texture stays what every non-fluid consumer renders.
- * `art` may be null (the furniture still draws; the art window is empty).
- */
-export function getCardFaceLayer(
-  card: SlabCard,
-  art: HTMLImageElement | null,
-  tier: keyof typeof FACE_TIERS,
-  layer: 'base' | 'ink'
-): THREE.CanvasTexture {
-  const key = `${card.id}:${tier}:${layer}:${art ? 'art' : 'noart'}`;
-  const hit = faceCache.get(key);
-  if (hit) return hit;
-  const o = cardFaceText(card, FACE_TIERS[tier]);
-  const tex = canvasTexture((ctx) => {
-    drawCardFace(ctx, o, art, innerArtBox(o), layer);
-  }, o.width, o.height);
-  faceCache.set(key, tex);
-  return tex;
-}
-
 /** A tiny subscription helper: one per texture kind. */
 function channel<T extends unknown[]>() {
   const set = new Set<(...args: T) => void>();
@@ -237,10 +213,9 @@ export function getLabelTexture(
   card: SlabCard,
   blank = false,
   tier: keyof typeof LABEL_TIERS = 'hero',
-  logo: HTMLImageElement | null = null,
-  inkOnly = false
+  logo: HTMLImageElement | null = null
 ): THREE.CanvasTexture {
-  const key = `${card.id}:${blank ? 'blank' : 'full'}:${tier}:${logo ? 'logo' : 'no-logo'}:${inkOnly ? 'ink' : 'flat'}`;
+  const key = `${card.id}:${blank ? 'blank' : 'full'}:${tier}:${logo ? 'logo' : 'no-logo'}`;
   const hit = labelCache.get(key);
   if (hit) return hit;
   const accent = blank ? '#D8D5D0' : card.color;
@@ -260,8 +235,6 @@ export function getLabelTexture(
     qr: !blank,
     logo,
     blank,
-    // fluid palette: ink-only canvas over the tintable plate mesh
-    inkOnly: !blank && inkOnly,
   };
   const tex = canvasTexture((ctx) => drawLabel(ctx, o), o.width, o.height);
   labelCache.set(key, tex);

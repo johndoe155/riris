@@ -56,20 +56,6 @@ const HoloShaderMaterial = shaderMaterial(
     uMaskFeather: 0.012,
     /** how strongly the foil shows outside the mask (the photo shows none) */
     uOutside: 0.015,
-    /**
-     * The holo ramp's four stops, ice tone and gold stops. These were
-     * hard-coded literals; they are uniforms now so the Forge's fluid
-     * palette can ease them toward each artwork's extracted colours. The
-     * defaults are EXACTLY the old literals, so nothing changes until the
-     * fluid driver feeds a palette (the pit never does).
-     */
-    uFoil1: new THREE.Color(1.0, 0.48, 0.22),
-    uFoil2: new THREE.Color(0.32, 0.78, 0.92),
-    uFoil3: new THREE.Color(1.0, 0.82, 0.34),
-    uFoil4: new THREE.Color(0.92, 0.35, 0.72),
-    uIce: new THREE.Color(0.78, 0.88, 1.0),
-    uGoldA: new THREE.Color(1.0, 0.86, 0.36),
-    uGoldB: new THREE.Color(0.62, 0.42, 0.09),
   },
   // vertex
   /* glsl */ `
@@ -98,14 +84,6 @@ const HoloShaderMaterial = shaderMaterial(
     uniform vec4 uMask;
     uniform float uMaskFeather;
     uniform float uOutside;
-    /* fluid palette stops (defaults are the original literals) */
-    uniform vec3 uFoil1;
-    uniform vec3 uFoil2;
-    uniform vec3 uFoil3;
-    uniform vec3 uFoil4;
-    uniform vec3 uIce;
-    uniform vec3 uGoldA;
-    uniform vec3 uGoldB;
 
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -132,11 +110,14 @@ const HoloShaderMaterial = shaderMaterial(
      * the pure-hue stops are pulled toward their own luma by uFoilSat.
      */
     vec3 holoGradient(float t) {
-      // the stops are uniforms (fluid palette); order and rhythm unchanged
+      vec3 c1 = vec3(1.0, 0.48, 0.22); // orange
+      vec3 c2 = vec3(0.32, 0.78, 0.92); // cyan
+      vec3 c3 = vec3(1.0, 0.82, 0.34); // yellow
+      vec3 c4 = vec3(0.92, 0.35, 0.72); // magenta
       float t2 = fract(t);
-      vec3 c = (t2 < 0.33) ? mix(uFoil1, uFoil2, t2 / 0.33)
-             : (t2 < 0.66) ? mix(uFoil2, uFoil3, (t2 - 0.33) / 0.33)
-             :               mix(uFoil3, uFoil4, (t2 - 0.66) / 0.34);
+      vec3 c = (t2 < 0.33) ? mix(c1, c2, t2 / 0.33)
+             : (t2 < 0.66) ? mix(c2, c3, (t2 - 0.33) / 0.33)
+             :               mix(c3, c4, (t2 - 0.66) / 0.34);
       // the foil's own orders arrive with roughly equal energy, so the ramp is
       // desaturated toward its luma before it multiplies the base
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -203,9 +184,9 @@ const HoloShaderMaterial = shaderMaterial(
       float n1 = noise(vUv * 12.0 + 3.1);
       float n2 = noise(vUv * 27.0 + 11.0);
       float crack = 1.0 - smoothstep(0.0, 0.16, abs(n1 - n2));
-      vec3 ice = uIce;
-      vec3 goldA = uGoldA;
-      vec3 goldB = uGoldB;
+      vec3 ice = vec3(0.78, 0.88, 1.0);
+      vec3 goldA = vec3(1.0, 0.86, 0.36);
+      vec3 goldB = vec3(0.62, 0.42, 0.09);
       vec3 gold = mix(goldB, goldA, sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0) * 0.5 + 0.5);
 
       // base finish: the card's own ink, lifted only slightly by the view angle
@@ -414,14 +395,6 @@ function textureAspect(texture: THREE.Texture | null | undefined): number {
   return w > 0 && h > 0 ? w / h : 1;
 }
 
-export interface HoloShaderPalette {
-  /** the four foil ramp stops (linear components, as the shader mixes them) */
-  foil: [THREE.Color, THREE.Color, THREE.Color, THREE.Color];
-  ice: THREE.Color;
-  goldA: THREE.Color;
-  goldB: THREE.Color;
-}
-
 export interface HoloCardMaterialProps {
   image?: THREE.Texture | null;
   finish?: FinishName;
@@ -438,11 +411,6 @@ export interface HoloCardMaterialProps {
   maskFeather?: number;
   /** foil strength outside the mask (0 = card plane only) */
   outside?: number;
-  /**
-   * Fluid palette targets (the Forge's driver supplies them). When omitted
-   * the uniforms stay at their defaults — the pit's look, bit for bit.
-   */
-  palette?: HoloShaderPalette;
 }
 
 export function HoloCardMaterial({
@@ -458,7 +426,6 @@ export function HoloCardMaterial({
   mask = [0.0569, 0.3675, 0.9431, 0.9536],
   maskFeather = 0.012,
   outside = 0.015,
-  palette,
 }: HoloCardMaterialProps) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const gl = useThree((state) => state.gl);
@@ -536,20 +503,6 @@ export function HoloCardMaterial({
     u.uPointer.value.copy(a.pointer);
     u.uFinish.value = a.finish;
     u.uIntensity.value = a.intensity;
-
-    // fluid palette: ease the colour uniforms toward the driver's targets
-    // (the same ~1 s settle as every other channel). No palette prop — as
-    // in the pit — and the uniforms simply stay at their defaults.
-    if (palette) {
-      const k = 1 - Math.exp(-3.5 * delta);
-      (u.uFoil1.value as THREE.Color).lerp(palette.foil[0], k);
-      (u.uFoil2.value as THREE.Color).lerp(palette.foil[1], k);
-      (u.uFoil3.value as THREE.Color).lerp(palette.foil[2], k);
-      (u.uFoil4.value as THREE.Color).lerp(palette.foil[3], k);
-      (u.uIce.value as THREE.Color).lerp(palette.ice, k);
-      (u.uGoldA.value as THREE.Color).lerp(palette.goldA, k);
-      (u.uGoldB.value as THREE.Color).lerp(palette.goldB, k);
-    }
   });
 
   return <holoShaderMaterial ref={materialRef} />;

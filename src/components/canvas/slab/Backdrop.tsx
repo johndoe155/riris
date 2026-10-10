@@ -1,8 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { fluidEngine } from './fluidPalette';
 
 /**
  * The slab stands in front of a plain gradient with a soft drop shadow — the
@@ -374,17 +372,6 @@ export function VoidBackdrop({
       uLight: { value: light },
     };
   }, [height, top, glow, bottom, angle, cover]);
-
-  // fluid palette: while the Forge's driver is mounted, ease the three
-  // stops toward its already-smoothed channels (the engine's values move,
-  // this copy just follows — one frame of lag at most). Unmounted — the
-  // tooling, or any future static use — and the uniforms never move.
-  useFrame(() => {
-    if (!fluidEngine.mounted) return;
-    uniforms.uDark.value.copy(fluidEngine.current.dark);
-    uniforms.uGlow.value.copy(fluidEngine.current.glowStop);
-    uniforms.uPale.value.copy(fluidEngine.current.paleStop);
-  });
 
   return (
     <mesh frustumCulled={false} renderOrder={-20} raycast={() => null}>

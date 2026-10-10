@@ -6,12 +6,10 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import type { SlabCard } from '@/data/slabCards';
 import { HoloCardMaterial, useCardPointer } from '@/components/canvas/HoloMaterial';
 import { getSlabGeometry } from './geometry';
-import { fluidEngine, holoShaderPalette } from './fluidPalette';
 import { REF_TONE, SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
 import { getWearMaps } from './textures';
 import {
   ensureCardTexture,
-  getCardFaceLayer,
   getCardFaceTexture,
   getFaceMapTexture,
   getLabelTexture,
@@ -186,14 +184,6 @@ export interface SlabProps {
   };
   timeOffset?: number;
   children?: ReactNode;
-  /**
-   * Fluid palette (Forge only): clone the hero glass so the shared
-   * singletons — the pit's cheap glass AND the reference view's hero glass —
-   * are never tinted, follow the engine's smoothed channels for the glass
-   * body/attenuation, and feed the live palette to the foil overlays. When
-   * absent (pit, reference view) nothing changes by a single bit.
-   */
-  fluid?: boolean;
 }
 
 const FLIP_SPEED = Math.PI / 0.55;
@@ -224,7 +214,6 @@ export function Slab({
   cardHandlers,
   timeOffset = 0,
   children,
-  fluid = false,
 }: SlabProps) {
   const geo = useMemo(() => getSlabGeometry(quality), [quality]);
   const mat = useMemo(() => getMaterials(), []);
@@ -275,63 +264,6 @@ export function Slab({
   const isActive = active || hovered;
   const foilPointer = pointer ?? localPointer;
 
-  /* --- pick the glass: real transmission in the Forge, and in the pit only
-         while this slab is hovered or held. The fluid (Forge) variant is a
-         clone, so the engine can tint it without touching the shared
-         singleton the pit's upgrade and the reference view rely on. --- */
-  const fluidGlass = useMemo(() => (fluid ? mat.glass.clone() : null), [fluid, mat]);
-  const glassMat = fluidGlass ?? (quality === 'hero' || upgradeGlass || isActive ? mat.glass : mat.glassCheap);
-
-  /* --- fluid material set: clones of every shared singleton the Forge
-         tints, plus the ink materials for the split card/label canvases.
-         Built ONLY when `fluid` — the pit and the reference view keep the
-         shared originals untouched. --- */
-  const fluidMats = useMemo(() => {
-    if (!fluid) return null;
-    return {
-      label: mat.label.clone(),
-      cardBody: mat.cardBody.clone(),
-      tray: new THREE.MeshStandardMaterial({ map: trayTex, roughness: 0.86, metalness: 0.04 }),
-      face: mat.face.clone(),
-      ridge: mat.ridge.clone(),
-      tabs: mat.ridgeTabs.map((m) => m.clone()),
-      sideTab: mat.sideTab.clone(),
-      labelInk: new THREE.MeshStandardMaterial({
-        map: getLabelTexture(card, false, tier, logo, true),
-        roughness: 0.52,
-        metalness: 0.06,
-        transparent: true,
-        toneMapped: false,
-      }),
-      cardInk: new THREE.MeshBasicMaterial({ transparent: true, toneMapped: false }),
-    };
-  }, [fluid, mat, trayTex, card, tier, logo]);
-
-  /* the split card canvases: base (paper + art) and ink (white furniture).
-     The base starts from the combined face so there is no flash; the ink
-     plane renders only once its own canvas is in the state below. */
-  const [fluidLayers, setFluidLayers] = useState<{ base: THREE.Texture; ink: THREE.Texture } | null>(null);
-  useEffect(() => {
-    if (!fluid) return;
-    let live = true;
-    // the art rides the shared image cache (the same load the combined face
-    // used), so the base layer carries the artwork and the ink layer the
-    // tintable furniture — both drawn by the same painter
-    loadImage(card.art).then((art) => {
-      if (!live) return;
-      const base = getCardFaceLayer(card, art, tier, 'base');
-      const ink = getCardFaceLayer(card, art, tier, 'ink');
-      if (fluidMats) {
-        fluidMats.cardInk.map = ink;
-        fluidMats.cardInk.needsUpdate = true;
-      }
-      setFluidLayers({ base, ink });
-    });
-    return () => {
-      live = false;
-    };
-  }, [fluid, card, tier, fluidMats]);
-
   /* --- flip + spin --- */
   const cardRef = useRef<THREE.Mesh>(null);
   const innerRef = useRef<THREE.Group>(null);
@@ -349,28 +281,11 @@ export function Slab({
       spinRef.current = THREE.MathUtils.damp(spinRef.current, spinSource ? spinSource() : spin, 9, delta);
       inner.rotation.z = spinRef.current;
     }
-    if (fluidGlass) {
-      // the engine's channels are already smoothed; following them here is
-      // the last hop of the fluid transition
-      fluidGlass.color.copy(fluidEngine.current.glass);
-      fluidGlass.attenuationColor.copy(fluidEngine.current.glassAtten);
-    }
-    const fm = fluidMats;
-    if (fm) {
-      const c = fluidEngine.current;
-      fm.label.color.copy(c.labelPlate);
-      fm.labelInk.color.copy(c.labelInk);
-      fm.cardBody.color.copy(c.cardPaper);
-      fm.cardInk.color.copy(c.cardInk);
-      fm.tray.color.copy(c.trayFloor);
-      fm.face.color.copy(c.caseFace);
-      fm.ridge.color.copy(c.ridge);
-      fm.tabs[0].color.copy(c.tab1);
-      fm.tabs[1].color.copy(c.tab2);
-      fm.tabs[2].color.copy(c.tab3);
-      fm.sideTab.color.copy(c.sideTab);
-    }
   });
+
+  /* --- pick the glass: real transmission in the Forge, and in the pit only
+         while this slab is hovered or held --- */
+  const glassMat = quality === 'hero' || upgradeGlass || isActive ? mat.glass : mat.glassCheap;
 
   const cardFaceZ = L.cardFace + 0.0012;
   const foilZ = cardFaceZ + 0.0016;
@@ -382,22 +297,22 @@ export function Slab({
         <mesh geometry={geo.shell} material={glassMat} position={[0, 0, geo.at.shell]} />
         {/* front face plate: the silhouette inset one moulding step. Its
             bevelled edge is the reference's 10 px chamfer + hairline */}
-        <mesh geometry={geo.face} material={fluidMats ? fluidMats.face : quality === 'hero' || upgradeGlass || isActive ? mat.face : glassMat} position={[0, 0, geo.at.face]} />
+        <mesh geometry={geo.face} material={quality === 'hero' || upgradeGlass || isActive ? mat.face : glassMat} position={[0, 0, geo.at.face]} />
         {/* back plate closes the case (centred on the window, like the tray) */}
-        <mesh geometry={geo.backPlate} material={fluidMats ? fluidMats.tray : mat.tray} position={geo.place.backPlate} />
+        <mesh geometry={geo.backPlate} material={mat.tray} position={geo.place.backPlate} />
         {/* tray ring — a plate with the card's cutout */}
-        <mesh geometry={geo.tray} material={fluidMats ? fluidMats.tray : mat.tray} position={geo.place.tray} />
+        <mesh geometry={geo.tray} material={mat.tray} position={geo.place.tray} />
         {/* window floor: the tray texture's plane, with the card cutout in it
             (the geometry behind it is the deep structure, this is the surface
             you actually see in the apron around the card) */}
-        <mesh geometry={geo.trayPlate} position={[0, 0, L.trayFront + 0.0012]} raycast={() => null} material={fluidMats ? fluidMats.tray : undefined}>
-          {fluidMats ? null : <meshStandardMaterial map={trayTex} roughness={0.86} metalness={0.04} />}
+        <mesh geometry={geo.trayPlate} position={[0, 0, L.trayFront + 0.0012]} raycast={() => null}>
+          <meshStandardMaterial map={trayTex} roughness={0.86} metalness={0.04} />
         </mesh>
         {/* label plate + its printed face */}
-        <mesh geometry={geo.labelPlate} material={fluidMats ? fluidMats.label : mat.label} position={[0, L.labelY, geo.at.labelPlate]} />
-        <mesh position={[0, L.labelY, L.labelFace]} material={fluidMats ? fluidMats.labelInk : undefined}>
+        <mesh geometry={geo.labelPlate} material={mat.label} position={[0, L.labelY, geo.at.labelPlate]} />
+        <mesh position={[0, L.labelY, L.labelFace]}>
           <planeGeometry args={[SLAB_SPEC.labelW, SLAB_SPEC.labelH]} />
-          {fluidMats ? null : <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />}
+          <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />
         </mesh>
         {/* label print on the back: the same texture object (duplication by
             alias, it cannot drift) on a PI-rotated plane just outside the
@@ -407,24 +322,24 @@ export function Slab({
             COLLECTION' header reads normally from the rear, exactly as on the
             front. Without this the rear top slot showed only the dark plate's
             blank rear cap. */}
-        <mesh position={[0, L.labelY, SLAB_SPEC.zBack - 0.0008]} rotation={[0, Math.PI, 0]} material={fluidMats ? fluidMats.labelInk : undefined}>
+        <mesh position={[0, L.labelY, SLAB_SPEC.zBack - 0.0008]} rotation={[0, Math.PI, 0]}>
           <planeGeometry args={[SLAB_SPEC.labelW, SLAB_SPEC.labelH]} />
-          {fluidMats ? null : <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />}
+          <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />
         </mesh>
         {/* the rail between the label and the window (measured y 418..427, inner
             frame x 435..1055), then its three bright tabs */}
-        <mesh geometry={geo.ridge} material={fluidMats ? fluidMats.ridge : mat.ridge} position={geo.place.ridge} />
+        <mesh geometry={geo.ridge} material={mat.ridge} position={geo.place.ridge} />
         {geo.place.ridgeTabs.map((p, i) => (
-          <mesh key={i} geometry={geo.ridgeTab} material={fluidMats ? fluidMats.tabs[i % fluidMats.tabs.length] : mat.ridgeTabs[i % mat.ridgeTabs.length]} position={p} />
+          <mesh key={i} geometry={geo.ridgeTab} material={mat.ridgeTabs[i % mat.ridgeTabs.length]} position={p} />
         ))}
         {geo.edgeTabs.map((tab, i) => (
-          <mesh key={`edge-${i}`} geometry={tab.geometry} material={fluidMats ? fluidMats.sideTab : mat.sideTab} position={tab.position} />
+          <mesh key={`edge-${i}`} geometry={tab.geometry} material={mat.sideTab} position={tab.position} />
         ))}
         {/* the card */}
         <mesh
           ref={cardRef}
           geometry={geo.card}
-          material={fluidMats ? fluidMats.cardBody : mat.cardBody}
+          material={mat.cardBody}
           position={[0, SLAB_SPEC.cardY, geo.at.card]}
           {...bind}
           {...(cardHandlers ?? {})}
@@ -434,23 +349,9 @@ export function Slab({
           <mesh geometry={geo.cardFace} position={[0, 0, cardFaceZ - geo.at.card]}>
             {/* unlit: the printed face must read exactly as painted — the
                 photo's inks are albedo, and a lit standard material under the
-                studio rig multiplied them past their texture values.
-                Fluid: the split base canvas (art only, transparent paper) so
-                the tintable cardBody shows around it; until the split lands
-                this is the combined texture, identical to the non-fluid. */}
-            <meshBasicMaterial
-              map={fluidMats && fluidLayers ? fluidLayers.base : face ?? undefined}
-              transparent={!!fluidMats && !!fluidLayers}
-              color={face ? '#ffffff' : card.color}
-              toneMapped={false}
-            />
+                studio rig multiplied them past their texture values */}
+            <meshBasicMaterial map={face ?? undefined} color={face ? '#ffffff' : card.color} toneMapped={false} />
           </mesh>
-          {/* fluid ink plane: the white furniture (keyline, frame, title,
-              traits, meta, footer) tinted by the engine's cardInk channel —
-              0.9 mm in front of the base, behind the foil overlay */}
-          {fluidMats && fluidLayers && (
-            <mesh geometry={geo.cardFace} position={[0, 0, cardFaceZ - geo.at.card + 0.0009]} material={fluidMats.cardInk} />
-          )}
           {/* foil overlay, masked to the card plane */}
           <mesh geometry={geo.cardFace} position={[0, 0, foilZ - geo.at.card]}>
             <HoloCardMaterial
@@ -468,7 +369,6 @@ export function Slab({
               maskFeather={0.012}
               outside={0.015}
               timeOffset={timeOffset}
-              palette={fluid ? holoShaderPalette() : undefined}
             />
           </mesh>
           {/* back face: the front design again — same geometry, same shape-space
@@ -489,20 +389,11 @@ export function Slab({
               front face above), so the rear is the front's pixel match at
               rest, and the foil overlay below carries the live effects. */}
           <mesh geometry={geo.cardFace} position={[0, 0, SLAB_SPEC.zBack - 0.0008 - geo.at.card]} rotation={[0, Math.PI, 0]}>
-            {/* unlit: the printed face must read exactly as painted — see the
-                front face above. Fluid: the same split base canvas. */}
-            <meshBasicMaterial
-              map={fluidMats && fluidLayers ? fluidLayers.base : face ?? undefined}
-              transparent={!!fluidMats && !!fluidLayers}
-              color={face ? '#ffffff' : card.color}
-              toneMapped={false}
-            />
+            {/* unlit: the printed face must read exactly as painted — the
+                photo's inks are albedo, and a lit standard material under the
+                studio rig multiplied them past their texture values */}
+            <meshBasicMaterial map={face ?? undefined} color={face ? '#ffffff' : card.color} toneMapped={false} />
           </mesh>
-          {/* fluid ink plane on the back: 0.6 mm nearer the rear camera than
-              the design, still clear of the foil at -0.0024 */}
-          {fluidMats && fluidLayers && (
-            <mesh geometry={geo.cardFace} position={[0, 0, SLAB_SPEC.zBack - 0.0014 - geo.at.card]} rotation={[0, Math.PI, 0]} material={fluidMats.cardInk} />
-          )}
           {/* foil on the back too, so the spun card carries the same finish:
               0.0016 nearer the rear camera than the design (smaller z), the
               mirror of the front's design->foil spacing */}
@@ -519,7 +410,6 @@ export function Slab({
               maskFeather={0.012}
               outside={0.015}
               timeOffset={timeOffset}
-              palette={fluid ? holoShaderPalette() : undefined}
             />
           </mesh>
         </mesh>

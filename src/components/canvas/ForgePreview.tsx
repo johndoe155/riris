@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, applyProps } from '@react-three/fiber';
 import * as THREE from 'three';
 import { OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@react-three/drei';
@@ -7,8 +7,6 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useVaultStore } from '@/store/useVaultStore';
 import { Slab } from '@/components/canvas/slab/Slab';
 import { VoidBackdrop, HERO_BACKDROP, HERO_WALL_HEIGHT } from '@/components/canvas/slab/Backdrop';
-import { deriveFluidTarget, extractPalette, fluidEngine } from '@/components/canvas/slab/fluidPalette';
-import { loadImage } from '@/components/canvas/slab/useSlabTextures';
 import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
 
 /**
@@ -107,56 +105,6 @@ function SpringOrbit() {
   );
 }
 
-/** white, in three's linear working space, for the light tint mixes */
-const LIGHT_WHITE = new THREE.Color('#ffffff');
-
-/**
- * The forge's live light rig: same intensities and placement as the static
- * pair it replaces, plus a per-frame tint from the fluid palette's former
- * channel (the extracted accent, pulled 72% back toward white — a gleam
- * colour, not a gel). Idle (engine unmounted) it stays pure white.
- */
-function PaletteLights() {
-  const ambient = useRef<THREE.AmbientLight>(null);
-  const key = useRef<THREE.DirectionalLight>(null);
-  useFrame(() => {
-    if (!fluidEngine.mounted) return;
-    ambient.current?.color.copy(LIGHT_WHITE).lerp(fluidEngine.current.former, 0.5);
-    key.current?.color.copy(LIGHT_WHITE).lerp(fluidEngine.current.former, 0.35);
-  });
-  return (
-    <>
-      <ambientLight ref={ambient} intensity={1.5} />
-      <directionalLight ref={key} position={[4, 5, 6]} intensity={2.1} />
-    </>
-  );
-}
-
-/**
- * The fluid palette's engine: ticks the ~1 s interpolation once per frame
- * and mirrors the smoothed background into the scene. Mounting it is what
- * marks the engine active — the void's stop uniforms, the cloned glass and
- * the holo colour uniforms all gate on `fluidEngine.mounted`, so nothing
- * anywhere else (the pit, the reference view) ever animates.
- */
-function FluidPaletteDriver() {
-  const scene = useThree((s) => s.scene);
-  useEffect(() => {
-    fluidEngine.mounted = true;
-    return () => {
-      fluidEngine.mounted = false;
-      fluidEngine.reset();
-    };
-  }, []);
-  useFrame((_, delta) => {
-    fluidEngine.tick(delta);
-    if (scene.background instanceof THREE.Color) {
-      scene.background.copy(fluidEngine.current.background);
-    }
-  });
-  return null;
-}
-
 export function ForgePreviewCanvas() {
   const finishType = useVaultStore((s) => s.finishType);
   const nftData = useVaultStore((s) => s.nftData);
@@ -172,21 +120,6 @@ export function ForgePreviewCanvas() {
 
   const toggleFlip = useCallback(() => setFlipped((f) => !f), []);
   const handlers = useMemo(() => ({ onDoubleClick: () => toggleFlip() }), [toggleFlip]);
-
-  /* --- fluid palette: whenever the subject image lands (default asset,
-         fetched NFT or local upload), sample it once and queue the derived
-         palette; the driver eases every channel over ~1 s --- */
-  useEffect(() => {
-    let live = true;
-    loadImage(card.art).then((img) => {
-      if (!live) return;
-      if (img) fluidEngine.setTarget(deriveFluidTarget(extractPalette(img)));
-      else fluidEngine.reset();
-    });
-    return () => {
-      live = false;
-    };
-  }, [card.art]);
 
   return (
     <div className="w-full h-full min-h-[500px] relative bg-transparent overflow-hidden">
@@ -204,16 +137,12 @@ export function ForgePreviewCanvas() {
         {/* Long-lens framing keeps the case filling the portrait Forge canvas while
             retaining the reference's nearly orthographic straight-on proportions. */}
         <PerspectiveCamera makeDefault position={[0, 0, 3.2]} fov={38} near={0.1} far={60} />
-        {/* scaled ~2.7x from the first rig so front-facing surfaces return their measured tones (scripts/analysis/_tones.mjs).
-            These are the scene's LIVE lights (the lightformers are baked once
-            by <Environment frames={1}> and cannot animate), so they are what
-            carries the fluid palette's lighting tint: every lit surface and
-            its speculars pick it up per frame. White at rest. */}
-        <PaletteLights />
+        {/* scaled ~2.7x from the first rig so front-facing surfaces return their measured tones (scripts/analysis/_tones.mjs) */}
+        <ambientLight intensity={1.5} />
+        <directionalLight position={[4, 5, 6]} intensity={2.1} />
 
         <StudioEnvironment />
         <MovingHighlights />
-        <FluidPaletteDriver />
         {/* deep stationary void: fixed ray directions, no edges to reveal */}
         <VoidBackdrop height={HERO_WALL_HEIGHT} {...HERO_BACKDROP} />
 
@@ -228,7 +157,6 @@ export function ForgePreviewCanvas() {
             flipped={flipped}
             active={hovered}
             cardHandlers={handlers}
-            fluid
           />
         </group>
 
