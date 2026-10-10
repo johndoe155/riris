@@ -234,18 +234,9 @@ export interface SlabProps {
 
 const FLIP_SPEED = Math.PI / 0.55;
 
-/*
- * The foil overlay stops on the art window's INNER edge (the square frame's
- * ink line): card UV, v from the bottom. Measured inner box 536..956 /
- * 542..963 on the 491 x 697 card.
- */
-const ART_STROKE_Y = (SLAB_SPEC.artStroke * SLAB_SPEC.cardW) / SLAB_SPEC.cardH;
-const FOIL_MASK: [number, number, number, number] = [
-  SLAB_SPEC.artInset + SLAB_SPEC.artStroke,
-  SLAB_SPEC.artBottom + ART_STROKE_Y,
-  1 - SLAB_SPEC.artInset - SLAB_SPEC.artStroke,
-  1 - SLAB_SPEC.artTop - ART_STROKE_Y,
-];
+/* The physical card-face mesh already clips the rounded silhouette. Foil is
+ * laminated over the whole printed face, including border, frame and text. */
+const FOIL_MASK: [number, number, number, number] = [0, 0, 1, 1];
 
 export function Slab({
   card,
@@ -453,12 +444,11 @@ export function Slab({
               intensity={intensity}
               hoverBoost={1.5}
               cardAspect={SLAB_SPEC.cardW / SLAB_SPEC.cardH}
-              // UV space: v runs from the bottom, so the art window is
-              // [artBottom, 1 - artTop] vertically. The art frame is a hard
-              // 0.0163-wide ink line, so the foil stops on it.
+              // UV space covers the complete card face; the mesh silhouette
+              // clips the foil to the rounded card geometry.
               mask={FOIL_MASK}
               maskFeather={0.012}
-              outside={0.015}
+              outside={0}
               timeOffset={timeOffset}
               palette={palette}
             />
@@ -500,7 +490,7 @@ export function Slab({
               cardAspect={SLAB_SPEC.cardW / SLAB_SPEC.cardH}
               mask={FOIL_MASK}
               maskFeather={0.012}
-              outside={0.015}
+              outside={0}
               timeOffset={timeOffset}
               palette={palette}
             />

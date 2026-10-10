@@ -45,18 +45,14 @@ const HoloShaderMaterial = shaderMaterial(
     uMode: 0,
     /**
      * x0, y0, x1, y1 of the foil mask, in card UV (v measured from the bottom).
-     * These are the measured art window of `reference-image.jpg`: card
-     * x 0.0569..0.9431, y 0.0464..0.6325 from the top.
+     * Foil is laminated over the entire printed face, including the frame and
+     * text panel; the rounded card-face geometry supplies the silhouette clip.
      */
-    uMask: new THREE.Vector4(0.0569, 0.3675, 0.9431, 0.9536),
-    /**
-     * The reference's art frame is a hard 4 px ink line, so the foil has to
-     * stop at it: the old 0.06 feather smeared the rainbow ~30 px past the
-     * window and onto the card's furniture, which the photo does not show.
-     */
+    uMask: new THREE.Vector4(0, 0, 1, 1),
+    /** A small edge feather keeps the foil from aliasing at the card silhouette. */
     uMaskFeather: 0.012,
-    /** how strongly the foil shows outside the mask (the photo shows none) */
-    uOutside: 0.015,
+    /** how strongly the foil shows outside the mask (full-face defaults to 0) */
+    uOutside: 0,
     /* Dynamic palette: the foil's diffraction orders, the ice tint and the
      * gold pair. Defaults are the hand-tuned constants; a palette driver
      * writes the derived family in here every frame. The ramp's FIRST stop
@@ -331,8 +327,10 @@ const HoloShaderMaterial = shaderMaterial(
        * sparkle lives inside the band. */
       float ripple = sin(vUv.y * 21.0 + uTime * 0.30) * 0.020
                    + sin(vUv.y * 47.0 - uTime * 0.22 + 1.7) * 0.012;
-      float bx = 0.74 + (pointer.x - 0.5) * 0.55 + (viewShift - 0.25) * 0.40;
-      float band = smoothstep(bx - 0.20 + ripple, bx - 0.02 + ripple, vUv.x);
+      float bx = 0.50 + (pointer.x - 0.5) * 0.72 + (pointer.y - 0.5) * 0.18
+               + (viewShift - 0.25) * 0.78;
+      float band = smoothstep(bx - 0.38 + ripple, bx - 0.12 + ripple, vUv.x)
+                 * (1.0 - smoothstep(bx + 0.10 + ripple, bx + 0.38 + ripple, vUv.x));
       float water = 0.5 + 0.5 * sin(vUv.x * 90.0
                     + sin(vUv.y * 60.0 + uTime * 0.30) * 2.0);
       vec3 bandCol = bandRamp(vUv.y + 0.03 * sin(vUv.x * 30.0 + uTime * 0.15));
@@ -341,8 +339,11 @@ const HoloShaderMaterial = shaderMaterial(
       vec3 holoTint = bandCol * (0.80 + 0.30 * band + 0.08 * water)
                     + sp.rgb * sparkIn * 1.10
                     + vec3(0.90, 0.95, 1.0) * spec * 0.30;
-      float holoAmt = clamp(band * (0.70 + 0.10 * water) + sparkIn * 0.35
-                          + fresnel * 0.08 + spec * 0.10, 0.0, 0.92);
+      float holoDots = sp.a * (0.18 + 0.82 * pointerGlow);
+      float holoHot = pow(max(dot(n, halfVec), 0.0), 18.0);
+      float holoAmt = clamp(band * (0.95 + 0.18 * water) + sparkIn * 0.55
+                          + holoDots * 0.45 + fresnel * 0.16 + spec * 0.18
+                          + holoHot * 0.24, 0.0, 1.35);
 
       /* ---- cracked ice: fine tone-on-tone facet mosaic ----
        * The reference is the subtle finish: a fine network of small
@@ -353,40 +354,48 @@ const HoloShaderMaterial = shaderMaterial(
       float facetLum = (fc.x - 0.5) * 0.42;
       float glint = pow(0.5 + 0.5 * sin(phase * 2.2 + fc.z * 43.0), 3.0)
                   * (0.4 + 0.6 * pointerGlow);
-      vec4 flash = shardField(vUv + 0.13, 13.0, phase * 1.3 + 4.0, 0.10, 0.25);
-      flash.rgb = mix(flash.rgb, vec3(1.0), 0.55);
-      flash.a *= 0.35;
-      vec3 iceTint = mix(uIce, vec3(1.0), 0.60) * (0.45 + facetLum + glint * 0.30)
-                   + flash.rgb * flash.a;
-      float iceAmt = clamp(0.04 + abs(facetLum) * 0.50 + fc.y * 0.06
-                         + glint * 0.12 + flash.a * 0.55
-                         + fresnel * 0.12 + spec * 0.10, 0.0, 0.60);
+      vec4 flash = shardField(vUv + 0.13, 13.0, phase * 1.3 + 4.0, 0.16, 0.018);
+      flash.rgb = mix(flash.rgb, vec3(1.0), 0.45);
+      flash.a *= 0.58;
+      vec4 heroIce = shardField(vUv + 0.41, 6.0, phase * 0.72 + 1.4, 0.30, 0.012);
+      heroIce.rgb = mix(heroIce.rgb, vec3(0.94, 0.90, 1.0), 0.34);
+      heroIce.a *= 0.78;
+      float iceShardA = 1.0 - (1.0 - flash.a) * (1.0 - heroIce.a);
+      vec3 iceShardCol = (flash.rgb * flash.a + heroIce.rgb * heroIce.a)
+                       / max(iceShardA, 0.0001);
+      vec3 iceTint = mix(uIce, vec3(1.0), 0.35) * (0.52 + facetLum + glint * 0.38)
+                   + iceShardCol * iceShardA * (0.78 + glint * 0.22)
+                   + vec3(0.90, 0.96, 1.0) * fc.y * 0.35;
+      float iceAmt = clamp(0.08 + abs(facetLum) * 0.64 + fc.y * 0.18
+                         + glint * 0.18 + iceShardA * 0.62
+                         + fresnel * 0.18 + spec * 0.16, 0.0, 1.05);
 
       /* ---- gold: the loudest finish — dense shattered-glass confetti ----
        * Three octaves: broad pale lavender washes, mid saturated shards and
        * small bright slivers, each flashing its own stop colour, scattered
        * densely enough to wash out ink underneath, plus glowing sparkle dots.
        * The gold pair stays as a faint warm sheen between the shards. */
-      vec4 gw = shardField(vUv + 0.37, 5.0, phase * 0.7 + 2.1, 0.75, 0.10);
-      gw.rgb = mix(gw.rgb, vec3(0.90, 0.86, 0.95), 0.55);
-      gw.a *= 0.45;
-      vec4 gm = shardField(vUv, 11.0, phase, 0.70, 0.04);
-      gm.rgb *= 1.20;
-      gm.a *= 0.80;
-      vec4 gs = shardField(vUv + 0.11, 20.0, phase * 1.2 + 4.2, 0.50, 0.03);
-      gs.rgb *= 1.25;
-      gs.a *= 0.90;
+      vec4 gw = shardField(vUv + 0.37, 5.0, phase * 0.7 + 2.1, 0.48, 0.012);
+      gw.rgb = vivid(gw.rgb);
+      gw.a *= 0.62;
+      vec4 gm = shardField(vUv, 10.0, phase, 0.54, 0.010);
+      gm.rgb = vivid(gm.rgb) * 1.16;
+      gm.a *= 0.92;
+      vec4 gs = shardField(vUv + 0.11, 18.0, phase * 1.2 + 4.2, 0.34, 0.008);
+      gs.rgb = vivid(gs.rgb) * 1.28;
+      gs.a *= 0.86;
       float shardA = 1.0 - (1.0 - gw.a) * (1.0 - gm.a) * (1.0 - gs.a);
       vec3 shardCol = (gw.rgb * gw.a + gm.rgb * gm.a + gs.rgb * gs.a)
                     / max(shardA, 0.0001);
-      vec4 gd = dotSparkle(vUv, phase * 3.0);
-      float dotA = gd.a * 0.35;
-      shardCol = (shardCol * shardA + gd.rgb * dotA) / max(shardA + dotA, 0.0001);
-      shardA = clamp(shardA + dotA, 0.0, 1.0);
+      float cluster = mix(0.42, 1.0, smoothstep(0.28, 0.78, noise(vUv * 3.2 + phase * 0.08)));
+      shardA *= cluster;
+      float goldHot = pow(max(dot(n, halfVec), 0.0), 14.0);
       vec3 warm = mix(uGoldB, uGoldA,
                       0.5 + 0.5 * sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0));
-      vec3 goldTint = shardCol + warm * 0.10;
-      float goldAmt = clamp(shardA * 0.95 + spec * 0.10 + fresnel * 0.05, 0.0, 0.97);
+      vec3 goldTint = shardCol + warm * (0.22 + goldHot * 0.42)
+                    + vec3(1.0, 0.88, 0.42) * goldHot * 0.34;
+      float goldAmt = clamp(shardA * 1.10 + spec * 0.18 + fresnel * 0.08
+                          + goldHot * 0.38, 0.0, 1.35);
 
       // base finish: the card's own ink, lifted only slightly by the view angle
       vec3 baseTint = vec3(1.0);
@@ -402,7 +411,7 @@ const HoloShaderMaterial = shaderMaterial(
         float alpha = effectAmt * mix(uOutside, 1.0, m) * uIntensity;
         vec3 col = effectColor / max(effectAmt, 0.0001);
         // keep the very top end of the foil from clipping to flat white
-        col = min(col, vec3(1.6));
+        col = min(col, vec3(2.6));
         gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
       } else {
         /* ---- base: the art itself, with the finish mixed in ---- */
@@ -625,9 +634,9 @@ export function HoloCardMaterial({
   cardAspect = 0.709,
   timeOffset = 0,
   overlay = false,
-  mask = [0.0569, 0.3675, 0.9431, 0.9536],
+  mask = [0, 0, 1, 1],
   maskFeather = 0.012,
-  outside = 0.015,
+  outside = 0,
   palette = null,
 }: HoloCardMaterialProps) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
@@ -669,6 +678,8 @@ export function HoloCardMaterial({
     u.uMaskFeather.value = maskFeather;
     u.uOutside.value = outside;
     material.transparent = overlay;
+    material.blending = overlay ? THREE.AdditiveBlending : THREE.NormalBlending;
+    material.toneMapped = false;
     material.depthWrite = !overlay;
     material.needsUpdate = true;
   }, [image, cardAspect, overlay, mask, maskFeather, outside]);
