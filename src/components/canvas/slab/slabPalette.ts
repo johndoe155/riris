@@ -11,6 +11,7 @@ import {
   lchToLab,
   linearToSrgb,
   mixHex,
+  smoothstep,
   srgbToLinear,
   type ArtworkSample,
   type PaletteAnchors,
@@ -349,12 +350,37 @@ export function deriveSlabPalette(sample: ArtworkSample, anchors?: PaletteAnchor
    * tones stay in charge of the case's colour. */
   const gel = { chromaScale: 3.2 };
 
-  /* typography / linework follow the contrast rule, not the hue: whichever
-   * near-neutral end has the contrast against the derived card field. */
-  const field = t(R.field);
+  /* ---- typography + linework: the contrast rule, keyed to the ART ----
+   * Every white border, rule and glyph on the card face prints in `ink`, so
+   * `ink` IS the typography. It follows the artwork's brightness, not the
+   * family's hue:
+   *
+   *   dark art  -> deep paper, white / very light text and borders
+   *   light art -> the paper lifts toward the pale end of the family (so the
+   *                linework has a surface to bite into) and the ink turns
+   *                charcoal / near-black
+   *   mid-tone  -> medium paper, high-contrast NEUTRAL ink: the tint is
+   *                stripped and the near-black / near-white end with the
+   *                greater lightness distance to the paper wins
+   *
+   * `paperW` is continuous in the art's mean lightness, so two artworks of
+   * neighbouring brightness derive neighbouring papers, and the engine glides
+   * between any two of them. At the calibration point (reference art,
+   * meanL 0.456) paperW is 0 and the mid band is not entered: the measured
+   * near-white-on-deep-paper face is reproduced exactly. */
+  const paperW = smoothstep(0.58, 0.74, sample.meanL);
+  const field = paperW > 0 ? mixHex(t(R.field), t(R.faceTop), paperW) : t(R.field);
   const fieldL = hexToLch(field).L;
-  const inkLight = fieldL < 0.55;
-  const ink = inkLight ? t('#fbf9fb', { chromaScale: 0.6, lightnessFollow: 0.25 }) : t('#171219', { chromaScale: 0.6, lightnessFollow: 0.25 });
+  const lightInk = t('#fbf9fb', { chromaScale: 0.6, lightnessFollow: 0.25 });
+  const darkInk = t('#171219', { chromaScale: 0.6, lightnessFollow: 0.25 });
+  const useLight = fieldL < 0.55; // the higher-contrast end against the paper
+  const midTone = fieldL > 0.42 && fieldL < 0.62;
+  const neutralise = (hex: string) => {
+    const lch = hexToLch(hex);
+    return lchToHex({ L: lch.L, C: Math.min(lch.C, 0.004), H: lch.H });
+  };
+  const ink = midTone ? neutralise(useLight ? '#fbf9fb' : '#141414') : useLight ? lightInk : darkInk;
+  const inkLight = useLight;
 
   /* shader stops: diffraction orders keep their full angular offset from the
    * family (a foil is a rainbow, not a swatch), while their chroma follows
@@ -422,7 +448,9 @@ export function deriveSlabPalette(sample: ArtworkSample, anchors?: PaletteAnchor
     sideTab: t(R.sideTab),
     plate: t(R.plate),
     cardInk: t(R.cardInk),
-    cardBodyInk: t(R.cardBodyInk),
+    // the extruded body reads as the paper's own edge, so it tracks the paper
+    // (the two are the same tone in the reference card)
+    cardBodyInk: field,
     cardPaper: t(R.cardPaper, { chromaScale: 0.5, lightnessFollow: 0.3 }),
     ridgeTab1: t(R.ridgeTab1),
     ridgeTab2: t(R.ridgeTab2),
@@ -433,7 +461,12 @@ export function deriveSlabPalette(sample: ArtworkSample, anchors?: PaletteAnchor
     artEdge: t(R.artEdge),
 
     labelPlum: t(R.labelPlum),
-    labelInk: inkLight ? t(R.labelInk, { chromaScale: 0.6, lightnessFollow: 0.25 }) : t('#171219', { chromaScale: 0.6, lightnessFollow: 0.25 }),
+    // the plate carries its own contrast rule: its ink answers the plate's
+    // lightness, never the art's, so the header stays legible on every palette
+    labelInk:
+      hexToLch(t(R.labelPlum)).L < 0.5
+        ? t(R.labelInk, { chromaScale: 0.6, lightnessFollow: 0.25 })
+        : t('#171219', { chromaScale: 0.6, lightnessFollow: 0.25 }),
     labelHairline: t(R.labelHairline),
     labelBevel: t(R.labelBevel),
     labelBlankBorder: t(R.labelBlankBorder, { lightnessFollow: 0.4 }),

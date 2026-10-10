@@ -89,11 +89,31 @@ the scene carries today:
 `retone(hex, anchors)` is the reusable rule: a tone keeps its **place** on
 the measured lightness ramp and its relative chroma, and only its hue family,
 overall saturation and mood move. Near-white and near-black tones are
-*contrast elements* — their lightness barely follows the curve, and the card
-ink itself is chosen by the contrast rule (light ink on a dark field,
-charcoal ink on a pale one), never by hue matching. Foil stops keep their
+*contrast elements* — their lightness barely follows the curve. Foil stops keep their
 full angular offset from the family (a foil is a rainbow, not a swatch);
 gold keeps a metallic hue and only leans with the family's warm bias.
+
+## 3b. Typography and linework: the contrast rule, keyed to the art
+
+Every border, rule and glyph on the card face prints in one slot, `ink`, so
+`ink` *is* the typography — and it follows the **brightness of the card art**,
+never the family hue:
+
+| artwork brightness | paper (`field`) | ink (text + linework) |
+| --- | --- | --- |
+| dark art | the measured deep paper | white / very light, a whisper of family tint |
+| light art | lifts toward the pale end of the family (`paperW = smoothstep(0.58, 0.74, artL)` blends the deep paper into the family's pale tone, so charcoal linework has a surface to bite into) | charcoal / near-black |
+| mid-tone | the medium paper | **high-contrast neutral**: tint stripped to C ≤ 0.004, and the near-black / near-white end with the greater lightness distance to the paper wins |
+
+`paperW` is continuous in the art's mean lightness, so neighbouring artworks
+derive neighbouring papers and the engine glides between any two. At the
+calibration point (reference art, meanL 0.456) `paperW` is 0 and the mid band
+is not entered: the measured near-white-on-deep-paper face is reproduced
+exactly. The label plate runs its own contrast rule against the plate's
+lightness, so the header stays legible on every palette.
+
+`scripts/analysis/_face_proof.mjs` renders real card faces for a dark, a mid
+and two light artworks — the visual proof of the three tiers.
 
 ## 4. The glide
 

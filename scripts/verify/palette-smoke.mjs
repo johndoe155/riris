@@ -191,6 +191,20 @@ const cases = [
     },
   },
   {
+    name: 'bright yellow', bg: '#e8d24a', fg: '#f4e58a',
+    check: (pal) => {
+      if (L(pal.ink) > 0.3) fail(`bright art: ink L ${L(pal.ink).toFixed(2)}, expected charcoal/near-black`);
+      if (L(pal.field) < 0.6) fail(`bright art: paper L ${L(pal.field).toFixed(2)}, expected a light paper for the dark linework`);
+    },
+  },
+  {
+    name: 'mid slate', bg: '#6a7280', fg: '#8a92a0',
+    check: (pal) => {
+      if (C(pal.ink) > 0.006) fail(`mid art: ink chroma ${C(pal.ink).toFixed(3)}, expected high-contrast neutral`);
+      if (Math.abs(L(pal.ink) - L(pal.field)) < 0.3) fail('mid art: neutral ink does not contrast the paper');
+    },
+  },
+  {
     name: 'dark violet', bg: '#241a33', fg: '#3a2b52',
     check: (pal) => {
       if (!near(hue(pal.voidGlow), 300, 45)) fail(`violet art: family hue ${hue(pal.voidGlow).toFixed(0)}, expected plum/violet`);
@@ -204,11 +218,25 @@ for (const c of cases) {
   c.check(pal, sample);
   /* hierarchy + gamut + contrast rule, for every case */
   if (!(L(pal.voidDark) < L(pal.voidGlow) && L(pal.voidGlow) < L(pal.voidPale))) fail(`${c.name}: void ramp not ordered`);
-  if (!(L(pal.field) < L(pal.faceMid) && L(pal.faceMid) < L(pal.faceTop))) fail(`${c.name}: card hierarchy not ordered`);
+  /* the paper sits BELOW the case tone on dark/mid palettes (deep card in a
+   * lighter case, as measured) and ABOVE it on light palettes (pale paper is
+   * the brightest surface of a light card) */
+  if (!(L(pal.faceMid) < L(pal.faceTop))) fail(`${c.name}: case tones not ordered`);
+  if (L(pal.field) > 0.62 ? L(pal.field) <= L(pal.faceMid) : L(pal.field) >= L(pal.faceMid)) {
+    fail(`${c.name}: paper not on its tier's side of the case tone (field ${L(pal.field).toFixed(2)}, faceMid ${L(pal.faceMid).toFixed(2)})`);
+  }
   if (!(L(pal.tray) < L(pal.windowWall))) fail(`${c.name}: image-panel framing not darker than its wall`);
+  /* the three typography tiers: dark palette -> light ink, light palette ->
+   * charcoal ink, mid-tone -> high-contrast neutral ink */
   const inkL = L(pal.ink);
-  if (L(pal.field) < 0.55 ? inkL < 0.8 : inkL > 0.3) {
-    fail(`${c.name}: typography contrast rule broken (field ${L(pal.field).toFixed(2)}, ink ${inkL.toFixed(2)})`);
+  const fieldL = L(pal.field);
+  if (Math.abs(inkL - fieldL) < 0.3) {
+    fail(`${c.name}: ink does not contrast its paper (field ${fieldL.toFixed(2)}, ink ${inkL.toFixed(2)})`);
+  }
+  if (fieldL < 0.42 && inkL < 0.8) fail(`${c.name}: dark palette must print white/very light text and borders`);
+  if (fieldL > 0.62 && inkL > 0.3) fail(`${c.name}: light palette must print charcoal/near-black text and borders`);
+  if (fieldL >= 0.42 && fieldL <= 0.62 && C(pal.ink) > 0.006) {
+    fail(`${c.name}: mid-tone palette must print high-contrast neutral ink (C ${C(pal.ink).toFixed(3)})`);
   }
   for (const [k, v] of slots(pal)) {
     if (!hexOk(v)) fail(`${c.name}: slot ${k} is not a hex colour: ${v}`);
@@ -293,6 +321,8 @@ if (napi) {
       if (Math.abs(pal.chroma - R.chroma) / R.chroma > 0.45) fail(`calibration: reference art chroma ${pal.chroma.toFixed(4)} vs ${R.chroma}`);
       if (Math.abs(L(pal.faceMid) - L(R.faceMid)) > 0.12) fail(`calibration: face mid lightness ${L(pal.faceMid).toFixed(2)} vs ${L(R.faceMid).toFixed(2)}`);
       if (!pal.inkLight) fail('calibration: reference art should keep light ink');
+      if (L(pal.ink) < 0.9) fail(`calibration: reference ink L ${L(pal.ink).toFixed(2)}, expected near-white`);
+      if (L(pal.field) > 0.4) fail(`calibration: reference paper L ${L(pal.field).toFixed(2)}, expected the measured deep paper`);
     }
   }
 } else {

@@ -104,7 +104,12 @@ per-consumer update rates and the identity guarantees — is in
 - **One tonal scale, applied everywhere.** `retone()` keeps every measured
   tone's place on the reference lightness ramp and its relative chroma and
   moves only hue family, saturation and mood; near-white/near-black stay
-  contrast elements and the card ink follows the contrast rule, never hue.
+  contrast elements.
+- **Typography follows the art's brightness, never hue:** dark art keeps the
+  deep paper with white text and borders; light art lifts the paper to the
+  family's pale end and prints charcoal/near-black linework; mid-tone art
+  gets high-contrast neutral ink (tint stripped, higher-contrast end wins).
+  `scripts/analysis/_face_proof.mjs` renders the three tiers on real faces.
   The 9×9 face-plate grid, tray, label and card furniture are all retoned.
 - **Everything coloured is covered**, including the shader: the foil's cool /
   warm / magenta orders keep their rainbow offsets from the family, ice is
