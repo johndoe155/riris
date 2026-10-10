@@ -1,6 +1,8 @@
 'use client';
 import { useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import type { PaletteDriver } from './slabPalette';
 
 /**
  * The slab stands in front of a plain gradient with a soft drop shadow — the
@@ -325,6 +327,13 @@ export interface VoidBackdropProps {
   angle?: number;
   /** fraction of the wall the calibrated gradient line spans */
   cover?: number;
+  /**
+   * Dynamic colour driver: the three ramp stops then follow the artwork's
+   * atmosphere, damped per frame straight into the uniforms (the void is the
+   * largest colour area in the Forge, so it must glide continuously rather
+   * than step with React). Without a driver the calibrated stops stay put.
+   */
+  driver?: PaletteDriver | null;
 }
 
 /**
@@ -337,6 +346,12 @@ function rawSrgb(hex: string): THREE.Color {
   return new THREE.Color(((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255);
 }
 
+/** write raw sRGB components (the shader encodes them itself) */
+function setRawSrgb(color: THREE.Color, hex: string) {
+  const v = parseInt(hex.replace('#', ''), 16);
+  color.setRGB(((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255, THREE.NoColorSpace);
+}
+
 export function VoidBackdrop({
   height = HERO_WALL_HEIGHT,
   top = '#b5a3b0',
@@ -344,6 +359,7 @@ export function VoidBackdrop({
   bottom = '#35202f',
   angle = 0.873,
   cover = 1,
+  driver = null,
 }: VoidBackdropProps) {
   const uniforms = useMemo(() => {
     // the ramp's endpoints in wall units — the same layout gradientTexture()
@@ -372,6 +388,14 @@ export function VoidBackdrop({
       uLight: { value: light },
     };
   }, [height, top, glow, bottom, angle, cover]);
+
+  useFrame(() => {
+    if (!driver) return;
+    const p = driver.current;
+    setRawSrgb(uniforms.uDark.value, p.voidDark);
+    setRawSrgb(uniforms.uGlow.value, p.voidGlow);
+    setRawSrgb(uniforms.uPale.value, p.voidPale);
+  });
 
   return (
     <mesh frustumCulled={false} renderOrder={-20} raycast={() => null}>

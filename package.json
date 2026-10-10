@@ -11,7 +11,8 @@
     "verify:textures": "node scripts/verify/canvas-smoke.mjs",
     "verify:shaders": "node scripts/verify/glsl-check.mjs",
     "verify:parity": "node scripts/verify/parity-check.mjs",
-    "verify": "npm run verify:geometry && npm run verify:textures && npm run verify:shaders && npm run verify:parity"
+    "verify": "npm run verify:geometry && npm run verify:textures && npm run verify:shaders && npm run verify:palette && npm run verify:parity",
+    "verify:palette": "node scripts/verify/palette-smoke.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",

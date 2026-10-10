@@ -438,3 +438,30 @@ export const REF_TONE = {
   /** the card's frame ink */
   cardPaper: '#fbf9fb',
 } as const;
+
+/* ------------------------------------------------------------------ *
+ * Face-plate tone grid
+ *
+ * The measured tone grid over the face plate (photo px), kept here with the
+ * other measured colour data so both the 2-D painter (textures.ts) and the
+ * palette manifest (slabPalette.ts) read the same numbers without importing
+ * each other. One deliberate deviation (row y 1240..1293, middle columns):
+ * with the cavity clipped symmetric about the card (windowH) that band is the
+ * case's own glass now, not the photo's cavity floor, so it grades between
+ * the measured wall tones on either side (#352531 left, #4a3a46 right)
+ * instead of repeating the tray's #423440.
+ * ------------------------------------------------------------------ */
+
+export const FACE_GRID_X = [422, 440, 465, 600, 744, 900, 1030, 1050, 1067];
+export const FACE_GRID_Y = [197, 300, 400, 430, 700, 900, 1100, 1240, 1293];
+export const FACE_GRID: string[][] = [
+  ['#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af'],
+  ['#6f5c6b', '#7a6776', '#82707e', '#8c7b87', '#8c7b87', '#8c7b87', '#907f8b', '#96859a', '#9b8a98'],
+  ['#55424f', '#5d4a58', '#6a5765', '#8c7b87', '#8c7b87', '#8c7b87', '#907f8b', '#96859a', '#9b8a98'],
+  ['#4a3844', '#40303c', '#55424f', '#8c7b87', '#8c7b87', '#8c7b87', '#8a7986', '#7e6d79', '#907f8b'],
+  ['#3b2b37', '#40303c', '#43333f', '#473844', '#473844', '#473844', '#99889a', '#907f8b', '#907e8b'],
+  ['#392935', '#40303c', '#43333f', '#473844', '#473844', '#473844', '#9c8b9d', '#93828f', '#8f7e8b'],
+  ['#372733', '#3d2d39', '#40303c', '#473844', '#473844', '#473844', '#8f7e8b', '#877683', '#847380'],
+  ['#352531', '#352531', '#392936', '#3e303b', '#41333e', '#453742', '#483a45', '#4a3a46', '#4a3a46'],
+  ['#33232f', '#33232f', '#372733', '#3f303c', '#3f303c', '#3f303c', '#3f303c', '#3f303c', '#3f303c'],
+];

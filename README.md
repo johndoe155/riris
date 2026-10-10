@@ -84,6 +84,49 @@ residual is the window's horizontal edges — its left edge is a 15 px ramp in t
 photo where the acrylic wall darkens, so that pair cannot be located better than
 about 3 px. Everything with a hard edge is inside 1 px.
 
+## Dynamic fluid palette (this branch)
+
+Selecting a preset image or uploading one no longer swaps only the art: the
+artwork is sampled, its dominant atmosphere derived, and the whole Forge —
+void backdrop, canvas background, ambient + key light, the eight studio
+Lightformers, acrylic shell, label plate, tray cavity, face-plate map, card
+furniture and the foil shader's diffraction orders — **lerps** to a palette
+built from that atmosphere (OKLab, λ 3.4, ~0.9 s). Reset glides back to the
+measured reference look. Full audit — sampling authority, the anchor
+calibration against the reference artwork, the ~70-slot colour manifest, the
+per-consumer update rates and the identity guarantees — is in
+**`docs/dynamic-palette-plan.md`**. In short:
+
+- **Atmosphere, not swatches.** 4 px block sampling kills small bright
+  details; the backdrop ring then the spread-weighted hue histogram decide
+  the family; mean L / sd L / mean C decide the mood (cinematic, pastel,
+  neutral, vivid), which moves the lightness curve and the depth.
+- **One tonal scale, applied everywhere.** `retone()` keeps every measured
+  tone's place on the reference lightness ramp and its relative chroma and
+  moves only hue family, saturation and mood; near-white/near-black stay
+  contrast elements and the card ink follows the contrast rule, never hue.
+  The 9×9 face-plate grid, tray, label and card furniture are all retoned.
+- **Everything coloured is covered**, including the shader: the foil's cool /
+  warm / magenta orders keep their rainbow offsets from the family, ice is
+  the family's pale cool side, gold leans with the family's warm bias while
+  staying metallic — and the orange first order plus `#FF4D00` remain brand
+  constants.
+- **Baked canvases glide too**: `PaletteTextureSet` repaints face / label /
+  tray / face-map in place, throttled per surface while moving, exact at
+  settle, so no texture ever swaps mid-glide.
+- **The pit and the reference compare pass no palette at all** and are
+  bit-identical to before; `npm run verify:palette` additionally asserts the
+  painters are byte-identical at the reference palette.
+
+```bash
+npm run verify:palette                            # identity, derivation, fluidity, calibration
+node scripts/analysis/_palette_sheet.mjs out.png  # art -> tonal hierarchy contact sheet
+```
+
+The harness header gained an **Art palette** row of local preset artworks so
+the derivation is exercisable with no network; the demo NFTs and the upload
+feed the same path.
+
 ## Earlier polish pass
 
 Only the three `canvas/` files changed in that pass; the store and harness are untouched.

@@ -6,8 +6,10 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import type { SlabCard } from '@/data/slabCards';
 import { HoloCardMaterial, useCardPointer } from '@/components/canvas/HoloMaterial';
 import { getSlabGeometry } from './geometry';
-import { REF_TONE, SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
+import { SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
 import { getWearMaps } from './textures';
+import { REFERENCE_PALETTE, type PaletteDriver, type SlabPalette } from './slabPalette';
+import { PaletteTextureSet } from './paletteTextures';
 import {
   ensureCardTexture,
   getCardFaceTexture,
@@ -41,10 +43,47 @@ interface SlabMaterials {
 
 let materials: SlabMaterials | null = null;
 
+/** shared material set (the pit): the measured reference colours */
 function getMaterials(): SlabMaterials {
   if (materials) return materials;
-  const wear = getWearMaps();
-  materials = {
+  materials = buildMaterials(getWearMaps());
+  return materials;
+}
+
+/** sRGB hex -> the linear working colour, memoised (per-frame application) */
+const colorCache = new Map<string, THREE.Color>();
+function colorFor(hex: string): THREE.Color {
+  let c = colorCache.get(hex);
+  if (!c) {
+    c = new THREE.Color(hex);
+    colorCache.set(hex, c);
+  }
+  return c;
+}
+
+/**
+ * Write a palette into a material set. Colours only — every other material
+ * property (roughness, transmission, clearcoat ...) is structural and stays.
+ */
+export function applyPaletteToMaterials(m: SlabMaterials, p: SlabPalette) {
+  m.glass.color.copy(colorFor(p.glassBody));
+  m.glass.attenuationColor.copy(colorFor(p.glassAttenuation));
+  m.glassCheap.color.copy(colorFor(p.glassCheap));
+  m.face.color.copy(colorFor(p.facePlate));
+  m.label.color.copy(colorFor(p.plate));
+  m.ridge.color.copy(colorFor(p.faceMid));
+  m.ridgeTabs[0].color.copy(colorFor(p.ridgeTab1));
+  m.ridgeTabs[1].color.copy(colorFor(p.ridgeTab2));
+  m.ridgeTabs[2].color.copy(colorFor(p.ridgeTab3));
+  m.sideTab.color.copy(colorFor(p.sideTab));
+  m.tray.color.copy(colorFor(p.tray));
+  m.cardBody.color.copy(colorFor(p.cardBodyInk));
+}
+
+function buildMaterials(wear: ReturnType<typeof getWearMaps>, faceMap?: THREE.Texture): SlabMaterials {
+  const R = REFERENCE_PALETTE;
+  const faceTexture = faceMap ?? getFaceMapTexture();
+  return {
     // real transmission — the Forge canvas is contained, so the pass is bounded.
     // The tint is the reference's own mauve cast (#91808c, sat ~18%) rather than
     // the blue-white this used to carry, and the attenuation is short enough
@@ -67,8 +106,8 @@ function getMaterials(): SlabMaterials {
       specularIntensity: 1,
       // smoky, not blue-white: the photo's walls read as lit plastic
       // (#907f8b on the key side), so the shell carries a lighter body tone
-      color: new THREE.Color('#a493a2'),
-      attenuationColor: new THREE.Color('#b7a2b4'),
+      color: colorFor(R.glassBody),
+      attenuationColor: colorFor(R.glassAttenuation),
       attenuationDistance: 2.4,
       envMapIntensity: 2.0,
       roughnessMap: wear.roughness,
@@ -85,9 +124,9 @@ function getMaterials(): SlabMaterials {
      * clearcoat layer still takes the strip lights for the live sheen.
      */
     face: new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color('#ffffff'),
+      color: colorFor(R.facePlate),
       map: (() => {
-        const t = getFaceMapTexture();
+        const t = faceTexture;
         // extrude cap UVs are shape-space world units centred on the plate, so
         // normalise them onto the map: one repeat across the plate's own box
         const fw = SLAB_SPEC.w - SLAB_SPEC.stepInset * 2;
@@ -110,7 +149,7 @@ function getMaterials(): SlabMaterials {
     // optical vocabulary as the hero glass, so the cheap case still shows a
     // body reflection and a hard streak instead of a flat tint
     glassCheap: new THREE.MeshPhysicalMaterial({
-      color: '#e4dbe4',
+      color: colorFor(R.glassCheap),
       roughness: 0.12,
       metalness: 0.04,
       clearcoat: 1,
@@ -124,22 +163,22 @@ function getMaterials(): SlabMaterials {
       side: THREE.DoubleSide,
     }),
     // measured off the reference's plate: #3b2a36, not the near-black it was
-    label: new THREE.MeshStandardMaterial({ color: REF_TONE.plate, roughness: 0.42, metalness: 0.02 }),
+    label: new THREE.MeshStandardMaterial({ color: colorFor(R.plate), roughness: 0.42, metalness: 0.02 }),
     // the rail between label and window. In the reference its body is the face
     // tone; only its three tabs catch the light (below), so the body is not lit
     // any brighter than the face it sits on.
-    ridge: new THREE.MeshStandardMaterial({ color: REF_TONE.faceMid, roughness: 0.42, metalness: 0 }),
+    ridge: new THREE.MeshStandardMaterial({ color: colorFor(R.faceMid), roughness: 0.42, metalness: 0 }),
     // the tabs on the rail, each at its measured tone: the key light is off to
     // the right, so the photo's tabs grade L125 / L173 / L199 left to right
-    ridgeTabs: SLAB_SPEC.ridgeTabTones.map(
+    ridgeTabs: [colorFor(R.ridgeTab1), colorFor(R.ridgeTab2), colorFor(R.ridgeTab3)].map(
       (tone) => new THREE.MeshStandardMaterial({ color: tone, roughness: 0.34, metalness: 0 })
     ),
     // the one moulded tab per side wall: muted, like the photo's
-    sideTab: new THREE.MeshStandardMaterial({ color: REF_TONE.sideTab, roughness: 0.5, metalness: 0 }),
+    sideTab: new THREE.MeshStandardMaterial({ color: colorFor(R.sideTab), roughness: 0.5, metalness: 0 }),
     // the tray underneath the window texture: the measured floor tone
-    tray: new THREE.MeshStandardMaterial({ color: REF_TONE.tray, roughness: 0.62, metalness: 0.02 }),
+    tray: new THREE.MeshStandardMaterial({ color: colorFor(R.tray), roughness: 0.62, metalness: 0.02 }),
     cardBody: new THREE.MeshPhysicalMaterial({
-      color: REF_TONE.cardBodyInk,
+      color: colorFor(R.cardBodyInk),
       roughness: 0.48,
       metalness: 0.02,
       clearcoat: 0.4,
@@ -148,7 +187,6 @@ function getMaterials(): SlabMaterials {
     }),
     wear,
   };
-  return materials;
 }
 
 /* ------------------------------------------------------------------ *
@@ -176,6 +214,14 @@ export interface SlabProps {
    * with the mesh without pushing React state sixty times a second.
    */
   spinSource?: () => number;
+  /**
+   * Dynamic colour driver. Omitted (the pit, the reference compare) the slab
+   * renders the measured reference look from the shared material set; given
+   * (the Forge) the slab owns a palette-scoped material set and repaints its
+   * baked textures in place, so every explicitly coloured element follows
+   * the artwork's palette — and the pit is untouched.
+   */
+  palette?: PaletteDriver | null;
   /** handlers forwarded to the card mesh (drag, hover) */
   cardHandlers?: {
     onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
@@ -211,18 +257,46 @@ export function Slab({
   upgradeGlass = false,
   spin = 0,
   spinSource,
+  palette = null,
   cardHandlers,
   timeOffset = 0,
   children,
 }: SlabProps) {
   const geo = useMemo(() => getSlabGeometry(quality), [quality]);
-  const mat = useMemo(() => getMaterials(), []);
   const gl = useThree((s) => s.gl);
   const L = geo.planes;
 
   /* --- card textures: cheap face first, art swapped in when it lands --- */
   const tier = quality === 'hero' ? 'hero' : 'cheap';
-  const [face, setFace] = useState<THREE.CanvasTexture | null>(() => getCardFaceTexture(card, null, tier));
+
+  /* Palette path: the four baked surfaces get their own canvases, painted
+   * with the live palette and repainted in place while it glides. Painted
+   * once synchronously here so the first frame is never a blank canvas. */
+  const palTex = useMemo(() => (palette ? new PaletteTextureSet(tier) : null), [palette, tier]);
+  useEffect(() => () => palTex?.dispose(), [palTex]);
+  const [artImg, setArtImg] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!palette) return;
+    let live = true;
+    loadImage(card.art).then((img) => {
+      if (live) setArtImg(img);
+    });
+    return () => {
+      live = false;
+    };
+  }, [palette, card.art]);
+  if (palTex && palette && !palTex.face.painted) {
+    palTex.update(palette.current, { card, tier, art: artImg, logo: null }, 0, false);
+  }
+
+  const mat = useMemo(
+    () => (palette ? buildMaterials(getWearMaps(), palTex?.faceMap.tex) : getMaterials()),
+    [palette, palTex]
+  );
+
+  const [face, setFace] = useState<THREE.CanvasTexture | null>(() =>
+    palette ? null : getCardFaceTexture(card, null, tier)
+  );
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   useEffect(() => {
     let live = true;
@@ -234,6 +308,7 @@ export function Slab({
     };
   }, []);
   useEffect(() => {
+    if (palette) return; // the palette path paints its own face texture
     let live = true;
     ensureCardTexture(card, tier).then((tex) => {
       if (live) setFace(tex);
@@ -247,17 +322,26 @@ export function Slab({
       live = false;
       off();
     };
-  }, [card, tier]);
+  }, [card, tier, palette]);
 
   const labelTex = useMemo(() => getLabelTexture(card, false, tier, logo), [card, tier, logo]);
   const trayTex = useMemo(() => getTrayTexture(), []);
 
+  /* which textures the meshes actually show */
+  const faceTex = palTex ? palTex.face.tex : face;
+  const labelTexture = palTex ? palTex.label.tex : labelTex;
+  const trayTexture = palTex ? palTex.tray.tex : trayTex;
+
   useEffect(() => {
     const max = gl.capabilities.getMaxAnisotropy();
+    if (palTex) {
+      palTex.setAnisotropy(max);
+      return;
+    }
     for (const t of [labelTex, trayTex, face, getFaceMapTexture()]) {
       if (t) t.anisotropy = Math.min(16, max);
     }
-  }, [gl, labelTex, trayTex, face]);
+  }, [gl, labelTex, trayTex, face, palTex]);
 
   /* --- pointer + hover --- */
   const { pointer: localPointer, hovered, bind } = useCardPointer(SLAB_SPEC.cardW, SLAB_SPEC.cardH);
@@ -271,6 +355,13 @@ export function Slab({
   const spinRef = useRef(spin);
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 1 / 30);
+
+    /* palette: damp the material colours every frame and let the baked
+     * textures repaint at their own throttled cadence */
+    if (palette) {
+      applyPaletteToMaterials(mat, palette.current);
+      palTex?.update(palette.current, { card, tier, art: artImg, logo }, performance.now(), palette.moving);
+    }
     const target = flipped ? Math.PI : 0;
     const step = FLIP_SPEED * delta;
     if (Math.abs(flip.current - target) < step) flip.current = target;
@@ -306,13 +397,13 @@ export function Slab({
             (the geometry behind it is the deep structure, this is the surface
             you actually see in the apron around the card) */}
         <mesh geometry={geo.trayPlate} position={[0, 0, L.trayFront + 0.0012]} raycast={() => null}>
-          <meshStandardMaterial map={trayTex} roughness={0.86} metalness={0.04} />
+          <meshStandardMaterial map={trayTexture} roughness={0.86} metalness={0.04} />
         </mesh>
         {/* label plate + its printed face */}
         <mesh geometry={geo.labelPlate} material={mat.label} position={[0, L.labelY, geo.at.labelPlate]} />
         <mesh position={[0, L.labelY, L.labelFace]}>
           <planeGeometry args={[SLAB_SPEC.labelW, SLAB_SPEC.labelH]} />
-          <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />
+          <meshStandardMaterial map={labelTexture} roughness={0.52} metalness={0.06} toneMapped={false} />
         </mesh>
         {/* label print on the back: the same texture object (duplication by
             alias, it cannot drift) on a PI-rotated plane just outside the
@@ -324,7 +415,7 @@ export function Slab({
             blank rear cap. */}
         <mesh position={[0, L.labelY, SLAB_SPEC.zBack - 0.0008]} rotation={[0, Math.PI, 0]}>
           <planeGeometry args={[SLAB_SPEC.labelW, SLAB_SPEC.labelH]} />
-          <meshStandardMaterial map={labelTex} roughness={0.52} metalness={0.06} toneMapped={false} />
+          <meshStandardMaterial map={labelTexture} roughness={0.52} metalness={0.06} toneMapped={false} />
         </mesh>
         {/* the rail between the label and the window (measured y 418..427, inner
             frame x 435..1055), then its three bright tabs */}
@@ -350,7 +441,7 @@ export function Slab({
             {/* unlit: the printed face must read exactly as painted — the
                 photo's inks are albedo, and a lit standard material under the
                 studio rig multiplied them past their texture values */}
-            <meshBasicMaterial map={face ?? undefined} color={face ? '#ffffff' : card.color} toneMapped={false} />
+            <meshBasicMaterial map={faceTex ?? undefined} color={faceTex ? '#ffffff' : card.color} toneMapped={false} />
           </mesh>
           {/* foil overlay, masked to the card plane */}
           <mesh geometry={geo.cardFace} position={[0, 0, foilZ - geo.at.card]}>
@@ -369,6 +460,7 @@ export function Slab({
               maskFeather={0.012}
               outside={0.015}
               timeOffset={timeOffset}
+              palette={palette}
             />
           </mesh>
           {/* back face: the front design again — same geometry, same shape-space
@@ -392,7 +484,7 @@ export function Slab({
             {/* unlit: the printed face must read exactly as painted — the
                 photo's inks are albedo, and a lit standard material under the
                 studio rig multiplied them past their texture values */}
-            <meshBasicMaterial map={face ?? undefined} color={face ? '#ffffff' : card.color} toneMapped={false} />
+            <meshBasicMaterial map={faceTex ?? undefined} color={faceTex ? '#ffffff' : card.color} toneMapped={false} />
           </mesh>
           {/* foil on the back too, so the spun card carries the same finish:
               0.0016 nearer the rear camera than the design (smaller z), the
@@ -410,6 +502,7 @@ export function Slab({
               maskFeather={0.012}
               outside={0.015}
               timeOffset={timeOffset}
+              palette={palette}
             />
           </mesh>
         </mesh>

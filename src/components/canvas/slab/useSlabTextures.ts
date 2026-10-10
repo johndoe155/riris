@@ -15,6 +15,7 @@ import {
   type LabelText,
 } from './textures';
 import type { BackStyle } from '@/data/slabCards';
+import type { SlabPalette } from './slabPalette';
 
 /**
  * Card textures are built per card, but loaders, images and results are cached
@@ -68,7 +69,11 @@ export const LABEL_TIERS = { hero: 2048, cheap: 1024 } as const;
 const FACE_ASPECT = SLAB_SPEC.cardH / SLAB_SPEC.cardW;
 const LABEL_ASPECT = SLAB_SPEC.labelH / SLAB_SPEC.labelW;
 
-export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): CardFaceText {
+export function cardFaceText(
+  card: SlabCard,
+  width: number = FACE_TIERS.hero,
+  pal: SlabPalette | null = null
+): CardFaceText {
   const traits: [string, string][] = card.id === 'reference'
     ? [
         ['BACKGROUNDS', 'Pink Starry (5%)'],
@@ -111,6 +116,10 @@ export function cardFaceText(card: SlabCard, width: number = FACE_TIERS.hero): C
     artBottom: SLAB_SPEC.artBottom,
     artHeight: 1 - SLAB_SPEC.artTop - SLAB_SPEC.artBottom,
     artStroke: SLAB_SPEC.artStroke,
+    // dynamic palette inks; omitted on the cached (pit) path
+    ink: pal?.ink,
+    field: pal?.field,
+    artEdge: pal?.artEdge,
   };
 }
 
@@ -209,6 +218,44 @@ export async function ensureCardTexture(
 
 const labelCache = new Map<string, THREE.CanvasTexture>();
 
+/**
+ * The label's text object. `pal` paints the plate in the derived family; the
+ * cached path omits it and the painter falls back to the measured plate.
+ */
+export function labelText(
+  card: SlabCard,
+  width: number,
+  pal: SlabPalette | null = null,
+  logo: HTMLImageElement | null = null,
+  blank = false
+): LabelText {
+  return {
+    title: `${card.title.replace(/\s*#?\d+$/, '')}\nCOLLECTION`.toUpperCase(),
+    grade: card.grade,
+    serial: card.serial,
+    width,
+    height: Math.round(width * LABEL_ASPECT),
+    accent: blank ? '#D8D5D0' : card.color,
+    // the reference plate reads neutral dark (~#383037) with only a hint of the
+    // card's own colour — a saturated moulding photographs far hotter than the
+    // real part; the colour belongs in the accent border, not the plate
+    plate: blank ? '#FFFFFF' : mixHex('#3f343c', card.color2, 0.06),
+    ink: blank ? '#141414' : '#F7F5F2',
+    qr: !blank,
+    logo,
+    blank,
+    paint: pal
+      ? {
+          plate: pal.labelPlum,
+          ink: pal.labelInk,
+          hairline: pal.labelHairline,
+          bevel: pal.labelBevel,
+          blankBorder: pal.labelBlankBorder,
+        }
+      : undefined,
+  };
+}
+
 export function getLabelTexture(
   card: SlabCard,
   blank = false,
@@ -218,24 +265,7 @@ export function getLabelTexture(
   const key = `${card.id}:${blank ? 'blank' : 'full'}:${tier}:${logo ? 'logo' : 'no-logo'}`;
   const hit = labelCache.get(key);
   if (hit) return hit;
-  const accent = blank ? '#D8D5D0' : card.color;
-  const width = LABEL_TIERS[tier];
-  const o: LabelText = {
-    title: `${card.title.replace(/\s*#?\d+$/, '')}\nCOLLECTION`.toUpperCase(),
-    grade: card.grade,
-    serial: card.serial,
-    width,
-    height: Math.round(width * LABEL_ASPECT),
-    accent,
-    // the reference plate reads neutral dark (~#383037) with only a hint of the
-    // card's own colour — a saturated moulding photographs far hotter than the
-    // real part; the colour belongs in the accent border, not the plate
-    plate: blank ? '#FFFFFF' : mixHex('#3f343c', card.color2, 0.06),
-    ink: blank ? '#141414' : '#F7F5F2',
-    qr: !blank,
-    logo,
-    blank,
-  };
+  const o = labelText(card, LABEL_TIERS[tier], null, logo, blank);
   const tex = canvasTexture((ctx) => drawLabel(ctx, o), o.width, o.height);
   labelCache.set(key, tex);
   return tex;
@@ -290,6 +320,7 @@ export function getFaceMapTexture(): THREE.CanvasTexture {
   if (!faceMapTex) faceMapTex = buildFaceMapTexture(1024);
   return faceMapTex;
 }
+
 
 let trayTex: THREE.CanvasTexture | null = null;
 

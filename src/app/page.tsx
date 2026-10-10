@@ -22,6 +22,22 @@ const ReferenceCompare = dynamic(() => import('@/components/canvas/ReferenceComp
 const FINISHES: FinishType[] = ['base', 'holo', 'cracked-ice', 'gold'];
 type PitFilter = 'all' | FinishType;
 
+/**
+ * Local artwork presets for the dynamic palette: picking one derives the
+ * Forge's colour scheme from that image's own atmosphere (and lerps the
+ * whole scene to it). Local files so the feature works with no network; the
+ * remote demo NFTs and the upload path feed the same derivation.
+ */
+const ART_PRESETS = [
+  { label: 'plum ghost', art: '/cards/Gjw0CRRXoAMjU8i.jpg', name: 'Ghost Lab #7389', collection: 'Ghost Lab' },
+  { label: 'red azuki', art: '/cards/Gfq0PT6W8AEZ1qU.jpg', name: 'Azuki #237', collection: 'Azuki' },
+  { label: 'green pudgy', art: '/cards/card_26.jpg', name: 'Pudgy Penguin #648', collection: 'Pudgy Penguins' },
+  { label: 'tan punk', art: '/cards/card_30.jpg', name: 'CryptoPunk #5443', collection: 'CryptoPunks' },
+  { label: 'blue doodle', art: '/cards/IMG_20261007_124052.jpg', name: 'Doodles #374', collection: 'Doodles' },
+  { label: 'pastel ape', art: '/cards/Gpo4KaoWUAAhtXw.jpg', name: 'Ape Reunion #100', collection: 'Bored Ape Yacht Club' },
+  { label: 'violet clone', art: '/cards/card_07.jpg', name: 'Clone X #511', collection: 'CloneX' },
+];
+
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
@@ -70,6 +86,16 @@ export default function Lab() {
     }
   }
 
+  function onPreset(p: (typeof ART_PRESETS)[number]) {
+    setNftData({
+      image: p.art,
+      name: p.name,
+      collection: p.collection,
+      tokenId: String(ART_PRESETS.indexOf(p) + 1),
+      contract: '0xPRESET',
+    });
+  }
+
   function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -104,6 +130,12 @@ export default function Lab() {
               <input type="file" accept="image/*" onChange={onUpload} className="sr-only" />
             </label>
             <Chip active={false} onClick={() => setNftData(null)}>Reset</Chip>
+            <span className="font-mono text-[11px] text-[#F5F3EF]/50">Art palette</span>
+            {ART_PRESETS.map((p) => (
+              <Chip key={p.art} active={nftData?.image === p.art} onClick={() => onPreset(p)}>
+                {p.label}
+              </Chip>
+            ))}
             <span className="font-mono text-[11px] text-[#FF4D00]">
               {busy ? 'Loading…' : nftData ? `${nftData.collection} · ${nftData.name}` : 'Placeholder image'}
             </span>

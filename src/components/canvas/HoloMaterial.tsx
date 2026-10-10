@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { shaderMaterial } from '@react-three/drei';
 import { applyProps, extend, useFrame, useThree, type ThreeElement, type ThreeEvent } from '@react-three/fiber';
+import type { PaletteDriver } from '@/components/canvas/slab/slabPalette';
 
 /* ------------------------------------------------------------------ *
  * Finishes
@@ -56,6 +57,18 @@ const HoloShaderMaterial = shaderMaterial(
     uMaskFeather: 0.012,
     /** how strongly the foil shows outside the mask (the photo shows none) */
     uOutside: 0.015,
+    /* Dynamic palette: the foil's diffraction orders, the ice tint and the
+     * gold pair. Defaults are the hand-tuned constants; a palette driver
+     * writes the derived family in here every frame. The ramp's FIRST stop
+     * stays the brand orange in the shader — the logo accent is a constant
+     * anchor across every palette. Values are LINEAR light, matching how the
+     * constants were authored. */
+    uFoilB: new THREE.Vector3(0.32, 0.78, 0.92),
+    uFoilC: new THREE.Vector3(1.0, 0.82, 0.34),
+    uFoilD: new THREE.Vector3(0.92, 0.35, 0.72),
+    uIce: new THREE.Vector3(0.78, 0.88, 1.0),
+    uGoldA: new THREE.Vector3(1.0, 0.86, 0.36),
+    uGoldB: new THREE.Vector3(0.62, 0.42, 0.09),
   },
   // vertex
   /* glsl */ `
@@ -84,6 +97,12 @@ const HoloShaderMaterial = shaderMaterial(
     uniform vec4 uMask;
     uniform float uMaskFeather;
     uniform float uOutside;
+    uniform vec3 uFoilB;
+    uniform vec3 uFoilC;
+    uniform vec3 uFoilD;
+    uniform vec3 uIce;
+    uniform vec3 uGoldA;
+    uniform vec3 uGoldB;
 
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -110,10 +129,10 @@ const HoloShaderMaterial = shaderMaterial(
      * the pure-hue stops are pulled toward their own luma by uFoilSat.
      */
     vec3 holoGradient(float t) {
-      vec3 c1 = vec3(1.0, 0.48, 0.22); // orange
-      vec3 c2 = vec3(0.32, 0.78, 0.92); // cyan
-      vec3 c3 = vec3(1.0, 0.82, 0.34); // yellow
-      vec3 c4 = vec3(0.92, 0.35, 0.72); // magenta
+      vec3 c1 = vec3(1.0, 0.48, 0.22); // orange: the brand constant
+      vec3 c2 = uFoilB; // cool order
+      vec3 c3 = uFoilC; // warm order
+      vec3 c4 = uFoilD; // magenta order
       float t2 = fract(t);
       vec3 c = (t2 < 0.33) ? mix(c1, c2, t2 / 0.33)
              : (t2 < 0.66) ? mix(c2, c3, (t2 - 0.33) / 0.33)
@@ -184,9 +203,9 @@ const HoloShaderMaterial = shaderMaterial(
       float n1 = noise(vUv * 12.0 + 3.1);
       float n2 = noise(vUv * 27.0 + 11.0);
       float crack = 1.0 - smoothstep(0.0, 0.16, abs(n1 - n2));
-      vec3 ice = vec3(0.78, 0.88, 1.0);
-      vec3 goldA = vec3(1.0, 0.86, 0.36);
-      vec3 goldB = vec3(0.62, 0.42, 0.09);
+      vec3 ice = uIce;
+      vec3 goldA = uGoldA;
+      vec3 goldB = uGoldB;
       vec3 gold = mix(goldB, goldA, sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0) * 0.5 + 0.5);
 
       // base finish: the card's own ink, lifted only slightly by the view angle
@@ -411,6 +430,8 @@ export interface HoloCardMaterialProps {
   maskFeather?: number;
   /** foil strength outside the mask (0 = card plane only) */
   outside?: number;
+  /** dynamic palette driver: the foil's orders/tints follow the artwork */
+  palette?: PaletteDriver | null;
 }
 
 export function HoloCardMaterial({
@@ -426,6 +447,7 @@ export function HoloCardMaterial({
   mask = [0.0569, 0.3675, 0.9431, 0.9536],
   maskFeather = 0.012,
   outside = 0.015,
+  palette = null,
 }: HoloCardMaterialProps) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const gl = useThree((state) => state.gl);
@@ -503,6 +525,17 @@ export function HoloCardMaterial({
     u.uPointer.value.copy(a.pointer);
     u.uFinish.value = a.finish;
     u.uIntensity.value = a.intensity;
+
+    /* the palette glides in the engine; the shader just tracks it */
+    if (palette) {
+      const sh = palette.current.shader;
+      u.uFoilB.value.set(sh.foilB[0], sh.foilB[1], sh.foilB[2]);
+      u.uFoilC.value.set(sh.foilC[0], sh.foilC[1], sh.foilC[2]);
+      u.uFoilD.value.set(sh.foilD[0], sh.foilD[1], sh.foilD[2]);
+      u.uIce.value.set(sh.ice[0], sh.ice[1], sh.ice[2]);
+      u.uGoldA.value.set(sh.goldA[0], sh.goldA[1], sh.goldA[2]);
+      u.uGoldB.value.set(sh.goldB[0], sh.goldB[1], sh.goldB[2]);
+    }
   });
 
   return <holoShaderMaterial ref={materialRef} />;

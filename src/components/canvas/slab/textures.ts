@@ -1,7 +1,8 @@
 'use client';
 
 import * as THREE from 'three';
-import { SLAB_SPEC, trayLayout, type TrayLayout } from './SlabSpec';
+import { FACE_GRID_X, FACE_GRID_Y, SLAB_SPEC, trayLayout, type TrayLayout } from './SlabSpec';
+import { REFERENCE_PALETTE, type SlabPalette } from './slabPalette';
 import { squircle } from './geometry';
 
 /* ------------------------------------------------------------------ *
@@ -40,6 +41,13 @@ export function mixHex(a: string, b: string, t: number): string {
   return `#${[mix(r1, r2), mix(g1, g2), mix(b1, b2)]
     .map((c) => c.toString(16).padStart(2, '0'))
     .join('')}`;
+}
+
+/** A palette hex at a fixed alpha, for the painters' rgba() literals. */
+export function withAlpha(hex: string, alpha: number): string {
+  const v = hex.replace('#', '');
+  const n = parseInt(v, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 }
 
 function toTexture(canvas: HTMLCanvasElement, { srgb = false } = {}): THREE.CanvasTexture {
@@ -199,6 +207,13 @@ export interface CardFaceText {
   traits: [string, string][];
   dark: boolean;
   tint: string;
+  /* ---- dynamic palette overrides (omit = the measured reference inks) ---- */
+  /** keyline / frame / typography ink (contrast element) */
+  ink?: string;
+  /** the card's printed body field */
+  field?: string;
+  /** letterbox fallback tone behind the art panel */
+  artEdge?: string;
   /** card face px */
   width: number;
   height: number;
@@ -244,8 +259,8 @@ export function drawCardFace(
   artBox: { x: number; y: number; w: number; h: number }
 ) {
   const { width: W, height: H } = o;
-  const ink = '#fbf9fb';
-  const paper = '#352334';
+  const ink = o.ink ?? '#fbf9fb';
+  const paper = o.field ?? '#352334';
   const bodyRadius = Math.max(2, (o.bodyRadius ?? 0.0489) * W);
 
   /* measured layout, as fractions of the card (x of W, y of H) */
@@ -298,7 +313,7 @@ export function drawCardFace(
   // whenever the window upsamples the source (pixel art stays razor sharp).
   const { x: ax, y: ay, w: aw, h: ah } = artBox;
   const edgeTone = (row: number) => {
-    if (!art) return '#392638';
+    if (!art) return o.artEdge ?? '#392638';
     const c = document.createElement('canvas');
     c.width = 1; c.height = 1;
     const cc = c.getContext('2d')!;
@@ -508,8 +523,10 @@ export function drawCardBack(
   h: number,
   bodyRadius = w * 0.0568,
   power = 4.6,
-  photo: HTMLImageElement | null = null
+  photo: HTMLImageElement | null = null,
+  pal: SlabPalette | null = null
 ) {
+  const P = pal ?? REFERENCE_PALETTE;
   ctx.clearRect(0, 0, w, h);
   ctx.save();
   clipSquircle(ctx, w, h, bodyRadius, power);
@@ -523,13 +540,13 @@ export function drawCardBack(
     ctx.fillRect(0, 0, w, h);
   }
   if (style === 'generic' || !photo) {
-    ctx.fillStyle = '#141418';
+    ctx.fillStyle = P.backField;
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = '#F5F3EF';
+    ctx.strokeStyle = P.backInk;
     ctx.lineWidth = w * 0.02;
     roundRect(ctx, w * 0.06, h * 0.05, w * 0.88, h * 0.9, w * 0.05);
     ctx.stroke();
-    ctx.fillStyle = '#F5F3EF';
+    ctx.fillStyle = P.backInk;
     ctx.textAlign = 'center';
     ctx.font = `700 ${w * 0.1}px system-ui, sans-serif`;
     ctx.fillText('NEMO', w / 2, h * 0.48);
@@ -565,17 +582,25 @@ export interface LabelText {
   /** extracted transparent version of the uploaded reference logo */
   logo?: HTMLImageElement | null;
   blank?: boolean;
+  /** dynamic palette inks; omitted = the measured reference plate */
+  paint?: {
+    plate?: string;
+    ink?: string;
+    hairline?: string;
+    bevel?: string;
+    blankBorder?: string;
+  };
 }
 
 export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   const { width: W, height: H } = o;
-  const plum = o.blank ? '#ffffff' : '#332333';
-  const white = o.blank ? '#141414' : '#fbf9fb';
+  const plum = o.paint?.plate ?? (o.blank ? '#ffffff' : '#332333');
+  const white = o.paint?.ink ?? (o.blank ? '#141414' : '#fbf9fb');
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = plum;
   ctx.fillRect(0, 0, W, H);
   if (o.blank) {
-    ctx.strokeStyle = '#d8cbd6';
+    ctx.strokeStyle = o.paint?.blankBorder ?? '#d8cbd6';
     ctx.lineWidth = Math.max(2, W * 0.006);
     ctx.strokeRect(W * 0.028, H * 0.09, W * 0.944, H * 0.82);
     return;
@@ -586,12 +611,14 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
    * "inset border" is a thin lavender hairline (L~74 against the plate's L50)
    * plus the lit bevel on the plate's right edge. Both, at plate scale.
    */
-  ctx.strokeStyle = 'rgba(122,105,120,0.85)';
+  const hairline = o.paint?.hairline ?? '#7a6978';
+  ctx.strokeStyle = withAlpha(hairline, 0.85);
   ctx.lineWidth = Math.max(1.5, W * 0.0025);
   ctx.strokeRect(W * 0.025, H * 0.085, W * 0.95, H * 0.83);
+  const bevelTone = o.paint?.bevel ?? '#c7b6c4';
   const bevel = ctx.createLinearGradient(W * 0.975, 0, W, 0);
-  bevel.addColorStop(0, 'rgba(199,182,196,0)');
-  bevel.addColorStop(1, 'rgba(199,182,196,0.55)');
+  bevel.addColorStop(0, withAlpha(bevelTone, 0));
+  bevel.addColorStop(1, withAlpha(bevelTone, 0.55));
   ctx.fillStyle = bevel;
   ctx.fillRect(W * 0.975, 0, W * 0.025, H);
 
@@ -713,7 +740,14 @@ export function buildLabelTexture(o: LabelText): THREE.CanvasTexture {
  * Tray / window textures with baked ambient occlusion
  * ------------------------------------------------------------------ */
 
-export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, layout: TrayLayout) {
+export function drawTray(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  layout: TrayLayout,
+  pal: SlabPalette | null = null
+) {
+  const P = pal ?? REFERENCE_PALETTE;
   /*
    * Measured off the reference (see docs/reference-parity.md). The window floor
    * is remarkably flat — #483945 at the top under the ridge, #473642 through
@@ -732,9 +766,9 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
   // the floor is flat #473844 top to bottom (apron and below-card margins
   // measure the same tone), so no vertical ramp beyond a luma of noise
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#483944');
-  g.addColorStop(0.5, '#473843');
-  g.addColorStop(1, '#473844');
+  g.addColorStop(0, P.trayTop);
+  g.addColorStop(0.5, P.trayMid);
+  g.addColorStop(1, P.trayBottom);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
@@ -744,7 +778,7 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
    * cavity — NOT the bright extruded bar an earlier revision carried. 8 photo
    * px of the 818 px window.
    */
-  ctx.fillStyle = '#8a7986';
+  ctx.fillStyle = P.trayWallBand;
   ctx.fillRect(0, 0, w, h * 0.0098);
   const seam = ctx.createLinearGradient(0, h * 0.0098, 0, h * 0.016);
   seam.addColorStop(0, 'rgba(0,0,0,0.35)');
@@ -772,7 +806,7 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
 
   // the cutout's lip: the die-cut edge is pale, and a hairline of shadow sits
   // just inside the tray where the card meets it
-  ctx.strokeStyle = 'rgba(214,222,238,0.16)';
+  ctx.strokeStyle = withAlpha(P.trayLip, 0.16);
   ctx.lineWidth = Math.max(1, w * 0.0035);
   roundRect(ctx, cx - pad * 0.5, cy - pad * 0.5, cw + pad, ch + pad, w * 0.055);
   ctx.stroke();
@@ -784,15 +818,15 @@ export function drawTray(ctx: CanvasRenderingContext2D, w: number, h: number, la
   // cavity side rails, measured: shadow side #43333f, key-light side #685864 —
   // mauve plastic, not the blue-white washes an earlier revision painted
   const lightL = ctx.createLinearGradient(0, 0, w * 0.065, 0);
-  lightL.addColorStop(0, 'rgba(67,51,63,0.9)');
-  lightL.addColorStop(0.6, 'rgba(67,51,63,0.35)');
-  lightL.addColorStop(1, 'rgba(67,51,63,0)');
+  lightL.addColorStop(0, withAlpha(P.trayRailL, 0.9));
+  lightL.addColorStop(0.6, withAlpha(P.trayRailL, 0.35));
+  lightL.addColorStop(1, withAlpha(P.trayRailL, 0));
   ctx.fillStyle = lightL;
   ctx.fillRect(0, 0, w * 0.065, h);
   const lightR = ctx.createLinearGradient(w, 0, w * 0.935, 0);
-  lightR.addColorStop(0, 'rgba(104,88,100,0.85)');
-  lightR.addColorStop(0.5, 'rgba(104,88,100,0.3)');
-  lightR.addColorStop(1, 'rgba(104,88,100,0)');
+  lightR.addColorStop(0, withAlpha(P.trayRailR, 0.85));
+  lightR.addColorStop(0.5, withAlpha(P.trayRailR, 0.3));
+  lightR.addColorStop(1, withAlpha(P.trayRailR, 0));
   ctx.fillStyle = lightR;
   ctx.fillRect(w * 0.935, 0, w * 0.065, h);
 
@@ -826,36 +860,17 @@ export function buildTrayTexture(w = 512, h = 768, layout: TrayLayout = trayLayo
 
 const FACE_PHOTO = { x0: 422, y0: 197, w: 645, h: 1096 };
 
-/** measured tone grid over the face plate, photo px (docs/card-parity-plan.md §3).
- * One deliberate deviation (row y 1240..1293, middle columns): with the cavity
- * clipped symmetric about the card (SlabSpec.windowH) that band is the case's
- * own glass now, not the photo's cavity floor, so it grades between the
- * measured wall tones on either side (#352531 left, #4a3a46 right) instead of
- * repeating the tray's #423440. */
-const FACE_GRID_X = [422, 440, 465, 600, 744, 900, 1030, 1050, 1067];
-const FACE_GRID_Y = [197, 300, 400, 430, 700, 900, 1100, 1240, 1293];
-const FACE_GRID: string[][] = [
-  ['#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af', '#b3a2af'],
-  ['#6f5c6b', '#7a6776', '#82707e', '#8c7b87', '#8c7b87', '#8c7b87', '#907f8b', '#96859a', '#9b8a98'],
-  ['#55424f', '#5d4a58', '#6a5765', '#8c7b87', '#8c7b87', '#8c7b87', '#907f8b', '#96859a', '#9b8a98'],
-  ['#4a3844', '#40303c', '#55424f', '#8c7b87', '#8c7b87', '#8c7b87', '#8a7986', '#7e6d79', '#907f8b'],
-  ['#3b2b37', '#40303c', '#43333f', '#473844', '#473844', '#473844', '#99889a', '#907f8b', '#907e8b'],
-  ['#392935', '#40303c', '#43333f', '#473844', '#473844', '#473844', '#9c8b9d', '#93828f', '#8f7e8b'],
-  ['#372733', '#3d2d39', '#40303c', '#473844', '#473844', '#473844', '#8f7e8b', '#877683', '#847380'],
-  ['#352531', '#352531', '#392936', '#3e303b', '#41333e', '#453742', '#483a45', '#4a3a46', '#4a3a46'],
-  ['#33232f', '#33232f', '#372733', '#3f303c', '#3f303c', '#3f303c', '#3f303c', '#3f303c', '#3f303c'],
-];
-
 function parseHex(hex: string): [number, number, number] {
   const v = hex.replace('#', '');
   return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
 }
 
-export function drawFaceMap(ctx: CanvasRenderingContext2D, w: number, h: number) {
+export function drawFaceMap(ctx: CanvasRenderingContext2D, w: number, h: number, pal: SlabPalette | null = null) {
+  const P = pal ?? REFERENCE_PALETTE;
   const { x0, y0, w: pw, h: ph } = FACE_PHOTO;
   const gx = FACE_GRID_X;
   const gy = FACE_GRID_Y;
-  const grid = FACE_GRID.map((row) => row.map(parseHex));
+  const grid = P.faceGrid.map((row) => row.map(parseHex));
   const img = ctx.createImageData(w, h);
   const d = img.data;
   const cell = (arr: number[], t: number): [number, number] => {
@@ -902,54 +917,59 @@ export function drawFaceMap(ctx: CanvasRenderingContext2D, w: number, h: number)
   // following the spec when it moves.
   const R = (SLAB_SPEC.radius / (SLAB_SPEC.w - SLAB_SPEC.stepInset * 2)) * w;
   const chamfer = ctx.createLinearGradient(0, 0, w, 0);
-  chamfer.addColorStop(0, 'rgba(59,42,55,0.85)');
-  chamfer.addColorStop(0.5, 'rgba(59,42,55,0.35)');
-  chamfer.addColorStop(0.8, 'rgba(144,126,139,0.55)');
-  chamfer.addColorStop(1, 'rgba(144,126,139,0.85)');
+  chamfer.addColorStop(0, withAlpha(P.chamferDark, 0.85));
+  chamfer.addColorStop(0.5, withAlpha(P.chamferDark, 0.35));
+  chamfer.addColorStop(0.8, withAlpha(P.chamferLit, 0.55));
+  chamfer.addColorStop(1, withAlpha(P.chamferLit, 0.85));
   ctx.strokeStyle = chamfer;
   ctx.lineWidth = S(10);
   roundRect(ctx, S(5), S(5), w - S(10), h - S(10), R - S(5));
   ctx.stroke();
   const hair = ctx.createLinearGradient(0, 0, w, 0);
-  hair.addColorStop(0, 'rgba(255,247,255,0.10)');
-  hair.addColorStop(0.55, 'rgba(255,247,255,0.22)');
-  hair.addColorStop(1, 'rgba(255,247,255,0.55)');
+  hair.addColorStop(0, withAlpha(P.mouldHair, 0.1));
+  hair.addColorStop(0.55, withAlpha(P.mouldHair, 0.22));
+  hair.addColorStop(1, withAlpha(P.mouldHair, 0.55));
   ctx.strokeStyle = hair;
   ctx.lineWidth = Math.max(1.5, S(2.5));
   roundRect(ctx, S(12), S(12), w - S(24), h - S(24), R - S(12));
   ctx.stroke();
 
   // shoulder step: 1 px hairline above the rail, 1 px shadow under it
-  ctx.fillStyle = 'rgba(255,247,255,0.35)';
+  ctx.fillStyle = withAlpha(P.stepHair, 0.35);
   rect(435, 417, 620, 2);
-  ctx.fillStyle = 'rgba(18,10,18,0.5)';
+  ctx.fillStyle = withAlpha(P.stepShadow, 0.5);
   rect(435, 427, 620, 2);
 
   // window-top wall band + its seam into the cavity
-  ctx.fillStyle = 'rgba(138,121,134,0.9)';
+  ctx.fillStyle = withAlpha(P.windowBand, 0.9);
   rect(465, 476, 565, 8);
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   rect(465, 484, 565, 2);
 
   // the two muted moulded side tabs
-  ctx.fillStyle = 'rgba(182,169,182,0.85)';
+  ctx.fillStyle = withAlpha(P.sideTabPaintL, 0.85);
   const [lx, ly] = T(438, 647);
   roundRect(ctx, lx, ly, S(8), (50 / ph) * h, S(3));
   ctx.fill();
-  ctx.fillStyle = 'rgba(195,182,194,0.85)';
+  ctx.fillStyle = withAlpha(P.sideTabPaintR, 0.85);
   const [rx, ry] = T(1043, 647);
   roundRect(ctx, rx, ry, S(8), (50 / ph) * h, S(3));
   ctx.fill();
 
   // bottom weld hairline
-  ctx.fillStyle = 'rgba(255,247,255,0.08)';
+  ctx.fillStyle = withAlpha(P.weldHair, 0.08);
   rect(430, 1289, 630, 2);
 }
 
-export function buildFaceMapTexture(w = 1024): THREE.CanvasTexture {
-  const h = Math.round((w * FACE_PHOTO.h) / FACE_PHOTO.w);
+/** the map's pixel height for a given width (the photo's aspect) */
+export function faceMapHeight(w = 1024): number {
+  return Math.round((w * FACE_PHOTO.h) / FACE_PHOTO.w);
+}
+
+export function buildFaceMapTexture(w = 1024, pal: SlabPalette | null = null): THREE.CanvasTexture {
+  const h = faceMapHeight(w);
   const { canvas, ctx } = makeCanvas(w, h);
-  drawFaceMap(ctx, w, h);
+  drawFaceMap(ctx, w, h, pal);
   return toTexture(canvas, { srgb: true });
 }
 
