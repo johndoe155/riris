@@ -446,6 +446,7 @@ export function Slab({
           {/* foil overlay, masked to the card plane */}
           <mesh geometry={geo.cardFace} position={[0, 0, foilZ - geo.at.card]}>
             <HoloCardMaterial
+              image={faceTex}
               finish={card.style}
               pointer={foilPointer}
               hovered={isActive}
@@ -491,6 +492,7 @@ export function Slab({
               mirror of the front's design->foil spacing */}
           <mesh geometry={geo.cardFace} position={[0, 0, SLAB_SPEC.zBack - 0.0024 - geo.at.card]} rotation={[0, Math.PI, 0]}>
             <HoloCardMaterial
+              image={faceTex}
               finish={card.style}
               pointer={foilPointer}
               hovered={isActive}
