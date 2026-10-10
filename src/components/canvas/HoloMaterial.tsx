@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { shaderMaterial } from '@react-three/drei';
 import { applyProps, extend, useFrame, useThree, type ThreeElement, type ThreeEvent } from '@react-three/fiber';
+import type { ForgePalette } from './forgePalette';
 
 /* ------------------------------------------------------------------ *
  * Finishes
@@ -56,6 +57,10 @@ const HoloShaderMaterial = shaderMaterial(
     uMaskFeather: 0.012,
     /** how strongly the foil shows outside the mask (the photo shows none) */
     uOutside: 0.015,
+    uPaletteBase: new THREE.Color('#ffffff'),
+    uPaletteCool: new THREE.Color('#c8e7f0'),
+    uPaletteWarm: new THREE.Color('#f1c676'),
+    uPaletteEnabled: 0,
   },
   // vertex
   /* glsl */ `
@@ -84,6 +89,10 @@ const HoloShaderMaterial = shaderMaterial(
     uniform vec4 uMask;
     uniform float uMaskFeather;
     uniform float uOutside;
+    uniform vec3 uPaletteBase;
+    uniform vec3 uPaletteCool;
+    uniform vec3 uPaletteWarm;
+    uniform float uPaletteEnabled;
 
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -167,6 +176,11 @@ const HoloShaderMaterial = shaderMaterial(
       // a second, coarser order so the ramp is not a single clean sine
       bands = mix(bands, sin(grating * 0.37 + 1.7) * 0.5 + 0.5, 0.35);
       vec3 foil = holoGradient(bands + viewShift * 0.5 + pointer.x * 0.25);
+      // Dynamic Forge palette adapts the finish atmosphere without replacing
+      // the foil's identity. Defaults preserve the existing pit behavior.
+      float paletteMix = uPaletteEnabled * clamp(0.18 + fresnel * 0.22 + pointerGlow * 0.12, 0.0, 0.46);
+      vec3 paletteAccent = mix(uPaletteCool, uPaletteWarm, bands);
+      foil = mix(foil, mix(foil, paletteAccent, 0.38), paletteMix);
 
       /* ---- per-finish colour + strength ---- */
       float w0 = max(0.0, 1.0 - abs(uFinish - 0.0));
@@ -190,16 +204,16 @@ const HoloShaderMaterial = shaderMaterial(
       vec3 gold = mix(goldB, goldA, sin(vUv.y * 3.0 + uTime * 0.2 + viewShift * 5.0) * 0.5 + 0.5);
 
       // base finish: the card's own ink, lifted only slightly by the view angle
-      vec3 baseTint = vec3(1.0);
+      vec3 baseTint = mix(vec3(1.0), uPaletteBase, uPaletteEnabled * 0.08);
       float baseAmt = 0.02 + fresnel * 0.04;
 
       vec3 holoTint = foil;
       float holoAmt = clamp(foilMask * 0.48 + spec * 0.18 + fresnel * 0.10, 0.0, 0.34);
 
-      vec3 iceTint = ice * (0.6 + crack * 0.4) + vec3(crack * 0.35);
+      vec3 iceTint = mix(ice * (0.6 + crack * 0.4) + vec3(crack * 0.35), uPaletteCool, uPaletteEnabled * 0.16);
       float iceAmt = clamp(0.24 + fresnel * 0.3 + crack * 0.45 + spec * 0.3, 0.0, 0.8);
 
-      vec3 goldTint = gold;
+      vec3 goldTint = mix(gold, uPaletteWarm, uPaletteEnabled * 0.14);
       float goldAmt = clamp(0.4 + fresnel * 0.3 + spec * 0.5, 0.0, 0.95);
 
       vec3 effectColor = (baseTint * baseAmt * w0 + holoTint * holoAmt * w1 +
@@ -411,6 +425,8 @@ export interface HoloCardMaterialProps {
   maskFeather?: number;
   /** foil strength outside the mask (0 = card plane only) */
   outside?: number;
+  /** Optional Forge-only atmosphere colors; omitted in the Gallery Pit. */
+  palette?: ForgePalette['shader'];
 }
 
 export function HoloCardMaterial({
@@ -426,6 +442,7 @@ export function HoloCardMaterial({
   mask = [0.0569, 0.3675, 0.9431, 0.9536],
   maskFeather = 0.012,
   outside = 0.015,
+  palette,
 }: HoloCardMaterialProps) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const gl = useThree((state) => state.gl);
@@ -465,10 +482,14 @@ export function HoloCardMaterial({
     u.uMask.value.set(mask[0], mask[1], mask[2], mask[3]);
     u.uMaskFeather.value = maskFeather;
     u.uOutside.value = outside;
+    u.uPaletteBase.value.set(palette?.base ?? '#ffffff');
+    u.uPaletteCool.value.set(palette?.cool ?? '#c8e7f0');
+    u.uPaletteWarm.value.set(palette?.warm ?? '#f1c676');
+    u.uPaletteEnabled.value = palette ? 1 : 0;
     material.transparent = overlay;
     material.depthWrite = !overlay;
     material.needsUpdate = true;
-  }, [image, cardAspect, overlay, mask, maskFeather, outside]);
+  }, [image, cardAspect, overlay, mask, maskFeather, outside, palette]);
 
   useFrame((state, rawDelta) => {
     const material = materialRef.current;

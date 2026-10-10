@@ -8,6 +8,7 @@ import { HoloCardMaterial, useCardPointer } from '@/components/canvas/HoloMateri
 import { getSlabGeometry } from './geometry';
 import { REF_TONE, SLAB_SPEC, slabLayers, type SlabQuality } from './SlabSpec';
 import { getWearMaps } from './textures';
+import type { ForgePalette } from '../forgePalette';
 import {
   ensureCardTexture,
   getCardFaceTexture,
@@ -151,6 +152,22 @@ function getMaterials(): SlabMaterials {
   return materials;
 }
 
+/** Forge materials must not share the pit's singleton materials. */
+function cloneMaterials(source: SlabMaterials): SlabMaterials {
+  return {
+    ...source,
+    glass: source.glass.clone(),
+    glassCheap: source.glassCheap.clone(),
+    face: source.face.clone(),
+    label: source.label.clone(),
+    ridge: source.ridge.clone(),
+    ridgeTabs: source.ridgeTabs.map((material) => material.clone()),
+    sideTab: source.sideTab.clone(),
+    tray: source.tray.clone(),
+    cardBody: source.cardBody.clone(),
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * Slab
  * ------------------------------------------------------------------ */
@@ -161,6 +178,8 @@ export interface SlabProps {
   quality?: SlabQuality;
   /** foil strength */
   intensity?: number;
+  /** Forge-only dynamic atmosphere; omitted by every Gallery Pit slab. */
+  palette?: ForgePalette;
   /** foil pointer, in card UV; when omitted the mesh drives it */
   pointer?: THREE.Vector2 | null;
   flipped?: boolean;
@@ -205,6 +224,7 @@ export function Slab({
   card,
   quality = 'hero',
   intensity = 1,
+  palette,
   pointer = null,
   flipped = false,
   active = false,
@@ -216,7 +236,7 @@ export function Slab({
   children,
 }: SlabProps) {
   const geo = useMemo(() => getSlabGeometry(quality), [quality]);
-  const mat = useMemo(() => getMaterials(), []);
+  const mat = useMemo(() => (quality === 'hero' ? cloneMaterials(getMaterials()) : getMaterials()), [quality]);
   const gl = useThree((s) => s.gl);
   const L = geo.planes;
 
@@ -276,6 +296,17 @@ export function Slab({
     if (Math.abs(flip.current - target) < step) flip.current = target;
     else flip.current += Math.sign(target - flip.current) * step;
     if (cardRef.current) cardRef.current.rotation.y = flip.current;
+    if (palette && quality === 'hero') {
+      mat.glass.color.set(palette.surfaces.shell);
+      mat.glass.attenuationColor.set(palette.surfaces.shellLight);
+      mat.face.color.set(palette.surfaces.face);
+      mat.label.color.set(palette.surfaces.label);
+      mat.ridge.color.set(palette.surfaces.ridge);
+      mat.ridgeTabs.forEach((tab) => tab.color.set(palette.surfaces.tab));
+      mat.sideTab.color.set(palette.surfaces.tab);
+      mat.tray.color.set(palette.surfaces.tray);
+      mat.cardBody.color.set(palette.surfaces.card);
+    }
     const inner = innerRef.current;
     if (inner) {
       spinRef.current = THREE.MathUtils.damp(spinRef.current, spinSource ? spinSource() : spin, 9, delta);
@@ -368,6 +399,7 @@ export function Slab({
               mask={FOIL_MASK}
               maskFeather={0.012}
               outside={0.015}
+              palette={palette?.shader}
               timeOffset={timeOffset}
             />
           </mesh>
@@ -409,6 +441,7 @@ export function Slab({
               mask={FOIL_MASK}
               maskFeather={0.012}
               outside={0.015}
+              palette={palette?.shader}
               timeOffset={timeOffset}
             />
           </mesh>

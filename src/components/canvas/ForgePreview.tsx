@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, applyProps } from '@react-three/fiber';
 import * as THREE from 'three';
 import { OrbitControls, PerspectiveCamera, Environment, Lightformer } from '@react-three/drei';
@@ -8,6 +8,46 @@ import { useVaultStore } from '@/store/useVaultStore';
 import { Slab } from '@/components/canvas/slab/Slab';
 import { VoidBackdrop, HERO_BACKDROP, HERO_WALL_HEIGHT } from '@/components/canvas/slab/Backdrop';
 import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
+import { DEFAULT_FORGE_PALETTE, extractForgePalette, type ForgePalette } from './forgePalette';
+
+function lerpHex(a: string, b: string, t: number) {
+  const ca = new THREE.Color(a); const cb = new THREE.Color(b);
+  ca.lerp(cb, t);
+  return `#${ca.getHexString()}`;
+}
+
+function lerpPalette(current: ForgePalette, target: ForgePalette, t: number): ForgePalette {
+  return {
+    ...current,
+    backdrop: {
+      dark: lerpHex(current.backdrop.dark, target.backdrop.dark, t),
+      glow: lerpHex(current.backdrop.glow, target.backdrop.glow, t),
+      pale: lerpHex(current.backdrop.pale, target.backdrop.pale, t),
+    },
+    surfaces: {
+      shell: lerpHex(current.surfaces.shell, target.surfaces.shell, t),
+      shellLight: lerpHex(current.surfaces.shellLight, target.surfaces.shellLight, t),
+      face: lerpHex(current.surfaces.face, target.surfaces.face, t),
+      tray: lerpHex(current.surfaces.tray, target.surfaces.tray, t),
+      label: lerpHex(current.surfaces.label, target.surfaces.label, t),
+      card: lerpHex(current.surfaces.card, target.surfaces.card, t),
+      ridge: lerpHex(current.surfaces.ridge, target.surfaces.ridge, t),
+      tab: lerpHex(current.surfaces.tab, target.surfaces.tab, t),
+    },
+    lights: {
+      key: lerpHex(current.lights.key, target.lights.key, t),
+      fill: lerpHex(current.lights.fill, target.lights.fill, t),
+      bounce: lerpHex(current.lights.bounce, target.lights.bounce, t),
+      specular: lerpHex(current.lights.specular, target.lights.specular, t),
+    },
+    shader: {
+      base: lerpHex(current.shader.base, target.shader.base, t),
+      cool: lerpHex(current.shader.cool, target.shader.cool, t),
+      warm: lerpHex(current.shader.warm, target.shader.warm, t),
+    },
+    source: target.source,
+  };
+}
 
 /**
  * Long strip lights are what real plastic shows: a soft body reflection with
@@ -21,20 +61,20 @@ import { cardFromNft, DEFAULT_SLAB } from '@/data/slabCards';
  * the rig is now one soft key, a cool fill opposite it and a dim bounce from
  * below, all near-neutral with the faintest mauve.
  */
-function StudioEnvironment() {
+function StudioEnvironment({ palette }: { palette: ForgePalette }) {
   return (
     <Environment resolution={256} frames={1} environmentIntensity={2.4}>
-      <Lightformer form="rect" intensity={2.2} color="#fff6fa" position={[5.5, 5, -3]} rotation={[Math.PI * 0.12, 0, -Math.PI * 0.16]} scale={[13, 2.4, 1]} />
-      <Lightformer form="rect" intensity={0.4} color="#e6dce8" position={[-6, 1.5, -3]} rotation={[0, Math.PI * 0.32, 0]} scale={[12, 2.6, 1]} />
-      <Lightformer form="rect" intensity={0.5} color="#6d5b66" position={[0, -6, 2]} rotation={[-Math.PI * 0.4, 0, 0]} scale={[16, 3, 1]} />
+      <Lightformer form="rect" intensity={2.2} color={palette.lights.key} position={[5.5, 5, -3]} rotation={[Math.PI * 0.12, 0, -Math.PI * 0.16]} scale={[13, 2.4, 1]} />
+      <Lightformer form="rect" intensity={0.4} color={palette.lights.fill} position={[-6, 1.5, -3]} rotation={[0, Math.PI * 0.32, 0]} scale={[12, 2.6, 1]} />
+      <Lightformer form="rect" intensity={0.5} color={palette.lights.bounce} position={[0, -6, 2]} rotation={[-Math.PI * 0.4, 0, 0]} scale={[16, 3, 1]} />
       {/* a narrow vertical strip: the hairline the moulding's bevel catches */}
-      <Lightformer form="rect" intensity={1.1} color="#ffffff" position={[3.2, 0, 3]} rotation={[0, -Math.PI * 0.18, 0]} scale={[0.7, 7, 1]} />
+      <Lightformer form="rect" intensity={1.1} color={palette.lights.specular} position={[3.2, 0, 3]} rotation={[0, -Math.PI * 0.18, 0]} scale={[0.7, 7, 1]} />
       {/* overhead softbox: the long body reflection that runs down the apron and
           turns on the clearcoat — the reference's bright top strip */}
-      <Lightformer form="rect" intensity={1.3} color="#fff4fa" position={[0, 6, 2]} rotation={[-Math.PI / 2.2, 0, 0]} scale={[12, 3.5, 1]} />
+      <Lightformer form="rect" intensity={1.3} color={palette.lights.key} position={[0, 6, 2]} rotation={[-Math.PI / 2.2, 0, 0]} scale={[12, 3.5, 1]} />
       {/* faint counter-strip on the left so the dark chamfer still carries a
           hairline of reflected light instead of reading flat */}
-      <Lightformer form="rect" intensity={0.8} color="#f6eef6" position={[-3.4, 0, 3]} rotation={[0, Math.PI * 0.2, 0]} scale={[0.5, 7, 1]} />
+      <Lightformer form="rect" intensity={0.8} color={palette.lights.fill} position={[-3.4, 0, 3]} rotation={[0, Math.PI * 0.2, 0]} scale={[0.5, 7, 1]} />
       {/* rear-side fill: every front-hemisphere former above left the case's
           BACK-facing normals an almost empty environment to sample, which is
           why the casing read flat and darker under the 180-degree orbit. A
@@ -43,8 +83,8 @@ function StudioEnvironment() {
           about a third of the front's intensity. Lightformers aim at the
           scene origin by default, so these face the case; they live wholly
           in the rear hemisphere, so the front look is untouched. */}
-      <Lightformer form="rect" intensity={0.7} color="#efe5ee" position={[-4.5, 4.5, -4]} scale={[9, 2.2, 1]} />
-      <Lightformer form="rect" intensity={0.65} color="#ffffff" position={[-3.2, 0, -3.2]} scale={[0.6, 7, 1]} />
+      <Lightformer form="rect" intensity={0.7} color={palette.lights.fill} position={[-4.5, 4.5, -4]} scale={[9, 2.2, 1]} />
+      <Lightformer form="rect" intensity={0.65} color={palette.lights.specular} position={[-3.2, 0, -3.2]} scale={[0.6, 7, 1]} />
     </Environment>
   );
 }
@@ -105,6 +145,38 @@ function SpringOrbit() {
   );
 }
 
+function ForgeScene({ card, targetPalette, flipped, hovered, handlers, setHovered }: {
+  card: typeof DEFAULT_SLAB;
+  targetPalette: ForgePalette;
+  flipped: boolean;
+  hovered: boolean;
+  handlers: { onDoubleClick: () => void };
+  setHovered: (value: boolean) => void;
+}) {
+  const [palette, setPalette] = useState(DEFAULT_FORGE_PALETTE);
+  const paletteRef = useRef(DEFAULT_FORGE_PALETTE);
+  useFrame((_, delta) => {
+    const next = lerpPalette(paletteRef.current, targetPalette, 1 - Math.exp(-3.8 * Math.min(delta, 1 / 30)));
+    paletteRef.current = next;
+    if (next.source !== palette.source || next.backdrop.glow !== palette.backdrop.glow) setPalette(next);
+  });
+  return (
+    <>
+      <color attach="background" args={[palette.backdrop.dark]} />
+      <PerspectiveCamera makeDefault position={[0, 0, 3.2]} fov={38} near={0.1} far={60} />
+      <ambientLight intensity={1.5} color={palette.lights.fill} />
+      <directionalLight position={[4, 5, 6]} intensity={2.1} color={palette.lights.key} />
+      <StudioEnvironment palette={palette} />
+      <MovingHighlights />
+      <VoidBackdrop height={HERO_WALL_HEIGHT} {...HERO_BACKDROP} top={palette.backdrop.pale} glow={palette.backdrop.glow} bottom={palette.backdrop.dark} />
+      <group onPointerOver={() => setHovered(true)} onPointerOut={() => setHovered(false)}>
+        <Slab card={card} quality="hero" intensity={0.82} palette={palette} flipped={flipped} active={hovered} cardHandlers={handlers} />
+      </group>
+      <SpringOrbit />
+    </>
+  );
+}
+
 export function ForgePreviewCanvas() {
   const finishType = useVaultStore((s) => s.finishType);
   const nftData = useVaultStore((s) => s.nftData);
@@ -117,6 +189,19 @@ export function ForgePreviewCanvas() {
     () => (nftData ? cardFromNft(nftData, finishType) : { ...DEFAULT_SLAB, style: finishType }),
     [nftData, finishType]
   );
+  const [targetPalette, setTargetPalette] = useState(DEFAULT_FORGE_PALETTE);
+  useEffect(() => {
+    let live = true;
+    const image = new Image();
+    image.onload = () => {
+      if (live) setTargetPalette(extractForgePalette(image, card.art));
+    };
+    image.onerror = () => {
+      if (live) setTargetPalette({ ...DEFAULT_FORGE_PALETTE, source: card.art });
+    };
+    image.src = card.art;
+    return () => { live = false; };
+  }, [card.art]);
 
   const toggleFlip = useCallback(() => setFlipped((f) => !f), []);
   const handlers = useMemo(() => ({ onDoubleClick: () => toggleFlip() }), [toggleFlip]);
@@ -133,34 +218,7 @@ export function ForgePreviewCanvas() {
         gl={{ antialias: true, alpha: false }}
         dpr={[1, 2]}
       >
-        <color attach="background" args={['#352334']} />
-        {/* Long-lens framing keeps the case filling the portrait Forge canvas while
-            retaining the reference's nearly orthographic straight-on proportions. */}
-        <PerspectiveCamera makeDefault position={[0, 0, 3.2]} fov={38} near={0.1} far={60} />
-        {/* scaled ~2.7x from the first rig so front-facing surfaces return their measured tones (scripts/analysis/_tones.mjs) */}
-        <ambientLight intensity={1.5} />
-        <directionalLight position={[4, 5, 6]} intensity={2.1} />
-
-        <StudioEnvironment />
-        <MovingHighlights />
-        {/* deep stationary void: fixed ray directions, no edges to reveal */}
-        <VoidBackdrop height={HERO_WALL_HEIGHT} {...HERO_BACKDROP} />
-
-        <group
-          onPointerOver={() => setHovered(true)}
-          onPointerOut={() => setHovered(false)}
-        >
-          <Slab
-            card={card}
-            quality="hero"
-            intensity={0.82}
-            flipped={flipped}
-            active={hovered}
-            cardHandlers={handlers}
-          />
-        </group>
-
-        <SpringOrbit />
+        <ForgeScene card={card} targetPalette={targetPalette} flipped={flipped} hovered={hovered} setHovered={setHovered} handlers={handlers} />
       </Canvas>
 
       <div className="absolute top-4 left-4 font-mono text-[9px] px-2 py-1 bg-black/60 text-white/60 border border-white/10 backdrop-blur">
