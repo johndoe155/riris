@@ -58,6 +58,23 @@ export interface FluidChannels {
   ice: THREE.Color;
   goldA: THREE.Color;
   goldB: THREE.Color;
+  /* label: plate body + print ink (border, bevel, title, logo) */
+  labelPlate: THREE.Color;
+  labelInk: THREE.Color;
+  /* card face: paper (body around the art) + printed ink (text, keyline,
+     frame) — the artwork itself is never tinted (it defines the palette) */
+  cardPaper: THREE.Color;
+  cardInk: THREE.Color;
+  /* window cavity floor multiplier (over the baked tray texture) */
+  trayFloor: THREE.Color;
+  /* case face plate multiplier (over the baked sheen/moulding map) */
+  caseFace: THREE.Color;
+  /* solid case furniture: ridge body, the three rail tabs, side tabs */
+  ridge: THREE.Color;
+  tab1: THREE.Color;
+  tab2: THREE.Color;
+  tab3: THREE.Color;
+  sideTab: THREE.Color;
 }
 
 /** sRGB Rec.709 luma of a raw-sRGB colour's components */
@@ -219,6 +236,19 @@ const BASE: FluidChannels = {
   ice: new THREE.Color(0.78, 0.88, 1.0),
   goldA: new THREE.Color(1.0, 0.86, 0.36),
   goldB: new THREE.Color(0.62, 0.42, 0.09),
+  /* today's solid furniture tones (REF_TONE / ridgeTabTones) and the
+     neutral multipliers — the exact pre-fluid values */
+  labelPlate: new THREE.Color('#3b2a36'),
+  labelInk: new THREE.Color('#ffffff'),
+  cardPaper: new THREE.Color('#352334'),
+  cardInk: new THREE.Color('#ffffff'),
+  trayFloor: new THREE.Color('#ffffff'),
+  caseFace: new THREE.Color('#ffffff'),
+  ridge: new THREE.Color('#8c7b87'),
+  tab1: new THREE.Color('#7d6c7a'),
+  tab2: new THREE.Color('#ad9cab'),
+  tab3: new THREE.Color('#c7b6c4'),
+  sideTab: new THREE.Color('#b6a9b6'),
 };
 
 /**
@@ -263,7 +293,32 @@ export function deriveFluidTarget(p: ExtractedPalette): FluidChannels {
   const goldA = toLin(mixColor(new THREE.Color('#ffdb5c'), accent, 0.5));
   const goldB = toLin(mixColor(new THREE.Color('#9e6b17'), mixColor(accent, secondary, 0.4), 0.35));
 
-  return { background, dark, glowStop, paleStop, glass, glassAtten, former, foil1, foil2, foil3, foil4, ice, goldA, goldB };
+  /* ---- baked-canvas and solid-furniture channels (all linear) ---- */
+  // label: a deep primary-family plate with pale accent-tinged print
+  const labelPlate = withLuma(mixColor(primary, secondary, 0.35), 0.10, 0.22).convertSRGBToLinear();
+  const labelInk = mixColor(new THREE.Color('#ffffff'), accent, 0.20).convertSRGBToLinear();
+  // card: paper just darker than the label plate; ink near-white so the
+  // title/traits/meta stay legible over it
+  const cardPaper = withLuma(mixColor(primary, secondary, 0.30), 0.10, 0.24).convertSRGBToLinear();
+  const cardInk = mixColor(new THREE.Color('#ffffff'), accent, 0.16).convertSRGBToLinear();
+  // cavity floor and case face: high-luma multipliers over their baked maps
+  // (they tint, they do not repaint — the moulding stays readable)
+  const trayFloor = withLuma(mixColor(new THREE.Color('#ffffff'), mixColor(primary, secondary, 0.5), 0.55), 0.42, 0.85).convertSRGBToLinear();
+  const caseFace = withLuma(mixColor(new THREE.Color('#ffffff'), secondary, 0.34), 0.50, 0.88).convertSRGBToLinear();
+  // solid furniture: mid-tones in the palette family, tabs graded toward the
+  // accent like the measured trio grades across the rail
+  const ridge = withLuma(mixColor(secondary, new THREE.Color('#ffffff'), 0.22), 0.34, 0.60).convertSRGBToLinear();
+  const tab1 = withLuma(mixColor(accent, new THREE.Color('#ffffff'), 0.42), 0.42, 0.72).convertSRGBToLinear();
+  const tab2 = withLuma(mixColor(accent, new THREE.Color('#ffffff'), 0.55), 0.48, 0.78).convertSRGBToLinear();
+  const tab3 = withLuma(mixColor(accent, new THREE.Color('#ffffff'), 0.68), 0.54, 0.84).convertSRGBToLinear();
+  const sideTab = withLuma(mixColor(secondary, new THREE.Color('#ffffff'), 0.34), 0.44, 0.72).convertSRGBToLinear();
+
+  return {
+    background, dark, glowStop, paleStop, glass, glassAtten, former,
+    foil1, foil2, foil3, foil4, ice, goldA, goldB,
+    labelPlate, labelInk, cardPaper, cardInk, trayFloor, caseFace,
+    ridge, tab1, tab2, tab3, sideTab,
+  };
 }
 
 /* ------------------------------------------------------------------ *

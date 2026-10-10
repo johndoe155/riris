@@ -237,11 +237,23 @@ export interface CardFaceText {
  * Everything is expressed as a fraction of the card so the 2048 px hero tier
  * and the pit tier draw the identical face.
  */
+/**
+ * Paint the card face. `layer` splits the design for the Forge's fluid
+ * palette WITHOUT touching the combined render the pit uses:
+ *   'full' (default) — everything, exactly as always (paper + art + ink);
+ *   'base'           — transparent paper, only the art window's contents;
+ *   'ink'            — transparent everywhere except the white furniture:
+ *                      keyline, art frame stroke, title, traits, meta, footer.
+ * The fluid card layers the base over the tintable card body and tints the
+ * ink through the drawing plane's material colour; 'full' is byte-identical
+ * to the pre-fluid painter.
+ */
 export function drawCardFace(
   ctx: CanvasRenderingContext2D,
   o: CardFaceText,
   art: HTMLImageElement | null,
-  artBox: { x: number; y: number; w: number; h: number }
+  artBox: { x: number; y: number; w: number; h: number },
+  layer: 'full' | 'base' | 'ink' = 'full'
 ) {
   const { width: W, height: H } = o;
   const ink = '#fbf9fb';
@@ -275,12 +287,15 @@ export function drawCardFace(
   ctx.clearRect(0, 0, W, H);
   ctx.save();
   clipSquircle(ctx, W, H, bodyRadius, Math.max(6, o.cornerPower ?? 8));
-  ctx.fillStyle = paper;
-  ctx.fillRect(0, 0, W, H);
+  if (layer === 'full') {
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, 0, W, H);
+  }
 
   // The rounded white keyline sits flush with the card's own edge: its outer
   // boundary IS the silhouette, which is what opens the 20 px gutter to the
-  // square art frame (the reference's double-border read).
+  // square art frame (the reference's double-border read). Ink layer.
+  if (layer !== 'base') {
   ctx.strokeStyle = ink;
   ctx.lineWidth = Math.max(3, keyStroke * W);
   roundRect(
@@ -292,10 +307,13 @@ export function drawCardFace(
     Math.max(6, (keyRadius - keyStroke / 2) * W)
   );
   ctx.stroke();
+  }
 
   // Art window: contain-fit, letterboxed with the source's own edge tones so
   // the background gradient runs on through the bars; nearest-neighbour
   // whenever the window upsamples the source (pixel art stays razor sharp).
+  // Base layer: this is the ONLY content (the artwork is never tinted);
+  // the ink layer skips it and keeps every furniture stroke below.
   const { x: ax, y: ay, w: aw, h: ah } = artBox;
   const edgeTone = (row: number) => {
     if (!art) return '#392638';
@@ -306,6 +324,7 @@ export function drawCardFace(
     const d = cc.getImageData(0, 0, 1, 1).data;
     return `rgb(${d[0]},${d[1]},${d[2]})`;
   };
+  if (layer !== 'ink') {
   const topTone = edgeTone(0);
   const bottomTone = edgeTone(art ? art.height - 1 : 0);
   const bg = ctx.createLinearGradient(0, ay, 0, ay + ah);
@@ -369,6 +388,8 @@ export function drawCardFace(
     lctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(layer.canvas, dx, dy, lw, lh);
   }
+  }
+  // the square frame's ink line belongs to the INK layer (tintable)
   ctx.strokeStyle = ink;
   ctx.lineWidth = Math.max(2, artStroke * W);
   ctx.strokeRect(ax - ctx.lineWidth / 2, ay - ctx.lineWidth / 2, aw + ctx.lineWidth, ah + ctx.lineWidth);
@@ -565,6 +586,13 @@ export interface LabelText {
   /** extracted transparent version of the uploaded reference logo */
   logo?: HTMLImageElement | null;
   blank?: boolean;
+  /**
+   * Fluid-palette variant: skip the plate fill so the canvas carries only
+   * the ink (border hairline, bevel, title, logo) over transparency — the
+   * tintable plate behind shows through, and the print plane's material
+   * colour tints the ink. The blank variant ignores this flag.
+   */
+  inkOnly?: boolean;
 }
 
 export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
@@ -572,8 +600,10 @@ export function drawLabel(ctx: CanvasRenderingContext2D, o: LabelText) {
   const plum = o.blank ? '#ffffff' : '#332333';
   const white = o.blank ? '#141414' : '#fbf9fb';
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = plum;
-  ctx.fillRect(0, 0, W, H);
+  if (!o.inkOnly) {
+    ctx.fillStyle = plum;
+    ctx.fillRect(0, 0, W, H);
+  }
   if (o.blank) {
     ctx.strokeStyle = '#d8cbd6';
     ctx.lineWidth = Math.max(2, W * 0.006);
