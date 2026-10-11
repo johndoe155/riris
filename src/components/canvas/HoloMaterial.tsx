@@ -100,6 +100,9 @@ const HoloShaderMaterial = shaderMaterial(
     uniform vec3 uIce;
     uniform vec3 uGoldA;
     uniform vec3 uGoldB;
+    uniform vec4 uMask;
+    uniform float uMaskFeather;
+    uniform float uOutside;
 
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -166,23 +169,16 @@ const HoloShaderMaterial = shaderMaterial(
            :              vec3(0.85, 0.92, 1.0);
     }
 
-    /** holo band spectrum across the beam: deep blue/violet at the inner
-     *  fade, teal/green/yellow/orange through the middle, deep red at the
-     *  card edge where the reflection is strongest. */
+    /** Broad horizontal holo fields: red, yellow, green, then blue. The
+     *  colour is driven by vUv.y so each field runs across the card. */
     vec3 bandRamp(float t) {
-      vec3 cViolet = vec3(0.42, 0.10, 1.0);
-      vec3 cBlue = vivid(mix(uFoilB, vec3(0.10, 0.25, 1.0), 0.55));
-      vec3 cTeal = vivid(uFoilB);
-      vec3 cGreen = vivid(mix(uFoilC, uFoilB, 0.5));
-      vec3 cYellow = vivid(uFoilC);
-      vec3 cOrange = vec3(1.0, 0.48, 0.22);
-      vec3 cRed = vec3(1.05, 0.06, 0.10);
-      vec3 c = mix(cViolet, cBlue, smoothstep(0.00, 0.14, t));
-      c = mix(c, cTeal, smoothstep(0.14, 0.30, t));
-      c = mix(c, cGreen, smoothstep(0.30, 0.48, t));
-      c = mix(c, cYellow, smoothstep(0.48, 0.70, t));
-      c = mix(c, cOrange, smoothstep(0.70, 0.85, t));
-      c = mix(c, cRed, smoothstep(0.85, 1.00, t));
+      vec3 cRed = vec3(1.10, 0.045, 0.08);
+      vec3 cYellow = vivid(mix(uFoilC, vec3(1.0, 0.55, 0.08), 0.35));
+      vec3 cGreen = vivid(mix(uFoilB, vec3(0.18, 1.0, 0.30), 0.45));
+      vec3 cBlue = vivid(mix(uFoilB, vec3(0.08, 0.22, 1.0), 0.55));
+      vec3 c = mix(cRed, cYellow, smoothstep(0.08, 0.34, t));
+      c = mix(c, cGreen, smoothstep(0.35, 0.67, t));
+      c = mix(c, cBlue, smoothstep(0.70, 0.98, t));
       return c;
     }
 
@@ -224,7 +220,7 @@ const HoloShaderMaterial = shaderMaterial(
      */
     vec4 shardField(vec2 uv, float cells, float phase, float density,
                     float soft, float pal, out float edge) {
-      vec2 g = uv * vec2(cells * 0.72, cells);
+      vec2 g = uv * vec2(cells * 1.15, cells);
       vec2 id = floor(g);
       vec2 f = fract(g);
       float r = hash21(id + 1.7);
@@ -243,9 +239,9 @@ const HoloShaderMaterial = shaderMaterial(
       float lit = 0.75 + 0.25 * sin(phase * 1.6 + r * 6.2831);
       float h = hash21(id + 6.1);
       vec3 col = (pal < 0.5) ? foilStop(h + phase * 0.04) : iceStop(h);
-      float opac = mix(0.45, 1.0, hash21(id + 12.7));
-      edge = e * present * smoothstep(0.0, 0.3, tri);
-      return vec4(col * lit, tri * present * opac * (0.65 + 0.30 * lit));
+      float opac = mix(0.22, 0.62, hash21(id + 12.7));
+      edge = e * present * smoothstep(0.0, 0.24, tri);
+      return vec4(col * lit, tri * present * opac * (0.48 + 0.22 * lit));
     }
 
     /**
@@ -258,7 +254,7 @@ const HoloShaderMaterial = shaderMaterial(
      */
     vec4 goldShards(vec2 uv, float cells, float phase, float density,
                     out float edge) {
-      vec2 g = uv * vec2(cells * 0.8, cells);
+      vec2 g = uv * vec2(cells * 0.92, cells);
       vec2 id = floor(g);
       vec2 f = fract(g);
       float r = hash21(id + 1.7);
@@ -296,7 +292,7 @@ const HoloShaderMaterial = shaderMaterial(
               : (hp < 5.0) ? vec3(0.35, 1.0, 0.35)
               :              vec3(1.0, 0.45, 0.08);
       vec3 col = mix(cA, cB, gradT) * 1.30;
-      float opac = mix(0.30, 0.75, hash21(id + 12.7));
+      float opac = mix(0.24, 0.62, hash21(id + 12.7));
       edge = e * present * compact * smoothstep(0.0, 0.25, tri);
       return vec4(col, tri * present * opac);
     }
@@ -334,6 +330,17 @@ const HoloShaderMaterial = shaderMaterial(
       float ratio = imageAspect / max(cardAspect, 0.0001);
       vec2 scale = ratio > 1.0 ? vec2(1.0 / ratio, 1.0) : vec2(1.0, ratio);
       return (uv - 0.5) * scale + 0.5;
+    }
+
+    float foilMask(vec2 uv) {
+      vec2 lo = uMask.xy;
+      vec2 hi = uMask.zw;
+      float feather = max(uMaskFeather, 0.0001);
+      float inside = smoothstep(lo.x - feather, lo.x + feather, uv.x)
+                   * smoothstep(hi.x + feather, hi.x - feather, uv.x)
+                   * smoothstep(lo.y - feather, lo.y + feather, uv.y)
+                   * smoothstep(hi.y + feather, hi.y - feather, uv.y);
+      return mix(clamp(uOutside, 0.0, 1.0), 1.0, inside);
     }
 
     void main() {
@@ -395,18 +402,19 @@ const HoloShaderMaterial = shaderMaterial(
       float edgeBoost = 1.0 - smoothstep(0.0, W * 0.5, dR);
       float micro = 0.82 + 0.18 * sin(vUv.y * 55.0
                     + 2.0 * sin(vUv.x * 12.0 + uTime * 0.26) + uTime * 0.40);
-      float hueT = clamp(1.0 - clamp(dR / W, 0.0, 1.0)
-                   + (vUv.y - 0.5) * 0.22 + 0.05 * sin(uTime * 0.06), 0.0, 1.0);
+      float liquid = noise(vUv * vec2(7.0, 4.0) + uTime * 0.03) - 0.5;
+      float hueT = clamp(1.0 - vUv.y + liquid * 0.18
+                   + rpl * 0.035 + 0.03 * sin(uTime * 0.06), 0.0, 1.0);
       vec3 bandCol = bandRamp(hueT);
-      vec3 glow = bandCol * bandP * (0.95 + 0.75 * edgeBoost) * uIntensity * micro;
+      vec3 glow = bandCol * bandP * (0.70 + 0.55 * edgeBoost) * uIntensity * micro;
       vec4 sp = dotSparkle(vUv, phase * 3.0 + pointerGlow * 1.2);
       vec3 pts = glintPoints(vUv, uTime, 0.975);
       vec3 holoAdd = glow
                    + (sp.rgb * sp.a * (0.04 + 0.85 * bm)
                    + pts * (0.15 + 0.35 * bm + 1.20 * bandP)
                    + vec3(bloomW + hot * 1.2) * (0.25 + 0.75 * bandP)) * I;
-      float holoKeep = clamp((0.42 * bandP + 0.10 * fresnel)
-                     * min(uIntensity, 1.0), 0.0, 0.85);
+      float holoKeep = clamp((0.24 * bandP + 0.06 * fresnel)
+                     * min(uIntensity, 1.0), 0.0, 0.58);
 
       /* ---- cracked ice: glassy pastel shards over a fine facet sheen ---- */
       vec4 fc = iceFacets(vUv);
@@ -414,11 +422,11 @@ const HoloShaderMaterial = shaderMaterial(
       float eA; vec4 sA = shardField(vUv, 6.0, phase * 0.9 + 2.0, 0.50, 0.02, 1.0, eA);
       float eB; vec4 sB = shardField(vUv + 0.23, 16.0, phase * 1.2 + 5.0, 0.60, 0.02, 1.0, eB);
       vec3 iceSrc = vec3(0.16) * (0.30 + max(facetLum, -0.10))
-                  + sA.rgb * sA.a * 0.80 + sB.rgb * sB.a * 0.70
-                  + vec3(0.90, 0.95, 1.0) * (eA * 0.35 + eB * 0.25)
+                  + sA.rgb * sA.a * 0.48 + sB.rgb * sB.a * 0.38
+                  + vec3(1.10, 1.16, 1.22) * (eA * 0.62 + eB * 0.48)
                   + uIce * fresnel * 0.10 + vec3(1.2) * hot * 0.4;
-      float iceStr = clamp(0.06 + max(facetLum, 0.0) * 0.50 + sA.a * 0.70 + sB.a * 0.60
-                         + (eA + eB) * 0.25 + fresnel * 0.10 + hot * 0.4, 0.0, 1.2);
+      float iceStr = clamp(0.045 + max(facetLum, 0.0) * 0.34 + sA.a * 0.42 + sB.a * 0.34
+                         + (eA + eB) * 0.22 + fresnel * 0.08 + hot * 0.32, 0.0, 0.86);
 
       /* ---- gold: luminous translucent confetti over the whole face ----
        * Additive tinted-glass flakes: the print stays readable underneath,
@@ -426,17 +434,17 @@ const HoloShaderMaterial = shaderMaterial(
        * and a fine-scale cluster keeps coverage even across both text
        * panels with only local open gaps. */
       float clus = 0.9 + 0.2 * noise(vUv * 7.0 + 3.1);
-      float e0; vec4 g0 = goldShards(vUv + 0.11, 4.0, phase * 0.8 + 7.0, 0.55 * clus, e0);
-      float e1; vec4 g1 = goldShards(vUv, 7.0, phase, 0.80 * clus, e1);
-      float e2; vec4 g2 = goldShards(vUv + 0.31, 13.0, phase * 1.15 + 3.1,
-                                     0.75 * clus, e2);
-      g0.a *= 0.40;
-      vec3 goldAdd = (g0.rgb * g0.a * 0.22 + g1.rgb * g1.a * 0.55 + g2.rgb * g2.a * 0.50
-                   + vec3(e1 * 0.55 + e2 * 0.45 + e0 * 0.20)
+      float e0; vec4 g0 = goldShards(vUv + 0.11, 3.5, phase * 0.8 + 7.0, 0.34 * clus, e0);
+      float e1; vec4 g1 = goldShards(vUv, 6.0, phase, 0.52 * clus, e1);
+      float e2; vec4 g2 = goldShards(vUv + 0.31, 9.0, phase * 1.15 + 3.1,
+                                     0.40 * clus, e2);
+      g0.a *= 0.32;
+      vec3 goldAdd = (g0.rgb * g0.a * 0.28 + g1.rgb * g1.a * 0.62 + g2.rgb * g2.a * 0.46
+                   + vec3(e1 * 0.82 + e2 * 0.64 + e0 * 0.30)
                    + glintPoints(vUv, uTime, 0.985) * 0.70
                    + vec3(bloomW + hot * 1.2) * 0.80) * I;
-      float goldKeep = clamp((g0.a * 0.30 + g1.a * 0.55 + g2.a * 0.50)
-                     * min(uIntensity, 1.0), 0.0, 0.80);
+      float goldKeep = clamp((g0.a * 0.24 + g1.a * 0.42 + g2.a * 0.34)
+                     * min(uIntensity, 1.0), 0.0, 0.56);
 
       /* ---- base: the card's own ink, barely lifted ---- */
       vec3 baseSrc = vec3(0.02);
@@ -461,8 +469,9 @@ const HoloShaderMaterial = shaderMaterial(
                     iceFinal * w2 + goldFinal * w3) / wSum;
 
       if (uMode > 0.5) {
-        /* ---- foil overlay, laminated over the whole face ---- */
-        gl_FragColor = vec4(srgbDec(final), 1.0);
+        /* ---- foil overlay, clipped to the measured art window ---- */
+        float alpha = foilMask(vUv);
+        gl_FragColor = vec4(srgbDec(final), alpha);
       } else {
         /* ---- base: the art itself, with the foil laminated on ---- */
         vec3 col = final;
@@ -711,17 +720,11 @@ export function HoloCardMaterial({
     // pipeline or ACES greys its hues - raw sRGB keeps the foil vivid and
     // lets hotspots blow to white like the reference photos.
     material.toneMapped = !overlay;
-    if (overlay) {
-      // premultiplied output: the foil ADDS its light while the print shows
-      // through by (1 - alpha); ice/base emit tint*alpha so they reduce to
-      // the ordinary normal blend and their pixels are unchanged.
-      material.blending = THREE.CustomBlending;
-      material.blendSrc = THREE.OneFactor;
-      material.blendDst = THREE.OneMinusSrcAlphaFactor;
-      material.blendEquation = THREE.AddEquation;
-    } else {
-      material.blending = THREE.NormalBlending;
-    }
+    // The overlay emits the finished foil colour and the mask controls how
+    // much of that colour replaces the printed face. Normal alpha blending is
+    // intentional here: with the old custom One/OneMinusSrcAlpha setup, even
+    // fully transparent mask pixels still added their RGB output to the card.
+    material.blending = THREE.NormalBlending;
     material.needsUpdate = true;
   }, [image, cardAspect, overlay, mask, maskFeather, outside]);
 
